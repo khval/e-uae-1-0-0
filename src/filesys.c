@@ -48,6 +48,7 @@
 #ifdef TARGET_AMIGAOS
 # include <dos/dos.h>
 # include <proto/dos.h>
+# include <dos/obsolete.h>
 #endif
 
 #define TRACING_ENABLED 0

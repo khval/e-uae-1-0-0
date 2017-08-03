@@ -44,6 +44,7 @@
 #include <clib/alib_protos.h>
 #endif
 #include <proto/dos.h>
+#include <dos/obsolete.h>
 #endif
 
 /****************************************************************************/
