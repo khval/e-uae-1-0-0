@@ -1,0 +1,346 @@
+E-UAE PowerPC JIT project v1.0.0
+================================
+
+This project is a fork of the E-UAE Amiga emulation project. You can find the
+original project's pages here:
+
+http://www.rcdrummond.net/uae
+
+Please also read the details of the original project in the included
+README_original file.
+
+The goal of the project is implementing Just-In-Time compiling for PowerPC
+processors, using (some of) the already available intel x86 implementation.
+
+For further details please have a look on the project blog:
+
+http://euaejit.blogspot.com
+
+
+You can find the actual project sources in the SourceForge project:
+
+https://sourceforge.net/projects/euaeppcjit
+
+
+If you would like to support the project then please consider a small donation:
+
+http://amigabounty.net/index.php?function=viewproject&projectid=35
+
+Thank you!
+
+
+Stable Release v1.0.0
+=====================
+The most important features of the fifth beta version are:
+
+ * Final bug fixes for the release.
+ 
+This is the first public stable release of the project.
+   
+You can get an idea of what is coming in the next release by peeking into the
+tickets at the project SourceForge page:
+
+https://sourceforge.net/p/euaeppcjit/tickets
+
+Please read the How to use and the Known issues sections carefully before
+you start using the release.
+
+You can also find a comparison of the original E-UAE v0.8.29 and this version
+in the What is the difference section.
+
+This emulator is backward compatible with the original v0.8.29, you can use
+the same tools or even the same configuration files with some JIT compiling-
+related changes.
+
+
+Files in this package
+=====================
+You can find the following directories and files in the package:
+
+  amiga      - Amiga binary tools (see docs)
+  docs       - documentation from the original E-UAE sources with adjustments
+  COPYING    - license document
+  make_hdf   - Make HDF file tool for creating hard disk images (see docs)
+  readdisk   - Disk image reading tool (see docs)
+  README     - this file what you are reading now
+  README_original - original README file that came with v0.8.29
+  uae        - Generic E-UAE executable compiled for running in an Amiga window
+
+
+What is the difference
+======================
+Here are the differences between the original v0.8.29 and this version:
+
+* Some minor fixes were applied on certain files when it was necessary.
+
+* The x86 JIT compiling was removed completely.
+
+* The PowerPC JIT compiling was implemented from scratch, some support 
+  functions were reused from the x86 implementation.
+  
+* New configuration items are available for the new JIT implementation.
+  (See docs/configuration.txt.)
+  
+* CyberGraphX overlay screen support (for MorphOS only at the moment)
+  
+* Some configuration items for JIT were removed.
+  (See docs/configuration.txt.)
+
+* An indicator LED were introduced for the JIT compiler state.
+  (See docs/configuration.txt.)
+
+* Collected various fixes from different individual forked releases of the
+  original E-UAE versions.
+
+* G5 (PowerPC 970/FX/GX/MP) support.
+  
+All other aspects of the emulation remained the same as it was available
+already in E-UAE v0.8.29 (as of 20/08/2008).
+
+
+Changes since the previous release (JITPPCBETA05)
+=================================================
+
+New/Changed:
+------------
+* Changed version number to v1.0.0 to match the release number, beta tags
+  won't be used anymore. (Ticket [#70])
+
+
+Improved:
+---------
+* Introduced JIT_DEBUG and JIT_DEBUG_VERBOSE compile time defines for
+  separating a debug build from a release. This change will improve the
+  speed of the release binary slightly. (Ticket [#71])
+
+
+Fixed:
+------
+
+* Fixed register dependency AND #imm,CCR and XOR #imm,CCR instructions.
+ (Ticket #68)
+
+* Fixed flag dependency in MULL.W instruction. (Ticket #67)
+
+* Fixed operand size and register dependency in MOVE.W CCR,Dx. (Ticket #66)
+
+* Fixes from Mike Blackburn for Linux/MacOS builds:
+  - Some fixes from P-UAE (various detections, typos, etc.)
+  - A few minor changes to CPU specific options and the way these are
+    handled:
+     o Amcc 440/460 hopefully now works, running under linux.
+     o Try to determine cache sizes.
+     o CPU specific compiler options, currently Linux only.
+	 
+
+How to use
+==========
+First of all: please read the list of available configuration items in the
+docs/configuration.txt file, especially regarding the JIT compiling
+configuration.
+
+You can reuse the same configuration files, HD image files, prepared folders
+that were already working with the previous E-UAE version.
+
+However, for testing the JIT implementation please make sure you set up
+the configuration exactly as listed below:
+    cpu_speed=max
+    cpu_type=68020 (or 68EC020, 68040, 68060, see Known issues)
+    cpu_compatible=false
+    cpu_cycle_exact=false
+    blitter_cycle_exact=false
+    cachesize=8192 (or higher)
+    comp_constjump=yes
+    comp_trustbyte=indirect (see Known issues)
+    comp_trustword=indirect
+    comp_trustlong=indirect
+
+These settings will make sure you get the best performance from the JIT
+compiled code and workaround any known issues.
+
+Please have a look at the docs/configuration.txt file for the details of
+these settings.
+
+Regarding the processor settings please note: the JIT implementation is
+depending on the availability of the processor cache, any software that turns
+the code cache off won't be JIT compiled.
+Same applies to the processor type: those processors types which don't have
+cache cannot be used together with the JIT compiling (these are: 68000, 68010).
+
+In case you are not sure whether the JIT compiling works or not with your
+configuration: turn on the JIT LED. (See show_leds in docs/configuration.txt.)
+If the JIT was set up properly then the JIT LED will blink green on the screen.
+This feature is available only on standard Amiga (non-RTG) screens.
+
+* For AmigaOne X1000 (PWRficient PA6T-1682M) users:
+Please use the binary from the archive which is tagged with "X1000":
+E-UAE_X1000.
+The current build is an experimental version, there is no final support for
+PA6T processor yet.
+
+* For G5 (PowerPC 970/FX/GX/MP) users:
+(Applicable to MacOSX only at the moment.)
+Please use the binary from the archive which is tagged with "G5": E-UAE_G5.
+The generic build is running on G5, but it is much slower due to missing
+instructions which are emulated by the operating system.
+
+* For MorphOS G5 (PowerPC 970/FX/GX/MP) users:
+G5 processor is not supported in this release. Currently the PPC970 target
+is not supported by the official SDK, as soon as this situation is improved
+I will release a special build for G5 processors.
+The current build will not perform well on G5 due to the missing instructions
+on the G5 architecture.
+Please look for G5-compatible builds for the same E-UAE version from other
+developers.
+
+
+How to report a bug
+===================
+When you think you have found a bug and would like to report it please make
+sure you follow these steps:
+
+1. Check whether the bug was already known. You can find the bug tickets on
+   the SourceForge project page: https://sourceforge.net/p/euaeppcjit/tickets
+
+2. Make sure you are using the most recent version of the emulator.
+   Check the SourceForge page for any updates:
+   https://sourceforge.net/p/euaeppcjit
+
+   You can check the version of your emulator when you start it from command
+   line, this will be the very first output from the program.
+
+   On AmigaOS(-like) systems you can also use the standard version command to
+   get the version of the UAE executable.
+
+   The version number includes a tag for the beta releases, for example:
+   1.0.0.
+
+3. Make sure JIT compiling is running, read through the How to use
+   section and follow the instructions regarding the configuration.
+   
+4. Try to run the emulated program with this diagnostic option in the
+   emulation configuration:
+   
+   comp_test_consistency=true
+   
+   If the emulator quits with this error message:
+   "JIT: cache consistency error, memory changed since code was compiled"
+   
+   Then the emulated program is not compatible with the current implementation
+   of JIT compiling.
+
+5. Try to reproduce the bug without optimization: turn off the optimization
+   in the configuration and try to reproduce the bug. (comp_optimize=false)
+
+6. Try to reproduce the bug without JIT compiling: turn off the JIT compiling
+   in the configuration and try to reproduce the bug. (cachesize=0)
+
+7. If you were able to reproduce the bug without JIT compiling then try to
+   reproduce it on the previous version of E-UAE.
+   If you are able to reproduce it then it is a generic E-UAE bug. Fixing
+   these issues is not a goal for the E-UAE PPC JIT project. You might still
+   report it, but most likely it won't be fixed in this project.
+
+8. If you think you had found a bug related to the JIT compiling then try to
+   make sure you can reproduce the bug consistently (or often enough) and
+   please describe the exact details at reporting, provide the software that
+   triggers the problem.
+
+9. See Contacts section for getting in touch with me. Gather all information
+   and send it to me by email.
+
+
+Known issues
+============
+* The following instructions are planned, but not implemented yet for the
+  JIT compiling at the moment:
+
+  - (Ticket #8) compare against bounds instructions (CMP2);
+
+  - (Ticket #10) the FPU instructions were not implemented yet, these are coming
+    at a later stage of the project.
+
+  Even though these instructions are not compiled, a fall-back mechanism kicks
+  in and these will be executed by the interpretive emulation.
+  Any software that is relying on these instructions will be still working.
+
+* (Ticket #11) E-UAE does not support 68030 processor type, if this processor
+  was selected then it falls back to 68010.
+
+* (Ticket #12) As it is stated in the original configuration documentation:
+  the 68060 emulation is incomplete, therefore it might not work properly.
+
+* (Ticket #15) The direct memory access is not completed yet, theoretically it
+  might work for certain software, but I suggest to turn it off by adding these
+  lines to the configuration: 
+    comp_trustbyte=indirect
+    comp_trustword=indirect
+    comp_trustlong=indirect
+
+* (Ticket #19) On-screen LEDs are not visible on the Picasso96 RTG screens,
+  so the JIT LED indicator is not useful on these screen modes.
+
+* (Ticket #62 and related tickets) Some programs are relying on precise
+  emulation of chipset timing. JIT compiled code is not able to provide this
+  level of precision, because it is more optimized to have better performance.
+  The result of slips in chipset timing might show up as flickering or
+  inconsistent behavior of the emulated program. These programs are not
+  compatible with the current JIT implementation.
+
+
+Where to get the sources
+========================
+You can find the current project sources at the SourceForge project pages:
+
+https://sourceforge.net/projects/euaeppcjit
+
+
+Notes for compiling the sources
+===============================
+For general notes for compiling please refer to the README_original file.
+
+To compile on Mac OSX 10.3.9 or earlier:
+
+Autoconf2.57 and automake1.6 mess up @OBJCFLAGS@ and is not really compatible. 
+
+Get the correct versions - replacing the previous version :
+http://ftp.gnu.org/gnu/autoconf/autoconf-2.61.tar.bz2
+./configure --bindir=/usr/bin --datarootdir=/usr/share && make install
+http://ftp.gnu.org/gnu/automake/automake-1.7.9.tar.bz2
+./configure --bindir=/usr/bin --datadir=/usr/share && make install
+
+For Mac OSX 10.4.x and 10.3.x: 
+Latest SDL.framework is not properly detected. 
+Using the SDL.framework already in E-UAE.app/Content/Frameworks at
+http://www.rcdrummond.net/uae
+Copy SDL.framework/Headers from the latest SDL.framework and put the framework
+in /Library/Frameworks/
+./configure --enable-jit --without-x --with-sdl-gl --with-cocoa-gui
+
+Source installed SDL is also detected.
+
+For AmigaOS4:
+You need to link libamiga to the binary otherwise the TimeDelay macro won't
+work. To do so add this parameter to the configure script:
+./configure LIBS=-lamiga
+
+
+Contact
+=======
+Send any opinion, bug reports, patches, etc. to
+Almos Rajnai (almos dot rajnai at GMail)
+
+You can also get in touch with me using the Contact form at the project blog:
+http://euaejit.blogspot.com
+
+
+Special thanks
+==============
+I would like to thank the constant support to
+
+  Thunder, kas1e, MickJT, Fab, Luigi Burdo, Samir Hawamdeh,
+  Tobias Netzel, Mike Blackburn and Chris Handley
+
+for helping me with lots of things regarding bug finding, fixing,
+platform support and constantly watching out for the updates on the repository.
+
