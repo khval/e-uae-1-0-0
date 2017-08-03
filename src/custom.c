@@ -3999,8 +3999,8 @@ static void adjust_array_sizes (void)
 	    sprite_entries[0] = p1;
 	    sprite_entries[1] = p2;
 
-	    memset (&sprite_entries[0][max_sprite_entry], (mcc - max_sprite_entry) * sizeof(struct sprite_entry), 0);
-	    memset (&sprite_entries[1][max_sprite_entry], (mcc - max_sprite_entry) * sizeof(struct sprite_entry), 0);
+	    memset (&sprite_entries[0][max_sprite_entry], 0, (mcc - max_sprite_entry) * sizeof(struct sprite_entry));
+	    memset (&sprite_entries[1][max_sprite_entry], 0, (mcc - max_sprite_entry) * sizeof(struct sprite_entry));
 
 	    write_log ("New max_sprite_entry=%d\n", mcc);
 
