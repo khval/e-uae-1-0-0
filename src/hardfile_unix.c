@@ -19,6 +19,13 @@
 #define DEBUG_LOG(...) do {} while(0)
 #endif
 
+/* Use 64-bit fd i/o on AmigaOS 4.x */
+#if defined(__amigaos4__) && defined(__NEWLIB__)
+#define off_t _off64_t
+#define open  open64
+#define lseek lseek64
+#endif
+
 
 static int hdf_seek (struct hardfiledata *hfd, uae_u64 offset)
 {
