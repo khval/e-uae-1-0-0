@@ -279,12 +279,12 @@ case $host_os in
     linux*)
       HOST_OS=linux
       OSDEP=od-linux
-      if [[ "$HOST_CPU = 'ppc'" ]]; then 
+      if [[ "$HOST_CPU = 'ppc'" ]]; then
 
       if [[ "`cat /proc/cpuinfo | grep -o -m1 440EP`" = '440EP' ]]; then
       AC_DEFINE(AMCC_CPU, 440ep, [AMCC PPC CPU])
       elif [[ "`cat /proc/cpuinfo | grep -o -m1 460EX`" = '460EX' ]]; then
-      AC_DEFINE(AMCC_CPU, 460ex, [AMCC PPC CPU]) 
+      AC_DEFINE(AMCC_CPU, 460ex, [AMCC PPC CPU])
       fi
 
       cp confdefs.h src/include/config.h
@@ -299,7 +299,7 @@ case $host_os in
     darwin8*)
       HOST_OS=darwin
       OSDEP=od-macosx
-      AC_DEFINE_UNQUOTED(darwin8, $host_os, [Darwin 8])   
+      AC_DEFINE_UNQUOTED(darwin8, $host_os, [Darwin 8])
       cp confdefs.h src/include/config.h
       ;;
     darwin9*)
@@ -556,6 +556,7 @@ WANT_CYCLEEXACT=yes
 WANT_CAPS=no
 WANT_FDI=yes
 WANT_ENFORCER=dunno
+WANT_CATWEASEL=no
 
 MATHLIB=-lm
 
@@ -650,14 +651,15 @@ AC_ARG_ENABLE(scsi-device,     AS_HELP_STRING([--enable-scsi-device],     [Enabl
 AC_ARG_ENABLE(bsdsock,         AS_HELP_STRING([--enable-bsdsock],         [Enable bsdsocket.library emulation]),                      [WANT_BSDSOCK=$enableval],[])
 AC_ARG_ENABLE(debugger,        AS_HELP_STRING([--disable-debugger],       [Disable internal debugger/monitor (default no)]),          [WANT_DEBUGGER=$enableval],[])
 AC_ARG_ENABLE(state-saving,    AS_HELP_STRING([--disable-state-saving],   [Disable support for saving state snapshots (default no)]),   [WANT_STATESAVING=$enableval],[])
-AC_ARG_ENABLE(enforcer,	       AS_HELP_STRING([--enable-enforcer],        [Enable ersatz Enforcer support (default auto)]),           [WANT_ENFORCER=$enableval],[])
+AC_ARG_ENABLE(enforcer,        AS_HELP_STRING([--enable-enforcer],        [Enable ersatz Enforcer support (default auto)]),           [WANT_ENFORCER=$enableval],[])
 AC_ARG_ENABLE(action-replay,   AS_HELP_STRING([--enable-action-replay],   [Enable Action Replay cartridge emulation (default yes)]),  [WANT_ACTION_REPLAY=$enableval],[])
 AC_ARG_ENABLE(xarcade,         AS_HELP_STRING([--disable-xarcade],        [Disable keymaps for X-Aracde joysticks (default: enabled)]),  [WANT_XARCADE=$enableval],[WANT_XARCADE=yes])
 AC_ARG_ENABLE(dga,             AS_HELP_STRING([--enable-dga],             [X11 version: Use the DGA extension]),                      [WANT_DGA=$enableval],[])
 AC_ARG_ENABLE(vidmode,         AS_HELP_STRING([--enable-vidmode],         [X11 version: Use the XF86VidMode extension]),              [WANT_VIDMODE=$enableval],[])
 AC_ARG_ENABLE(ui,              AS_HELP_STRING([--enable-ui],              [Use a user interface if possible (default on)]),           [WANT_UI=$enableval],[])
-AC_ARG_ENABLE(audio,	       AS_HELP_STRING([--enable-audio],           [Enable audio output (default auto)]),                      [WANT_AUDIO=$enableval],[])
-AC_ARG_ENABLE(fdi,	       AS_HELP_STRING([--enable-fdi],             [Enable FDI support (default yes)]),                        [WANT_FDI=$enableval],[])
+AC_ARG_ENABLE(audio,           AS_HELP_STRING([--enable-audio],           [Enable audio output (default auto)]),                      [WANT_AUDIO=$enableval],[])
+AC_ARG_ENABLE(fdi,             AS_HELP_STRING([--enable-fdi],             [Enable FDI support (default yes)]),                        [WANT_FDI=$enableval],[])
+AC_ARG_ENABLE(catweasel,       AS_HELP_STRING([--enable-catweasel],       [Enable Catweasel support (default no)]),                   [WANT_CATWEASEL=$enableval],[])
 
 AC_ARG_WITH(sdl,
   AS_HELP_STRING([--with-sdl], [Use SDL library for low-level functions]),
@@ -1121,7 +1123,7 @@ if [[ "x$WANT_AUDIO" != "xno" ]]; then
       NEED_THREAD_SUPPORT=yes
     fi
   fi
-  
+
   AC_MSG_RESULT("$SND_NAME")
 
   dnl
@@ -1503,6 +1505,17 @@ if [[ "x$WANT_FDI" != "xno" ]]; then
   UAE_DEFINES="$UAE_DEFINES -DFDI2RAW"
 fi
 
+dnl
+dnl  Do we want Catweasel.support?
+dnl
+AC_MSG_CHECKING([whether to enable catweasel support])
+if [[ "x$WANT_CATWEASEL" != "xno" ]]; then
+  UAE_DEFINES="$UAE_DEFINES -DCATWEASEL"
+  CATWEASELOBJS='catweasel.$(OBJEXT)'
+  AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+fi
 
 
 dnl
@@ -1575,7 +1588,7 @@ dnl CPU Specifics
 dnl -----------------------------------------------
 
 dnl ppc
-if [[ "$HOST_CPU" = 'ppc' -o "$HOST_CPU" = 'ppc64' ]]; then 
+if [[ "$HOST_CPU" = 'ppc' -o "$HOST_CPU" = 'ppc64' ]]; then
 AC_DEFINE_UNQUOTED(PPC_CPU, $host_cpu, [PPC CPU])
 
 dnl
@@ -1587,7 +1600,7 @@ if [[ "x$WANT_CPUOPTI" != "xno" ]]; then
 
 dnl
 dnl 32 or 64 bit
-dnl 
+dnl
 is_32bit=no
 AC_MSG_CHECKING([whether CPU is 32bit])
 if [[ "$HOST_CPU" = "ppc" ]]; then
@@ -1602,7 +1615,7 @@ is_64bit=no
 AC_MSG_CHECKING([whether CPU is 64bit])
 if [[ "$HOST_CPU" = "ppc64" ]]; then
 is_64bit=yes
-dnl Generally the case 
+dnl Generally the case
 AC_DEFINE(HAVE_PPC64,1,[CPU is PPC64])
 AC_DEFINE(ICACHE_SIZE,64,[CPU ICACHE_SIZE])
 AC_DEFINE(DCACHE_SIZE,64,[CPU DCACHE_SIZE])
@@ -1634,7 +1647,7 @@ dnl 9 = g3 (750) 10 = g4 (7400) 11 = g4 (7450) 100 = g5 (970)
 AC_MSG_CHECKING([host cpu type])
 GETFLAGS=`sysctl -a hw | grep hw.cpusubtype:  | awk '{print $2}'`
 if test "$GETFLAGS" =  "9" ; then
-CPUCFLAGS="-mcpu=750 -mtune=750" 
+CPUCFLAGS="-mcpu=750 -mtune=750"
 elif test  "$GETFLAGS" =  "10" ; then
 CPUCFLAGS="$CPUCFLAGS -mcpu=7400 -mtune=7400"
 elif test  "$GETFLAGS" =  "11" ; then
@@ -1666,7 +1679,7 @@ AC_DEFINE(DCACHE_SIZE,128,[CPU DCACHE_SIZE])
 fi
 AC_MSG_RESULT([$GETFLAGS])
 
-fi 
+fi
 dnl -- macos
 
 dnl -- linux
@@ -1854,6 +1867,7 @@ AC_SUBST(CDOBJS)
 AC_SUBST(DEBUGOBJS)
 AC_SUBST(FILESYSOBJS)
 AC_SUBST(BSDSOCKOBJS)
+AC_SUBST(CATWEASELOBJS)
 AC_SUBST(UAE_RSRCFILE)
 AC_SUBST(SET_MAKE)
 AC_SUBST(MATHLIB)
