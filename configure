@@ -628,6 +628,7 @@ subdirs
 top_srcdir
 MATHLIB
 UAE_RSRCFILE
+CATWEASELOBJS
 BSDSOCKOBJS
 FILESYSOBJS
 DEBUGOBJS
@@ -834,6 +835,7 @@ enable_vidmode
 enable_ui
 enable_audio
 enable_fdi
+enable_catweasel
 with_sdl
 with_sdl_sound
 with_sdl_gfx
@@ -1538,6 +1540,7 @@ Optional Features:
   --enable-ui             Use a user interface if possible (default on)
   --enable-audio          Enable audio output (default auto)
   --enable-fdi            Enable FDI support (default yes)
+  --enable-catweasel      Enable Catweasel support (default no)
   --disable-sdltest       Do not try to compile and run a test SDL program
 
 Optional Packages:
@@ -10604,6 +10607,7 @@ WANT_CYCLEEXACT=yes
 WANT_CAPS=no
 WANT_FDI=yes
 WANT_ENFORCER=dunno
+WANT_CATWEASEL=no
 
 MATHLIB=-lm
 
@@ -10789,6 +10793,11 @@ fi
 # Check whether --enable-fdi was given.
 if test "${enable_fdi+set}" = set; then :
   enableval=$enable_fdi; WANT_FDI=$enableval
+fi
+
+# Check whether --enable-catweasel was given.
+if test "${enable_catweasel+set}" = set; then :
+  enableval=$enable_catweasel; WANT_CATWEASEL=$enableval
 fi
 
 
@@ -12930,6 +12939,17 @@ if [ "x$WANT_FDI" != "xno" ]; then
   UAE_DEFINES="$UAE_DEFINES -DFDI2RAW"
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to enable catweasel support" >&5
+$as_echo_n "checking whether to enable catweasel support... " >&6; }
+if [ "x$WANT_CATWEASEL" != "xno" ]; then
+  UAE_DEFINES="$UAE_DEFINES -DCATWEASEL"
+  CATWEASELOBJS='catweasel.$(OBJEXT)'
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
 
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build internal debugger/monitor" >&5
@@ -13302,6 +13322,7 @@ else
   BUILD_MACOSX_BUNDLE_TRUE='#'
   BUILD_MACOSX_BUNDLE_FALSE=
 fi
+
 
 
 
