@@ -45,45 +45,117 @@ unsigned int __stack_size = MIN_STACK_SIZE;
 #endif
 
 struct Device *TimerBase;
-#ifdef __amigaos4__
-struct Library *ExpansionBase;
-struct TimerIFace *ITimer;
-struct ExpansionIFace *IExpansion;
-#endif
 
 //Version tag string for AmigaOS version command
 //Not perfect: format of date supposed to be: dd.MM.yyyy, but that format is not available
 //at compile time. Could be resolved using a clever define in the makefile...
 char* AMIGAOS_VERSION_TAG = "$VER: " UAE_VERSION_STRING " (" __DATE__ ")";
 
+#ifdef __amigaos4__
+
+struct Library *ExpansionBase = NULL;
+struct TimerIFace *ITimer = NULL;
+struct ExpansionIFace *IExpansion = NULL;
+static struct TimeRequest timereq;				// IORequest for timer
+BOOL timer_device_open = FALSE;
+
+struct IntuitionBase    *IntuitionBase = NULL;
+struct GfxBase          *GraphicsBase = NULL;
+struct Library          *LayersBase = NULL;
+struct Library          *AslBase = NULL;
+struct Library          *CyberGfxBase = NULL;
+
+struct AslIFace *IAsl = NULL;
+struct GraphicsIFace *IGraphics = NULL;
+struct LayersIFace *ILayers = NULL;
+struct IntuitionIFace *IIntuition = NULL;
+struct CyberGfxIFace *ICyberGfx = NULL;
+
+#define closeLib(x) \
+	if (I ## x ) DropInterface ((struct Interface *) I ## x ); I ## x = NULL; \
+	if (x ## Base) CloseLibrary ( x ## Base); x ## Base= NULL;
+
+#else
+
+#define closeLib(x) if (x ## Base) CloseLibrary ( x ## Base); x ## Base= NULL;
+
+#endif
+
 static void free_libs (void)
 {
+
+printf("%s:%d\n",__FUNCTION__,__LINE__);
+
 #ifdef __amigaos4__
-    if (ITimer)
-	DropInterface ((struct Interface *)ITimer);
-    if (IExpansion)
-	DropInterface ((struct Interface *)IExpansion);
-    if (ExpansionBase)
-	CloseLibrary (ExpansionBase);
+	if (ITimer) DropInterface ((struct Interface *)ITimer);
+
+	if (timer_device_open)
+	{
+		CloseDevice((struct IORequest *) &timereq);
+		timer_device_open = FALSE;
+	}
 #endif
+
+	closeLib(Expansion);
+	closeLib(Asl);
+	closeLib(Graphics);
+	closeLib(Layers);
+	closeLib(Intuition);
+	closeLib(CyberGfx);
 }
 
-static void init_libs (void)
+
+static BOOL init_libs (void)
 {
     atexit (free_libs);
 
+#ifndef __amigaos4__
     TimerBase = (struct Device *) FindName(&SysBase->DeviceList, "timer.device");
+#endif
 
 #ifdef __amigaos4__
-    ITimer = (struct TimerIFace *) GetInterface((struct Library *)TimerBase, "main", 1, 0);
 
-    ExpansionBase = OpenLibrary ("expansion.library", 0);
-    if (ExpansionBase)
-	IExpansion = (struct ExpansionIFace *) GetInterface(ExpansionBase, "main", 1, 0);
+	if (OpenDevice(TIMERNAME, UNIT_MICROHZ, (struct IORequest *) &timereq, 0))
+	{
+		return FALSE;
+	}
 
-    if(!ITimer || !IExpansion)
-	exit (20);
+	timer_device_open = TRUE;
+
+	TimerBase = (struct Library *) timereq.Request.io_Device;
+	ITimer = (struct TimerIFace *) GetInterface(TimerBase,"main",1L,NULL) ;
+
+	ExpansionBase = OpenLibrary ("expansion.library", 0);
+	if (ExpansionBase) IExpansion = (struct ExpansionIFace *) GetInterface(ExpansionBase, "main", 1, 0);
+
+  	IntuitionBase = (void*) OpenLibrary ("intuition.library", 0L);
+	if (IntuitionBase) IIntuition = (struct IntuitionIFace *) GetInterface ((struct Library *) IntuitionBase, "main", 1, NULL);
+	if (!IIntuition)  return FALSE;
+
+	LayersBase = OpenLibrary ("layers.library", 0L);
+	if (LayersBase) ILayers = (struct LayersIFace *) GetInterface (LayersBase, "main", 1, NULL);
+	if (!ILayers) return FALSE;
+
+	GraphicsBase = (void*) OpenLibrary ("graphics.library", 0L);
+	if (GraphicsBase) IGraphics = (struct GraphicsIFace *) GetInterface ((struct Library *) GraphicsBase, "main", 1, NULL);
+	if (!IGraphics) return FALSE;
+
+	CyberGfxBase = OpenLibrary ("cybergraphics.library", 40);
+	if (CyberGfxBase) ICyberGfx = (struct CyberGfxIFace *) GetInterface (CyberGfxBase, "main", 1, NULL);
+	if (!ICyberGfx)  return FALSE;
+
+	AslBase = OpenLibrary ("asl.library", 53);
+	if (AslBase) IAsl = (struct AslIFace *) GetInterface (AslBase, "main", 1, NULL);
+	if (!IAsl)  return FALSE;
+
+	if(!ITimer || !IExpansion) return FALSE;
+
 #endif
+
+	printf("all libs are loaded\n");
+
+
+	return TRUE;
 }
 
 static int fromWB;

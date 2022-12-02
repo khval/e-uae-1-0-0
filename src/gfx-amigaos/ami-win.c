@@ -130,20 +130,20 @@ enum {
  * prototypes & global vars
  */
 
-struct IntuitionBase    *IntuitionBase = NULL;
-struct GfxBase          *GfxBase = NULL;
-struct Library          *LayersBase = NULL;
-struct Library          *AslBase = NULL;
-struct Library          *CyberGfxBase = NULL;
+extern struct IntuitionBase    *IntuitionBase ;
+extern struct GfxBase          *GfxBase ;
+extern struct Library          *LayersBase ;
+extern struct Library          *AslBase ;
+extern struct Library          *CyberGfxBase ;
 #ifdef USE_CGX_OVERLAY
-struct Library          *CGXVideoBase = NULL;
+extern struct Library          *CGXVideoBase;
 #endif
 
-struct AslIFace *IAsl;
-struct GraphicsIFace *IGraphics;
-struct LayersIFace *ILayers;
-struct IntuitionIFace *IIntuition;
-struct CyberGfxIFace *ICyberGfx;
+extern struct AslIFace *IAsl;
+extern struct GraphicsIFace *IGraphics;
+extern struct LayersIFace *ILayers;
+extern struct IntuitionIFace *IIntuition;
+extern struct CyberGfxIFace *ICyberGfx;
 
 #ifdef USE_CGX_OVERLAY
 int use_overlay = 0;
@@ -163,12 +163,15 @@ void ToggleBilinear(void);
 
 unsigned long            frame_num; /* for arexx */
 
+struct RastPort  comp_RP;
+
 static UBYTE            *Line;
-static struct RastPort  *RP;
-static struct Screen    *S;
-static struct Window    *W;
+static struct Screen    *S = NULL;;
+struct RastPort  *RP = NULL;
+struct Window    *W = NULL;
 static struct RastPort  *TempRPort;
-static struct BitMap    *BitMap;
+static struct BitMap    *BitMap = NULL;
+
 #ifdef USE_CYBERGFX
 # ifdef USE_CYBERGFX_V41
 static uae_u8 *CybBuffer;
@@ -1405,32 +1408,32 @@ static int setup_publicscreen(void)
 
     W = OpenWindowTags (NULL,
 			WA_Title,        (ULONG)PACKAGE_NAME,
-#ifdef USE_CGX_OVERLAY
-			use_overlay ? WA_MinWidth : TAG_IGNORE, currprefs.gfx_width_win/2,
-			use_overlay ? WA_MinHeight : TAG_IGNORE, currprefs.gfx_height_win/2,
-			WA_InnerWidth,   currprefs.gfx_width_win,
-			WA_InnerHeight,  currprefs.gfx_height_win,
-			WA_MaxWidth, S->Width,
-			WA_MaxHeight, S->Height,
-			WA_SizeGadget, use_overlay ? TRUE : FALSE,
-			WA_SizeBBottom, use_overlay ? TRUE : FALSE,
-#else
 			WA_AutoAdjust,   TRUE,
 			WA_InnerWidth,   gfxvidinfo.width,
 			WA_InnerHeight,  gfxvidinfo.height,
-#endif
 			WA_PubScreen,    (ULONG)S,
-			WA_Zoom,         (ULONG)ZoomArray,
+
 			WA_IDCMP,        IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
 				       | IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW
 				       | IDCMP_MOUSEMOVE    | IDCMP_DELTAMOVE
 				       | IDCMP_CLOSEWINDOW  | IDCMP_REFRESHWINDOW
 				       | IDCMP_NEWSIZE      | IDCMP_INTUITICKS,
+
 			WA_Flags,	 WFLG_DRAGBAR     | WFLG_DEPTHGADGET
 				       | WFLG_REPORTMOUSE | WFLG_RMBTRAP
-					   | WFLG_ACTIVATE    | WFLG_CLOSEGADGET
+				       | WFLG_ACTIVATE    | WFLG_CLOSEGADGET
+					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
 				       | WFLG_SMART_REFRESH,
+
+
+			WA_MaxWidth, ~0,
+			WA_MaxHeight, ~0,
+
+//			WA_SizeBRight, TRUE,
+//			WA_SizeBBottom, TRUE,
+			WA_Zoom,         (ULONG)ZoomArray,
 			TAG_DONE);
+
 
     UnlockPubScreen (NULL, S);
 
@@ -1447,10 +1450,29 @@ static int setup_publicscreen(void)
     gfxvidinfo.width  = (W->Width  - W->BorderRight - W->BorderLeft);
     gfxvidinfo.height = (W->Height - W->BorderTop   - W->BorderBottom);
 #endif
+
+#if 0
 	XOffset = W->BorderLeft;
 	YOffset = W->BorderTop;
+#else
+	XOffset = 0;
+	YOffset = 0;
+#endif
 
-    RP = W->RPort;
+	InitRastPort(&comp_RP);
+
+	{
+		ULONG depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
+		comp_RP.BitMap = AllocBitMap( gfxvidinfo.width, gfxvidinfo.height, depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
+	}
+
+	if (comp_RP.BitMap == NULL ) return 0;
+
+	RP = &comp_RP; 
+
+    	RectFillColor(RP, 0, 0, gfxvidinfo.width, gfxvidinfo.height, 0xFF000000);
+
+//	RP = W->RPort;
 
 #ifdef USE_CGX_OVERLAY
 	if (use_overlay)
@@ -1709,86 +1731,20 @@ static int setup_userscreen (void)
 
 int graphics_setup (void)
 {
-    if (((struct ExecBase *)SysBase)->LibNode.lib_Version < 36) {
-	write_log ("UAE needs OS 2.0+ !\n");
-	return 0;
-    }
-    os39 = (((struct ExecBase *)SysBase)->LibNode.lib_Version >= 39);
-
-    atexit (graphics_leave);
-
-    IntuitionBase = (void*) OpenLibrary ("intuition.library", 0L);
-    if (!IntuitionBase) {
-	write_log ("No intuition.library ?\n");
-	return 0;
-    } else {
-#ifdef __amigaos4__
-	IIntuition = (struct IntuitionIFace *) GetInterface ((struct Library *) IntuitionBase, "main", 1, NULL);
-	if (!IIntuition) {
-	    CloseLibrary ((struct Library *) IntuitionBase);
-	    IntuitionBase = 0;
-	    return 0;
-	}
-#endif
-    }
-
-    GfxBase = (void*) OpenLibrary ("graphics.library", 0L);
-    if (!GfxBase) {
-	write_log ("No graphics.library ?\n");
-	return 0;
-    } else {
-#ifdef __amigaos4__
-	IGraphics = (struct GraphicsIFace *) GetInterface ((struct Library *) GfxBase, "main", 1, NULL);
-	if (!IGraphics) {
-	    CloseLibrary ((struct Library *) GfxBase);
-	    GfxBase = 0;
-	    return 0;
-	}
-#endif
-    }
-
-    LayersBase = OpenLibrary ("layers.library", 0L);
-    if (!LayersBase) {
-	write_log ("No layers.library\n");
-	return 0;
-    } else {
-#ifdef __amigaos4__
-	ILayers = (struct LayersIFace *) GetInterface (LayersBase, "main", 1, NULL);
-	if (!ILayers) {
-	    CloseLibrary (LayersBase);
-	    LayersBase = 0;
-	    return 0;
-	}
-#endif
-    }
-
-#ifdef USE_CYBERGFX
-    if (!CyberGfxBase) {
-        CyberGfxBase = OpenLibrary ("cybergraphics.library", 40);
-#ifdef __amigaos4__
-        if (CyberGfxBase) {
-	   ICyberGfx = (struct CyberGfxIFace *) GetInterface (CyberGfxBase, "main", 1, NULL);
-           if (!ICyberGfx) {
-	       CloseLibrary (CyberGfxBase);
-	       CyberGfxBase = 0;
-	   }
-	}
-#endif
-    }
-#endif
-
-#ifdef USE_CGX_OVERLAY
-	if (!CGXVideoBase)
+	if (((struct ExecBase *)SysBase)->LibNode.lib_Version < 36)
 	{
-		CGXVideoBase = (struct Library *)OpenLibrary("cgxvideo.library", 42);
+		write_log ("UAE needs OS 2.0+ !\n");
+		return 0;
 	}
-#endif
 
-    init_pointer ();
+	os39 = (((struct ExecBase *)SysBase)->LibNode.lib_Version >= 39);
 
-    initpseudodevices ();
+	init_pointer ();
+	initpseudodevices ();
 
-    return 1;
+	atexit (graphics_leave);
+
+	return 1;
 }
 
 /****************************************************************************/
@@ -2181,55 +2137,39 @@ void graphics_leave (void)
 	FreeVec (Line);
 	Line = NULL;
     }
-    if (CM) {
-	ReleaseColors();
-	CM = NULL;
-    }
-    if (W) {
-	restore_prWindowPtr ();
-	CloseWindow (W);
-	W = NULL;
-    }
 
-    free_pointer ();
-
-    if (!usepub && S) {
-	if (!CloseScreen (S)) {
-	    gui_message ("Please close all opened windows on UAE's screen.\n");
-	    do
-		Delay (50);
-	    while (!CloseScreen (S));
+	if (CM)
+	{
+		ReleaseColors();
+		CM = NULL;
 	}
-	S = NULL;
-    }
-    if (AslBase) {
-	CloseLibrary( (void*) AslBase);
-	AslBase = NULL;
-    }
-    if (GfxBase) {
-	CloseLibrary ((void*)GfxBase);
-	GfxBase = NULL;
-    }
-    if (LayersBase) {
-	CloseLibrary (LayersBase);
-	LayersBase = NULL;
-    }
-    if (IntuitionBase) {
-	CloseLibrary ((void*)IntuitionBase);
-	IntuitionBase = NULL;
-    }
 
-#ifdef USE_CGX_OVERLAY
-	if (CGXVideoBase) {
-	CloseLibrary((void*)CGXVideoBase);
-	CGXVideoBase = NULL;
+	if (W)
+	{
+		restore_prWindowPtr ();
+		CloseWindow (W);
+		W = NULL;
+
+		if (comp_RP.BitMap)
+		{
+			FreeBitMap(comp_RP.BitMap);
+			comp_RP.BitMap = NULL;
+		}
 	}
-#endif
 
-    if (CyberGfxBase) {
-	CloseLibrary((void*)CyberGfxBase);
-	CyberGfxBase = NULL;
-    }
+	free_pointer ();
+
+	if (!usepub && S) 
+	{
+		if (!CloseScreen (S))
+		{
+			gui_message ("Please close all opened windows on UAE's screen.\n");
+			do
+				Delay (50);
+			while (!CloseScreen (S));
+		}
+		S = NULL;
+	}
 }
 
 /****************************************************************************/
@@ -2795,7 +2735,9 @@ int is_fullscreen (void)
 
 int is_vsync (void)
 {
-    return 0;
+	if (comp_RP.BitMap) 	BackFill_Func(NULL, NULL);
+
+	return 0;
 }
 
 void toggle_fullscreen (void)
@@ -2803,8 +2745,8 @@ void toggle_fullscreen (void)
     graphics_leave ();
     currprefs.amiga_screen_type = 2;
     notice_screen_contents_lost ();
-    XOffset = NULL;
-    YOffset = NULL;
+    XOffset = 0;
+    YOffset = 0;
     usepub = 0;
     graphics_setup();
     graphics_init ();
