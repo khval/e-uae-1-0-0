@@ -1624,12 +1624,15 @@ static int setup_userscreen (void)
     if(DisplayID & DIPF_IS_HAM) Depth = 6; /* only ham6 for the moment */
 #endif
 
+#ifndef __amigaos4__
+
+	// AmigaOS4 uses compsition, and can scale to the window, we don't need any hacks...
+	// to center the screen..
+
     /* If chosen screen is smaller than UAE display size then clip
      * display to screen size */
-    if (ScreenWidth  < gfxvidinfo.width)
-	gfxvidinfo.width = ScreenWidth;
-    if (ScreenHeight < gfxvidinfo.width)
-	gfxvidinfo.height = ScreenHeight;
+    if (ScreenWidth  < gfxvidinfo.width) gfxvidinfo.width = ScreenWidth;
+    if (ScreenHeight < gfxvidinfo.width) gfxvidinfo.height = ScreenHeight;
 
 #ifdef USE_CGX_OVERLAY
 	if (use_overlay)
@@ -1641,23 +1644,24 @@ static int setup_userscreen (void)
 	{
 #endif
 	    /* If chosen screen is larger, than centre UAE's display */
-	    if (ScreenWidth > gfxvidinfo.width)
-		XOffset = (ScreenWidth - gfxvidinfo.width) / 2;
-	    if (ScreenHeight > gfxvidinfo.width)
-		YOffset = (ScreenHeight - gfxvidinfo.height) / 2;
+	    if (ScreenWidth > gfxvidinfo.width)	 XOffset = (ScreenWidth - gfxvidinfo.width) / 2;
+	    if (ScreenHeight > gfxvidinfo.width) YOffset = (ScreenHeight - gfxvidinfo.height) / 2;
+
 #ifdef USE_CGX_OVERLAY
 	}
 #endif
 
+#endif
+
     S = OpenScreenTags (NULL,
 			SA_DisplayID,			 DisplayID,
-			SA_Width,			 ScreenWidth,
+			SA_Width,				 ScreenWidth,
 			SA_Height,			 ScreenHeight,
 			SA_Depth,			 Depth,
 			SA_Overscan,			 OverscanType,
 			SA_AutoScroll,			 AutoScroll,
 			SA_ShowTitle,			 FALSE,
-			SA_Quiet,			 TRUE,
+			SA_Quiet,				 TRUE,
 			SA_Behind,			 TRUE,
 			SA_PubName,			 (ULONG)"UAE",
 			/* v39 stuff here: */
@@ -1681,10 +1685,10 @@ static int setup_userscreen (void)
 			WA_Height,		S->Height,
 			WA_CustomScreen,	(ULONG)S,
 			WA_Backdrop,		TRUE,
-			WA_Borderless,		TRUE,
+			WA_Borderless,	TRUE,
 			WA_RMBTrap,		TRUE,
 			WA_Activate,		TRUE,
-			WA_ReportMouse,		TRUE,
+			WA_ReportMouse,	TRUE,
 			WA_IDCMP,		IDCMP_MOUSEBUTTONS
 					      | IDCMP_RAWKEY
 					      | IDCMP_DISKINSERTED
@@ -1707,7 +1711,22 @@ static int setup_userscreen (void)
 
     hide_pointer (W);
 
-    RP = W->RPort; /* &S->Rastport if screen is not public */
+#ifdef __amigaos4__
+
+	InitRastPort(&comp_RP);
+	{
+		ULONG depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
+		comp_RP.BitMap = AllocBitMap( gfxvidinfo.width, gfxvidinfo.height, depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
+	}
+
+	if (comp_RP.BitMap == NULL ) return 0;
+	RP = &comp_RP; 
+
+#else
+ 
+//	RP = W->RPort; /* &S->Rastport if screen is not public */
+
+#endif
 
     PubScreenStatus (S, 0);
 
