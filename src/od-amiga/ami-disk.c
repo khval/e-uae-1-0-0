@@ -44,7 +44,6 @@
 #include <clib/alib_protos.h>
 #endif
 #include <proto/dos.h>
-#include <dos/obsolete.h>
 #endif
 
 /****************************************************************************/
@@ -75,6 +74,25 @@ static char dfx_done[4];
 static int device_exists (const char *device_name, int device_unit);
 static int dev_inhibit(char *dev,int on);
 static void set_req(int ok);
+
+#ifdef __amigaos4__
+struct TagItem tags_MEMF_CHIP[] = {
+							{AVT_Type,MEMF_SHARED},
+							{TAG_DONE,0}
+						};
+#undef CreatePort
+#undef DeletePort
+#undef AllocMem
+#undef FreeMem
+#undef DeleteIORequest
+#define DeleteFile Delete
+#define CreatePort(name,pri) AllocSysObject(ASOT_PORT, TAG_DONE )
+#define DeletePort(port) FreeSysObject(ASOT_PORT, port )
+#define DeleteIORequest(ioreq) FreeSysObject(ASOT_IOREQUEST, ioreq )
+#define AllocMem(size,type) AllocVecTagList(size, tags_ ## type )
+#define FreeMem(ptr,size) FreeVec(ptr)
+#endif
+
 
 /****************************************************************************/
 /*
@@ -388,13 +406,26 @@ static int dev_inhibit (char *dev, int on)
     else
 	sprintf (buff, "%s:", dev);
 
-    if ((DevPort = (struct MsgPort*) DeviceProc ((STRPTR)buff))) {
-	if (on) {
-	    DoPkt (DevPort, ACTION_INHIBIT, DOSTRUE, 0, 0, 0, 0);
-	    return 1;
+
+	{
+		struct DevProc *d;
+
+		d = GetDeviceProc( (STRPTR) buff , NULL );
+		if (d)
+		{
+			if (on)
+			{
+				DoPkt (d -> dvp_Port, ACTION_INHIBIT, DOSTRUE, 0, 0, 0, 0);
+				FreeDeviceProc(d);
+				return 1;
+			}
+			else
+			{
+				DoPkt (d -> dvp_Port, ACTION_INHIBIT, DOSFALSE, 0, 0, 0, 0);
+				FreeDeviceProc(d);
+			}
+		}
 	}
-	else
-	    DoPkt (DevPort, ACTION_INHIBIT, DOSFALSE, 0, 0, 0, 0);
-    }
+
     return 0;
 }
