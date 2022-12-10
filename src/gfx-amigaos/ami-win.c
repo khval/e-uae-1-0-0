@@ -1540,7 +1540,6 @@ static int setup_userscreen (void)
     struct ScreenModeRequester *ScreenRequest;
     ULONG DisplayID;
 
-
     LONG ScreenWidth = 0, ScreenHeight = 0, Depth = 0;
     UWORD OverscanType = OSCAN_STANDARD;
     BOOL AutoScroll = TRUE;
@@ -1550,28 +1549,6 @@ static int setup_userscreen (void)
     ULONG width  = gfxvidinfo.width;
     ULONG height = gfxvidinfo.height;
 #endif
-
-    if (!AslBase) {
-	AslBase = OpenLibrary ("asl.library", 36);
-	if (!AslBase) {
-	    write_log ("Can't open asl.library v36.\n");
-	    return 0;
-	} else {
-#ifdef __amigaos4__
-	    IAsl = (struct AslIFace *) GetInterface ((struct Library *)AslBase, "main", 1, NULL);
-	    if (!IAsl) {
-		CloseLibrary (AslBase);
-		AslBase = 0;
-		write_log ("Can't get asl.library interface\n");
-	    }
-#endif
-	}
-#ifdef __amigaos4__
-    } else {
-        IAsl->Obtain ();
-        release_asl = 1;
-#endif
-    }
 
     ScreenRequest = AllocAslRequest (ASL_ScreenModeRequest, NULL);
 
