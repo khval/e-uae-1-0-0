@@ -10,6 +10,10 @@
 #include "sysdeps.h"
 #include "options.h"
 #include "uaeexe.h"
+#include <stdbool.h>
+
+#include "disk.h"
+#include "savestate.h"
 
 /****************************************************************************/
 
@@ -50,6 +54,8 @@
 # endif
 #endif
 
+extern struct Window *W;
+
 /****************************************************************************/
 
 #define LEN 256
@@ -77,7 +83,7 @@ int appw_init (struct Window *W)
 		     GetInterface (WorkbenchBase, "main", 1, NULL);
 	if (IWorkbench) {
 #endif
-	    AppPort = CreatePort (0, 0);
+	    AppPort = AllocSysObject(ASOT_PORT, TAG_DONE );
 	    if (AppPort) {
 		AppWin = AddAppWindow (0, 0, W, AppPort, NULL);
 		if (AppWin) {
@@ -104,7 +110,7 @@ void appw_exit (void)
 	void *msg;
 	while ((msg = GetMsg (AppPort)))
 	    ReplyMsg (msg);
-	DeletePort (AppPort);
+	FreeSysObject (ASOT_PORT, AppPort);
 	AppPort = NULL;
     }
     if (AppWin) {
@@ -154,28 +160,85 @@ static void addcmd (char *cmd, int len, ULONG lock, char *name)
 
 /***************************************************************************/
 
+char *image_files_array[] = {".adf",".dms",NULL};
+
+bool is_in_array(char *name, char **array)
+{
+	if (!name) 
+		return false;
+	else
+	{
+		int item_len;
+		int name_len = strlen(name);
+		char **i;
+		for (i=array; *i; i++)
+		{
+			item_len = strlen(*i);
+			if (name_len>=item_len)
+			{
+				if (strcasecmp(name + name_len - item_len,*i) == 0) return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 void appw_events (void)
 {
-    if (AppWin) {
-	struct AppMessage *msg;
-	struct WBArg *arg;
-	while ((msg = (void*) GetMsg (AppPort))) {
-	    char cmd[LEN];
-	    int  i;
+	if (AppWin)
+	{
+		struct AppMessage *msg;
+		struct WBArg *arg;
+		char cmd[LEN];
+		char path[512];
+		int pl,fl, sl;
+		char *diskimage;
 
-	    arg = msg->am_ArgList;
+		while ((msg = (void*) GetMsg (AppPort)))
+		{
+			int  i;
+			arg = msg->am_ArgList;
 
-	    strcpy (cmd, "cd ");
-	    NameFromLock (arg[0].wa_Lock, &cmd[3], LEN - 3);
-	    if (!uaeexe (cmd)) {
-		strcpy (cmd,"run "); strcpy (cmd + 4, arg[0].wa_Name);
-		for (i = 1; i < msg->am_NumArgs; ++i)
-		    addcmd (cmd, LEN - 2, arg[i].wa_Lock, arg[i].wa_Name);
-		    /*                 ^    */
-		    /* 2 bytes for security */
-		uaeexe (cmd);
-	    }
-	    ReplyMsg ((void*) msg);
+			if (is_in_array(arg -> wa_Name, image_files_array ))
+			{
+				NameFromLock (arg->wa_Lock, &path, 512);
+
+				pl = strlen(path);
+				fl = strlen(arg -> wa_Name);
+				sl =  pl + fl +2;
+	
+				diskimage = malloc(sl);
+				sprintf(diskimage,"%s%s%s", path, 
+					(pl ? 
+						(path[pl-1] == '/') || ((path[pl-1] == ':') ) ? "" : "/"
+					: ""),
+					arg -> wa_Name);
+
+				//do_file_dialog (FILEDIALOG_INSERT_DF0 + 0);
+
+				strcpy (changed_prefs.df[0], diskimage);
+
+				if (W) ActivateWindow( W );
+
+				free(diskimage);
+			}
+			else
+			{
+				strcpy (cmd, "cd ");
+				NameFromLock (arg[0].wa_Lock, &cmd[3], LEN - 3);
+				if (!uaeexe (cmd))
+				{
+					strcpy (cmd,"run "); strcpy (cmd + 4, arg[0].wa_Name);
+					for (i = 1; i < msg->am_NumArgs; ++i)
+						addcmd (cmd, LEN - 2, arg[i].wa_Lock, arg[i].wa_Name);
+		   	 		/*                 ^    */
+					/* 2 bytes for security */
+					uaeexe (cmd);
+				}
+			}
+
+			ReplyMsg ((void*) msg);
+		}
 	}
-    }
 }
