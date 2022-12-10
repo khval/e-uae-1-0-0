@@ -1831,6 +1831,18 @@ static void restore_prWindowPtr (void)
  * gfxinfo - the buffer description (which gets filled in by this routine)
  * rp      - the Rastport this buffer will be blitted to
  */
+
+
+struct TagItem tags_any[] = {
+							{AVT_Type,MEMF_SHARED},
+							{TAG_DONE,0}
+						};
+
+struct TagItem tags_public[] = {
+							{AVT_Type,MEMF_SHARED},
+							{TAG_DONE,0}
+						};
+
 static APTR setup_cgx41_buffer (struct vidbuf_description *gfxinfo, const struct RastPort *rp)
 {
 #ifdef USE_CGX_OVERLAY
@@ -1861,7 +1873,7 @@ static APTR setup_cgx41_buffer (struct vidbuf_description *gfxinfo, const struct
      * and destination modulos to be equal. It certainly goes all wobbly
      * on MorphOS at least when they differ.
      */
-    buffer = AllocVec (bytes_per_row * gfxinfo->height, MEMF_ANY);
+    buffer = AllocVecTagList (bytes_per_row * gfxinfo->height, tags_any);
 
     if (buffer) {
 		gfxinfo->bufmem      = buffer;
@@ -2023,7 +2035,7 @@ int graphics_init (void)
 
     set_prWindowPtr (W);
 
-    Line = AllocVec ((gfxvidinfo.width + 15) & ~15, MEMF_ANY | MEMF_PUBLIC);
+    Line = AllocVecTagList ((gfxvidinfo.width + 15) & ~15, tags_public );
     if (!Line) {
 	write_log ("Unable to allocate raster buffer.\n");
 	return 0;
@@ -2033,7 +2045,7 @@ int graphics_init (void)
 	write_log ("Unable to allocate BitMap.\n");
 	return 0;
     }
-    TempRPort = AllocVec (sizeof (struct RastPort), MEMF_ANY | MEMF_PUBLIC);
+    TempRPort = AllocVecTagList (sizeof (struct RastPort), tags_public );
     if (!TempRPort) {
 	write_log ("Unable to allocate RastPort.\n");
 	return 0;
