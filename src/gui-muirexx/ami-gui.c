@@ -226,29 +226,32 @@ static void do_file_dialog (unsigned int type)
  * Process selected file.
  */
 
-	    default: /* to stop GCC complaining */
-	    case FILEDIALOG_INSERT_DF0:
-	    case FILEDIALOG_INSERT_DF1:
-	    case FILEDIALOG_INSERT_DF2:
-	    case FILEDIALOG_INSERT_DF3:
-		set_last_savestate_dir (FileRequest->fr_Drawer);
-		strcpy (changed_prefs.df[FILEDIALOG_DRIVE(type)], path);
-		break;
+		switch (type)
+		{
+			default: /* to stop GCC complaining */
+			case FILEDIALOG_INSERT_DF0:
+			case FILEDIALOG_INSERT_DF1:
+			case FILEDIALOG_INSERT_DF2:
+			case FILEDIALOG_INSERT_DF3:
+				set_last_floppy_dir( FileRequest->fr_Drawer );
+				set_last_savestate_dir (FileRequest->fr_Drawer);
+				strcpy (changed_prefs.df[FILEDIALOG_DRIVE(type)], path);
+				break;
 
-	    case FILEDIALOG_SAVE_STATE:
-		set_last_savestate_dir (FileRequest->fr_Drawer);
-		savestate_initsave (path, 1);
-		save_state (path, "Description");
-		break;
+			case FILEDIALOG_SAVE_STATE:
+				set_last_savestate_dir (FileRequest->fr_Drawer);
+				savestate_initsave (path, 1);
+				save_state (path, "Description");
+				break;
 
-	    case FILEDIALOG_LOAD_STATE:
-		set_last_savestate_dir (FileRequest->fr_Drawer);
-		savestate_initsave (path, 1);
-		savestate_state = STATE_DORESTORE;
-		write_log ("Restoring state from '%s'...\n", path);
-		break;
+			case FILEDIALOG_LOAD_STATE:
+				set_last_savestate_dir (FileRequest->fr_Drawer);
+				savestate_initsave (path, 1);
+				savestate_state = STATE_DORESTORE;
+				write_log ("Restoring state from '%s'...\n", path);
+				break;
+		}
 	}
-    }
 
 	FreeAslRequest (FileRequest);
 
