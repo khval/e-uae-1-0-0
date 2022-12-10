@@ -55,3 +55,7 @@ src/tools/genlinetoscr
 src/make_hdf
 src/readdisk
 src/uae
+
+src/.uaerc
+
+src/kick.rom
