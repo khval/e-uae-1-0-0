@@ -147,34 +147,7 @@ static void do_file_dialog (unsigned int type)
     const char *req_lastdir;
     int         req_do_save = FALSE;
 
-#ifdef __amigaos4__
-    int release_asl = 0;
-#endif
-
-    if (type >= FILEDIALOG_MAX)
-	return;
-
-    if (!AslBase) {
-	AslBase = OpenLibrary ("asl.library", 36);
-	if (!AslBase) {
-	    write_log ("Can't open asl.library v36.\n");
-	    return;
-	} else {
-#ifdef __amigaos4__
-	    IAsl = (struct AslIFace *) GetInterface ((struct Library *)AslBase, "main", 1, NULL);
-	    if (!IAsl) {
-		CloseLibrary (AslBase);
-		AslBase = 0;
-		write_log ("Can't get asl.library interface\n");
-	    }
-#endif
-	}
-#ifdef __amigaos4__
-    } else {
-	IAsl->Obtain ();
-	release_asl = 1;
-#endif
-    }
+	if (type >= FILEDIALOG_MAX) return;
 
     FileRequest = AllocAslRequest (ASL_FileRequest, NULL);
     if (!FileRequest) {
@@ -270,11 +243,6 @@ static void do_file_dialog (unsigned int type)
     }
 
     FreeAslRequest (FileRequest);
-
-#ifdef __amigaos4__
-    if (release_asl)
-	IAsl->Release ();
-#endif
 
     return;
 }
