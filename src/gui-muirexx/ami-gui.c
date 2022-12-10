@@ -70,18 +70,21 @@ static void free_last_savestate_dir (void)
 
 static const char *get_last_floppy_dir (void)
 {
-    if (!last_floppy_dir) {
-	static int done = 0;
-	unsigned int len;
+	if (!last_floppy_dir)
+	{
+		static int done = 0;
+		unsigned int len;
 
-	if (!done) {
-	    done = 1;
-	    atexit (free_last_floppy_dir);
+		if (!done)
+		{
+			done = 1;
+			atexit (free_last_floppy_dir);
+		}
+
+		last_floppy_dir = my_strdup (prefs_get_attr ("floppy_path"));
 	}
 
-	last_floppy_dir = my_strdup (prefs_get_attr ("floppy_path"));
-    }
-    return last_floppy_dir;
+	return last_floppy_dir;
 }
 
 static const char *get_last_savestate_dir (void)
@@ -102,19 +105,22 @@ static const char *get_last_savestate_dir (void)
 
 static void set_last_floppy_dir (const char *path)
 {
-    if (last_floppy_dir) {
-	free (last_floppy_dir);
-	last_floppy_dir = 0;
-    }
-
-    if (path) {
-	unsigned int len = strlen (path);
-	if (len) {
-	    last_floppy_dir = malloc (len + 1);
-	    if (last_floppy_dir)
-		strcpy (last_floppy_dir, path);
+	if (last_floppy_dir)
+	{
+		free (last_floppy_dir);
+		last_floppy_dir = NULL;
 	}
-    }
+
+	if (path)
+	{
+		unsigned int len = strlen (path);
+		if (len)
+		{
+			last_floppy_dir = malloc (len + 1);
+			if (last_floppy_dir)
+				strcpy (last_floppy_dir, path);
+		}
+	}
 }
 
 static void set_last_savestate_dir (const char *path)
@@ -136,87 +142,89 @@ static void set_last_savestate_dir (const char *path)
 
 static void do_file_dialog (unsigned int type)
 {
-    struct FileRequester *FileRequest;
-    struct Window *win;
+	struct FileRequester *FileRequest;
+	struct Window *win;
 
-    char buf[80];
-    char path[512];
+	char buf[80];
+	char path[512];
 
-    const char *req_prompt;
-    const char *req_pattern = 0;
-    const char *req_lastdir;
-    int         req_do_save = FALSE;
+	const char *req_prompt;
+	const char *req_pattern = 0;
+	const char *req_lastdir;
+	int         req_do_save = FALSE;
 
 	if (type >= FILEDIALOG_MAX) return;
 
-    FileRequest = AllocAslRequest (ASL_FileRequest, NULL);
-    if (!FileRequest) {
-	write_log ("Unable to allocate file requester.\n");
-	return;
-    }
+	FileRequest = AllocAslRequest (ASL_FileRequest, NULL);
+	if (!FileRequest)
+	{
+		write_log ("Unable to allocate file requester.\n");
+		return;
+	}
 
-    /* Find this task's default window */
-    win = ((struct Process *) FindTask (NULL))->pr_WindowPtr;
-    if (win == (struct Window *)-1)
-	win = 0;
+	/* Find this task's default window */
+	win = ((struct Process *) FindTask (NULL))->pr_WindowPtr;
+	if (win == (struct Window *)-1) win = 0;
 
-    /*
-     * Prepare requester.
-     */
-    switch (type) {
+/*
+ * Prepare requester.
+ */
 
-	default: /* to stop GCC complaining */
-	case FILEDIALOG_INSERT_DF0:
-	case FILEDIALOG_INSERT_DF1:
-	case FILEDIALOG_INSERT_DF2:
-	case FILEDIALOG_INSERT_DF3:
-	    sprintf (buf, "Select image to insert in drive DF%d:", FILEDIALOG_DRIVE(type));
-	    req_prompt = buf;
-	    req_pattern = "(#?.(ad(f|z)|dms|ipf|zip)#?|df?|?)";
-	    req_lastdir = get_last_floppy_dir ();
-	    break;
+	switch (type)
+	{
+		default: /* to stop GCC complaining */
+		case FILEDIALOG_INSERT_DF0:
+		case FILEDIALOG_INSERT_DF1:
+		case FILEDIALOG_INSERT_DF2:
+		case FILEDIALOG_INSERT_DF3:
+			sprintf (buf, "Select image to insert in drive DF%d:", FILEDIALOG_DRIVE(type));
+			req_prompt = buf;
+			req_pattern = "(#?.(ad(f|z)|dms|ipf|zip)#?|df?|?)";
+			req_lastdir = get_last_floppy_dir ();
+			break;
 
-	case FILEDIALOG_SAVE_STATE:
-	    req_prompt = "Select file to save emulator state to";
-	    req_pattern = "#?.uss";
-	    req_lastdir = get_last_savestate_dir ();
-	    req_do_save = TRUE;
-	    break;
+		case FILEDIALOG_SAVE_STATE:
+			req_prompt = "Select file to save emulator state to";
+			req_pattern = "#?.uss";
+			req_lastdir = get_last_savestate_dir ();
+			req_do_save = TRUE;
+			break;
 
-	case FILEDIALOG_LOAD_STATE:
-	    req_prompt = "Select saved state file to load";
-	    req_pattern = "#?.uss";
-	    req_lastdir = get_last_savestate_dir ();
-	    break;
-    }
+		case FILEDIALOG_LOAD_STATE:
+			req_prompt = "Select saved state file to load";
+			req_pattern = "#?.uss";
+			req_lastdir = get_last_savestate_dir ();
+			break;
+	}
 
-    /*
-     * Do the file request.
-     */
-    if (AslRequestTags (FileRequest,
-			ASLFR_TitleText,      req_prompt,
-			ASLFR_InitialDrawer,  req_lastdir,
+/*
+ * Do the file request.
+ */
+
+	if (AslRequestTags (FileRequest,
+			ASLFR_TitleText,  req_prompt,
+			ASLFR_InitialDrawer, req_lastdir,
 			ASLFR_InitialPattern, req_pattern,
 			ASLFR_DoPatterns,     req_pattern != 0,
-			ASLFR_DoSaveMode,     req_do_save,
-			ASLFR_RejectIcons,    TRUE,
-			ASLFR_Window,         win,
-			TAG_DONE)) {
+			ASLFR_DoSaveMode,   req_do_save,
+			ASLFR_RejectIcons,  TRUE,
+			ASLFR_Window,  win,
+			TAG_DONE))
+	{
 
-	/*
-	 * User selected a file.
-	 *
-	 * Construct file path to selected image.
-	 */
-	strcpy (path, FileRequest->fr_Drawer);
-	if (strlen (path) && !(path[strlen (path) - 1] == ':' || path[strlen (path) - 1] == '/'))
-	    strcat (path, "/");
-	strcat (path, FileRequest->fr_File);
+/*
+ * User selected a file.
+ *
+ * Construct file path to selected image.
+ */
 
-	/*
-	 * Process selected file.
-	 */
-	switch (type) {
+		strcpy (path, FileRequest->fr_Drawer);
+		if (strlen (path) && !(path[strlen (path) - 1] == ':' || path[strlen (path) - 1] == '/')) strcat (path, "/");
+		strcat (path, FileRequest->fr_File);
+
+/*
+ * Process selected file.
+ */
 
 	    default: /* to stop GCC complaining */
 	    case FILEDIALOG_INSERT_DF0:
@@ -242,9 +250,9 @@ static void do_file_dialog (unsigned int type)
 	}
     }
 
-    FreeAslRequest (FileRequest);
+	FreeAslRequest (FileRequest);
 
-    return;
+	return;
 }
 
 /****************************************************************************/
