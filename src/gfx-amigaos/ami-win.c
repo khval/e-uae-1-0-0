@@ -9,6 +9,7 @@
 
 #include "sysconfig.h"
 #include "sysdeps.h"
+#include "stdbool.h"
 
 /* sam: Argg!! Why did phase5 change the path to cybergraphics ? */
 //#define CGX_CGX_H <cybergraphics/cybergraphics.h>
@@ -43,6 +44,7 @@
 
 #include <libraries/asl.h>
 #include <intuition/pointerclass.h>
+#include <intuition/imageclass.h>
 
 /****************************************************************************/
 
@@ -55,6 +57,9 @@
 # include <proto/exec.h>
 # include <proto/dos.h>
 # include <proto/asl.h>
+# include <workbench/workbench.h>
+# include <proto/wb.h>
+# include <proto/icon.h>
 
 #ifdef USE_CYBERGFX
 # ifdef __SASC
@@ -99,7 +104,7 @@
 #include "hotkeys.h"
 #include "version.h"
 
-#define BitMap Picasso96BitMap  /* Argh! */
+#include "window_icons.h"
 #include "picasso96.h"
 #undef BitMap
 
@@ -108,10 +113,20 @@
 #define UAEIFF "UAEIFF"        /* env: var to trigger iff dump */
 #define UAESM  "UAESM"         /* env: var for screen mode */
 
+static void graphics_subshutdown (void);
+
+static void open_window(void);
+static void close_window(void);
+static bool is_uniconifyed(void);
+static bool enable_Iconify(void);
+static void dispose_Iconify(void);
+
 static int need_dither;        /* well.. guess :-) */
 static int use_delta_buffer;   /* this will redraw only needed places */
 static int use_cyb;            /* this is for cybergfx truecolor mode */
 static int use_approx_color;
+
+extern void write_log(const char *fmt, ... );
 
 extern xcolnr xcolors[4096];
 
@@ -161,25 +176,31 @@ void SwapBuffer(void);
 void ToggleBilinear(void);
 #endif
 
+bool empty_msg_queue(struct MsgPort *port);
+
 unsigned long            frame_num; /* for arexx */
 
 struct RastPort  comp_RP;
 
-static UBYTE            *Line;
-static struct Screen    *S = NULL;;
-struct RastPort  *RP = NULL;
-struct Window    *W = NULL;
-static struct RastPort  *TempRPort;
-static struct BitMap    *BitMap = NULL;
+static UBYTE			*Line = NULL;
+static struct Screen		*S = NULL;;
+struct RastPort			*RP = NULL;
+struct Window			*W = NULL;
+static struct RastPort	*TempRPort = NULL;
+static struct BitMap		*BitMap = NULL;
+
+extern struct kIcon iconifyIcon;
+extern struct kIcon padlockicon;
+extern struct kIcon fullscreenicon;
 
 #ifdef USE_CYBERGFX
 # ifdef USE_CYBERGFX_V41
-static uae_u8 *CybBuffer;
+static uae_u8 *CybBuffer = NULL;
 # else
 static struct BitMap    *CybBitMap;
 # endif
 #endif
-static struct ColorMap  *CM;
+static struct ColorMap  *CM = NULL;
 static int              XOffset,YOffset;
 
 static int os39;        /* kick 39 present */
@@ -534,7 +555,9 @@ static void flush_block_cgx (struct vidbuf_description *gfxinfo, int first_line,
 # else
 static void flush_line_cgx_v41 (struct vidbuf_description *gfxinfo, int line_no)
 {
-    WritePixelArray (CybBuffer,
+	if (comp_RP.BitMap)
+	{
+		WritePixelArray (CybBuffer,
 		     0 , line_no,
 		     gfxinfo->rowbytes,
 		     RP,
@@ -543,11 +566,14 @@ static void flush_line_cgx_v41 (struct vidbuf_description *gfxinfo, int line_no)
 		     gfxinfo->width,
 		     1,
 		     RECTFMT_RAW);
+	}
 }
 
 static void flush_block_cgx_v41 (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
-    WritePixelArray (CybBuffer,
+	if (comp_RP.BitMap)
+	{
+		WritePixelArray (CybBuffer,
 		     0 , first_line,
 		     gfxinfo->rowbytes,
 		     RP,
@@ -556,6 +582,7 @@ static void flush_block_cgx_v41 (struct vidbuf_description *gfxinfo, int first_l
 		     gfxinfo->width,
 		     last_line - first_line + 1,
 		     RECTFMT_RAW);
+	}
 }
 # endif
 
@@ -1358,11 +1385,12 @@ static int setup_customscreen (void)
 	NewWindowStructure.Height = screen->Height;
 	NewWindowStructure.Screen = screen;	   
 
-    W = (void*)OpenWindow (&NewWindowStructure);
-    if (!W) {
-	write_log ("Cannot open UAE window on custom screen.\n");
-	return 0;
-    }
+	W = (void*)OpenWindow (&NewWindowStructure);
+	if (!W)
+	{
+		write_log ("Cannot open UAE window on custom screen.\n");
+		return 0;
+	}
 
 #ifdef USE_CGX_OVERLAY
 	if (use_overlay)
@@ -1381,9 +1409,52 @@ static int setup_customscreen (void)
 
 /****************************************************************************/
 
+static void open_window(void)
+{
+	W = OpenWindowTags (NULL,
+			WA_Title,        (ULONG)PACKAGE_NAME,
+			WA_AutoAdjust,   TRUE,
+			WA_InnerWidth,   gfxvidinfo.width,
+			WA_InnerHeight,  gfxvidinfo.height,
+			WA_PubScreen,    (ULONG)S,
+
+			WA_IDCMP,        IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
+					| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW
+					| IDCMP_MOUSEMOVE    | IDCMP_DELTAMOVE
+					| IDCMP_CLOSEWINDOW  | IDCMP_REFRESHWINDOW
+					| IDCMP_NEWSIZE | IDCMP_INTUITICKS | IDCMP_GADGETUP,
+
+			WA_Flags,	 WFLG_DRAGBAR     | WFLG_DEPTHGADGET
+					| WFLG_REPORTMOUSE | WFLG_RMBTRAP
+					| WFLG_ACTIVATE    | WFLG_CLOSEGADGET
+					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
+					| WFLG_SMART_REFRESH,
+
+
+			WA_MaxWidth, ~0,
+			WA_MaxHeight, ~0,
+
+//			WA_Zoom,         (ULONG)ZoomArray,
+			TAG_DONE);
+
+	if (W)
+	{
+	 	open_icon( W, ICONIFYIMAGE, GID_ICONIFY, &iconifyIcon );
+	 	open_icon( W, POPUPIMAGE, GID_FULLSCREEN, &fullscreenicon );
+	 	open_icon( W, PADLOCKIMAGE, GID_PADLOCK, &padlockicon );
+	}
+
+}
+
 static int setup_publicscreen(void)
 {
+/*
     UWORD ZoomArray[4] = {0, 0, 0, 0};
+
+    ZoomArray[2] = 128;
+    ZoomArray[3] = S->BarHeight + 1;
+*/
+
     char *pubscreen = strlen (currprefs.amiga_publicscreen)
 	? currprefs.amiga_publicscreen : NULL;
 
@@ -1394,8 +1465,6 @@ static int setup_publicscreen(void)
 	return 0;
     }
 
-    ZoomArray[2] = 128;
-    ZoomArray[3] = S->BarHeight + 1;
 
     CM = S->ViewPort.ColorMap;
 
@@ -1406,42 +1475,17 @@ static int setup_publicscreen(void)
 	}
     }
 
-    W = OpenWindowTags (NULL,
-			WA_Title,        (ULONG)PACKAGE_NAME,
-			WA_AutoAdjust,   TRUE,
-			WA_InnerWidth,   gfxvidinfo.width,
-			WA_InnerHeight,  gfxvidinfo.height,
-			WA_PubScreen,    (ULONG)S,
+	open_window();
 
-			WA_IDCMP,        IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
-				       | IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW
-				       | IDCMP_MOUSEMOVE    | IDCMP_DELTAMOVE
-				       | IDCMP_CLOSEWINDOW  | IDCMP_REFRESHWINDOW
-				       | IDCMP_NEWSIZE      | IDCMP_INTUITICKS,
+	UnlockPubScreen (NULL, S);
 
-			WA_Flags,	 WFLG_DRAGBAR     | WFLG_DEPTHGADGET
-				       | WFLG_REPORTMOUSE | WFLG_RMBTRAP
-				       | WFLG_ACTIVATE    | WFLG_CLOSEGADGET
-					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
-				       | WFLG_SMART_REFRESH,
+	if (!W)
+	{
+		write_log ("Can't open window on public screen!\n");
+		CM = NULL;
+		return 0;
+	}
 
-
-			WA_MaxWidth, ~0,
-			WA_MaxHeight, ~0,
-
-//			WA_SizeBRight, TRUE,
-//			WA_SizeBBottom, TRUE,
-			WA_Zoom,         (ULONG)ZoomArray,
-			TAG_DONE);
-
-
-    UnlockPubScreen (NULL, S);
-
-    if (!W) {
-	write_log ("Can't open window on public screen!\n");
-	CM = NULL;
-	return 0;
-    }
 
 #ifdef USE_CGX_OVERLAY
 	gfxvidinfo.width  = currprefs.gfx_width_win;
@@ -1630,7 +1674,7 @@ static int setup_userscreen (void)
 
 #endif
 
-    S = OpenScreenTags (NULL,
+	S = OpenScreenTags (NULL,
 			SA_DisplayID,			 DisplayID,
 			SA_Width,				 ScreenWidth,
 			SA_Height,			 ScreenHeight,
@@ -1648,18 +1692,30 @@ static int setup_userscreen (void)
 			SA_Draggable,			 (use_cyb ? FALSE : TRUE),
 			SA_Interleaved,			 TRUE,
 			TAG_DONE);
-    if (!S) {
-	gui_message ("Unable to open the requested screen.\n");
-	return 0;
-    }
+	if (!S)
+	{
+		gui_message ("Unable to open the requested screen.\n");
+		return 0;
+	}
 
-    CM           =  S->ViewPort.ColorMap;
-    is_halfbrite = (S->ViewPort.Modes & EXTRA_HALFBRITE);
-    is_ham       = (S->ViewPort.Modes & HAM);
+	CM           =  S->ViewPort.ColorMap;
+	is_halfbrite = (S->ViewPort.Modes & EXTRA_HALFBRITE);
+	is_ham       = (S->ViewPort.Modes & HAM);
 
-    W = OpenWindowTags (NULL,
-			WA_Width,		S->Width,
-			WA_Height,		S->Height,
+	ULONG x;
+	ULONG Width;
+	ULONG Height;
+
+	Width = gfxvidinfo.width * S -> Height / gfxvidinfo.height ;
+	Height = S -> Height ;
+	
+	x = (S -> Width -  Width) / 2;		// calulate edge, two edges.
+
+
+	W = OpenWindowTags (NULL,
+			WA_Left, 			x,
+			WA_Width,		Width,
+			WA_Height,		Height,
 			WA_CustomScreen,	(ULONG)S,
 			WA_Backdrop,		TRUE,
 			WA_Borderless,	TRUE,
@@ -1677,16 +1733,17 @@ static int setup_userscreen (void)
 			(os39 ? WA_BackFill : TAG_IGNORE),   (ULONG) LAYERS_NOBACKFILL,
 			TAG_DONE);
 
-    if(!W) {
-	write_log ("AMIGFX: Unable to open the window.\n");
-	CloseScreen (S);
-	S  = NULL;
-	RP = NULL;
-	CM = NULL;
-	return 0;
-    }
+	if(!W)
+	{
+		write_log ("AMIGFX: Unable to open the window.\n");
+		CloseScreen (S);
+		S  = NULL;
+		RP = NULL;
+		CM = NULL;
+		return 0;
+	}
 
-    hide_pointer (W);
+	hide_pointer (W);
 
 #ifdef __amigaos4__
 
@@ -1738,7 +1795,7 @@ int graphics_setup (void)
 	init_pointer ();
 	initpseudodevices ();
 
-	atexit (graphics_leave);
+	atexit (graphics_subshutdown);
 
 	return 1;
 }
@@ -2093,7 +2150,22 @@ int graphics_init (void)
 
 /****************************************************************************/
 
-void graphics_leave (void)
+void close_window()
+{
+	if (W)
+	{
+		restore_prWindowPtr ();
+	 	dispose_icon( W, &iconifyIcon );
+	 	dispose_icon( W, &padlockicon );
+		dispose_icon( W, &fullscreenicon );
+		CloseWindow (W);
+		W = NULL;
+	}
+
+	free_pointer ();
+}
+
+static void graphics_subshutdown (void)
 {
     closepseudodevices ();
     appw_exit ();
@@ -2140,20 +2212,13 @@ void graphics_leave (void)
 		CM = NULL;
 	}
 
-	if (W)
+	close_window();
+
+	if (comp_RP.BitMap)
 	{
-		restore_prWindowPtr ();
-		CloseWindow (W);
-		W = NULL;
-
-		if (comp_RP.BitMap)
-		{
-			FreeBitMap(comp_RP.BitMap);
-			comp_RP.BitMap = NULL;
-		}
+		FreeBitMap(comp_RP.BitMap);
+		comp_RP.BitMap = NULL;
 	}
-
-	free_pointer ();
 
 	if (!usepub && S) 
 	{
@@ -2191,10 +2256,91 @@ void graphics_notify_state (int state)
 
 /***************************************************************************/
 
+struct MsgPort *iconifyPort = NULL;
+struct DiskObject *_dobj = NULL;
+struct AppIcon *appicon = NULL;
+
+bool empty_msg_queue(struct MsgPort *port)
+{
+	struct Message *msg;
+	// empty que.
+	while ((msg = (struct Message *) GetMsg( port ) ))
+	{
+		ReplyMsg( (struct Message *) msg );
+		return true;
+	}
+	return false;
+}
+
+
+bool is_uniconifyed()
+{
+	if (iconifyPort)
+	{
+		ULONG signal = 1 << iconifyPort->mp_SigBit;
+		 if (SetSignal(0L, signal) & signal)
+		{
+			return empty_msg_queue(iconifyPort);
+		}
+	}
+	return false;
+}
+
+bool enable_Iconify()
+{
+	int n;
+
+	const char *files[]={"progdir:uae","envarc:sys/def_tool",NULL};
+
+	for (n=0;files[n];n++)
+	{
+		_dobj = GetDiskObjectNew( files[n] );
+		if (_dobj) break;
+	}
+
+	if (_dobj)
+	{
+		_dobj -> do_CurrentX = 0;
+		_dobj -> do_CurrentY = 0;
+
+		iconifyPort = (struct MsgPort *) AllocSysObject(ASOT_PORT,NULL);
+
+		if (iconifyPort)
+		{
+			appicon = AddAppIcon(1, 0, "uae", iconifyPort, 0, _dobj, 
+					WBAPPICONA_SupportsOpen, TRUE,
+					TAG_END);
+
+			if (appicon) return true;
+		}
+	}
+
+	return false;
+}
+
+void dispose_Iconify()
+{
+	if (_dobj)
+	{
+		RemoveAppIcon( appicon );
+		FreeDiskObject(_dobj);
+		appicon = NULL;
+		_dobj = NULL;
+	}
+
+	if (iconifyPort)
+	{
+		FreeSysObject ( ASOT_PORT, iconifyPort ); 
+		iconifyPort = NULL;
+	}
+}
+
+
 void handle_events(void)
 {
-    struct IntuiMessage *msg;
-    int dmx, dmy, mx, my, class, code, qualifier;
+		struct IntuiMessage *msg;
+	int dmx, dmy, mx, my, class, code, qualifier;
+	UWORD GadgetID;
 
    /* this function is called at each frame, so: */
     ++frame_num;       /* increase frame counter */
@@ -2213,42 +2359,83 @@ void handle_events(void)
     }
 #endif
 
-    while ((msg = (struct IntuiMessage*) GetMsg (W->UserPort))) {
-	class     = msg->Class;
-	code      = msg->Code;
-	dmx       = msg->MouseX;
-	dmy       = msg->MouseY;
-	mx        = msg->IDCMPWindow->MouseX; // Absolute pointer coordinates
-	my        = msg->IDCMPWindow->MouseY; // relative to the window
-	qualifier = msg->Qualifier;
-
-	ReplyMsg ((struct Message*)msg);
-
-	switch (class) {
-	    case IDCMP_NEWSIZE:
-		do_inhibit_frame ((W->Flags & WFLG_ZOOMED) ? 1 : 0);
-		break;
-
-	    case IDCMP_REFRESHWINDOW:
-		if (use_delta_buffer) {
-		    /* hack: this forces refresh */
-		    uae_u8 *ptr = oldpixbuf;
-		    int i, len = gfxvidinfo.width;
-		    len *= gfxvidinfo.pixbytes;
-		    for (i=0; i < currprefs.gfx_height_win; ++i) {
-			ptr[00000] ^= 255;
-			ptr[len-1] ^= 255;
-			ptr += gfxvidinfo.rowbytes;
-		    }
+	if (iconifyPort)		// iconifyed mode..
+	{
+		if (is_uniconifyed())
+		{
+			open_window();
+			dispose_Iconify();
 		}
-		BeginRefresh (W);
-		flush_block (0, currprefs.gfx_height_win - 1);
-		EndRefresh (W, TRUE);
-		break;
 
-	    case IDCMP_CLOSEWINDOW:
-		uae_quit ();
-		break;
+		appw_events();
+		return;
+	}
+
+	while ( (W) && (msg = (struct IntuiMessage*) GetMsg (W->UserPort)) )
+	{
+		class     = msg->Class;
+		code      = msg->Code;
+		dmx       = msg->MouseX;
+		dmy       = msg->MouseY;
+		mx        = msg->IDCMPWindow->MouseX; // Absolute pointer coordinates
+		my        = msg->IDCMPWindow->MouseY; // relative to the window
+		qualifier = msg->Qualifier;
+	 	GadgetID = (msg -> IAddress) ? ((struct Gadget *) ( msg -> IAddress)) -> GadgetID : 0 ;
+
+		ReplyMsg ((struct Message*)msg);
+
+		switch (class)
+		{
+			case IDCMP_NEWSIZE:
+				do_inhibit_frame ((W->Flags & WFLG_ZOOMED) ? 1 : 0);
+				break;
+
+			case IDCMP_REFRESHWINDOW:
+				if (use_delta_buffer)
+				{
+					/* hack: this forces refresh */
+					uae_u8 *ptr = oldpixbuf;
+					int i, len = gfxvidinfo.width;
+					len *= gfxvidinfo.pixbytes;
+					for (i=0; i < currprefs.gfx_height_win; ++i)
+					{
+						ptr[00000] ^= 255;
+						ptr[len-1] ^= 255;
+						ptr += gfxvidinfo.rowbytes;
+					}
+				}
+				BeginRefresh (W);
+				flush_block (0, currprefs.gfx_height_win - 1);
+				EndRefresh (W, TRUE);
+				break;
+
+			case IDCMP_GADGETUP:
+				switch (GadgetID)
+				{
+					case GID_ICONIFY: 
+						if (enable_Iconify())
+						{
+							empty_msg_queue(W->UserPort);
+							close_window();
+						}
+						break;
+
+					case GID_FULLSCREEN:
+						toggle_fullscreen();
+						break;
+
+					case GID_PADLOCK:
+						toggle_mousegrab();
+						break;
+
+					default:
+						break;
+				}
+				break;
+
+			case IDCMP_CLOSEWINDOW:
+				uae_quit ();
+				break;
 
 	    case IDCMP_RAWKEY: {
 		int keycode = code & 127;
@@ -2731,14 +2918,14 @@ int is_fullscreen (void)
 
 int is_vsync (void)
 {
-	if (comp_RP.BitMap) 	BackFill_Func(NULL, NULL);
+	if ((comp_RP.BitMap) && (W)) BackFill_Func(NULL, NULL);
 
 	return 0;
 }
 
 void toggle_fullscreen (void)
 {
-    graphics_leave ();
+    graphics_subshutdown ();
     currprefs.amiga_screen_type = 2;
     notice_screen_contents_lost ();
     XOffset = 0;
