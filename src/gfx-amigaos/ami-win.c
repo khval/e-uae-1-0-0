@@ -105,8 +105,63 @@
 #include "version.h"
 
 #include "window_icons.h"
-#include "picasso96.h"
+
+// #define BitMap Picasso96BitMap  /* Argh! */
+
+#ifdef PICASSO96
+#undef PICASSO96
+#define PICASSO96_SUPPORTED
+#include "../include/picasso96.h"
+#endif
+
 #undef BitMap
+
+#ifdef PICASSO96
+static int screen_is_picasso;
+static int screen_was_picasso;
+static char picasso_invalid_lines[1201];
+static int picasso_has_invalid_lines;
+static int picasso_invalid_start, picasso_invalid_stop;
+static int picasso_maxw = 0, picasso_maxh = 0;
+static int mode_count;
+extern struct picasso_vidbuf_description picasso_vidinfo;
+
+static int bitdepth, bit_unit;
+static int current_width, current_height;
+
+static int red_bits, green_bits, blue_bits;
+static int red_shift, green_shift, blue_shift;
+
+struct p96colors
+{
+	UBYTE a;
+	UBYTE r;
+	UBYTE g;
+	UBYTE b;
+};
+
+static struct p96colors p96Colors[256];
+
+/* Standard P96 screen modes */
+#define MAX_SCREEN_MODES 12
+static int x_size_table[MAX_SCREEN_MODES] = { 320, 320, 320, 320, 640, 640, 640, 800, 1024, 1152, 1280 };
+static int y_size_table[MAX_SCREEN_MODES] = { 200, 240, 256, 400, 350, 480, 512, 600, 768,  864,  1024 };
+
+static int palette_update_start = 256;
+static int palette_update_end   = 0;
+
+/* Supported SDL screen modes */
+#define MAX_SDL_SCREENMODE 32
+
+struct screen_rect
+{
+	int w;
+	int h;
+};
+
+static struct screen_rect screenmode[MAX_SDL_SCREENMODE];
+
+#endif
 
 /****************************************************************************/
 
@@ -2562,8 +2617,51 @@ void LED (int on)
 
 #ifdef PICASSO96
 
+/*
+ * Add a screenmode to the emulated P96 display database
+ */
+
+static void add_p96_mode (int width, int height, int emulate_chunky, int *count)
+{
+    unsigned int i;
+
+    for (i = 0; i <= (emulate_chunky ? 1 : 0); i++) {
+	if (*count < MAX_PICASSO_MODES) {
+	    DisplayModes[*count].res.width  = width;
+	    DisplayModes[*count].res.height = height;
+	    DisplayModes[*count].depth      = (i == 1) ? 1 : bit_unit >> 3;
+	    DisplayModes[*count].refresh    = 75;
+	    (*count)++;
+
+	    write_log ("SDLGFX: Added P96 mode: %dx%dx%d\n", width, height, (i == 1) ? 8 : bitdepth);
+	}
+    }
+    return;
+}
+
+#define is_hwsurface true
+
 void DX_Invalidate (int first, int last)
 {
+    DEBUG_LOG ("Function: DX_Invalidate %i - %i\n", first, last);
+
+    if (is_hwsurface)
+	return;
+
+    if (first > last)
+	return;
+
+    picasso_has_invalid_lines = 1;
+    if (first < picasso_invalid_start)
+	picasso_invalid_start = first;
+
+    if (last > picasso_invalid_stop)
+	picasso_invalid_stop = last;
+
+    while (first <= last) {
+	picasso_invalid_lines[first] = 1;
+	first++;
+    }
 }
 
 int DX_BitsPerCannon (void)
@@ -2573,19 +2671,134 @@ int DX_BitsPerCannon (void)
 
 void DX_SetPalette (int start, int count)
 {
+    DEBUG_LOG ("Function: DX_SetPalette\n");
+
+    if (! screen_is_picasso || picasso96_state.RGBFormat != RGBFB_CHUNKY)
+	return;
+
+    if (picasso_vidinfo.pixbytes != 1) {
+	/* This is the case when we're emulating a 256 color display. */
+	while (count-- > 0) {
+	    int r = picasso96_state.CLUT[start].Red;
+	    int g = picasso96_state.CLUT[start].Green;
+	    int b = picasso96_state.CLUT[start].Blue;
+	    picasso_vidinfo.clut[start++] =
+				 (doMask256 (r, red_bits, red_shift)
+				| doMask256 (g, green_bits, green_shift)
+				| doMask256 (b, blue_bits, blue_shift));
+	}
+    } else {
+	int i;
+	for (i = start; i < start+count && i < 256;  i++) {
+	    p96Colors[i].r = picasso96_state.CLUT[i].Red;
+	    p96Colors[i].g = picasso96_state.CLUT[i].Green;
+	    p96Colors[i].b = picasso96_state.CLUT[i].Blue;
+	}
+	SDL_SetColors (screen, &p96Colors[start], start, count);
+    }
 }
+
+void DX_SetPalette_vsync(void)
+{
+    if (palette_update_end > palette_update_start) {
+	DX_SetPalette (palette_update_start,
+				palette_update_end - palette_update_start);
+    palette_update_end   = 0;
+    palette_update_start = 0;
+  }
+}
+
 
 int DX_FillResolutions (uae_u16 *ppixel_format)
 {
-    return 0;
+    int i;
+    int count = 0;
+    int emulate_chunky = 0;
+
+    DEBUG_LOG ("Function: DX_FillResolutions\n");
+
+	if (bit_unit == 16)
+		picasso_vidinfo.rgbformat = RGBFB_R5G6B5;
+	else
+		picasso_vidinfo.rgbformat = RGBFB_A8R8G8B8;
+
+    *ppixel_format = 1 << picasso_vidinfo.rgbformat;
+    if (bit_unit == 16 || bit_unit == 32) {
+	*ppixel_format |= RGBFF_CHUNKY;
+	emulate_chunky = 1;
+    }
+
+    /* Check list of standard P96 screenmodes */
+
+	for (i = 0; i < MAX_SCREEN_MODES; i++)
+	{
+		add_p96_mode (x_size_table[i], y_size_table[i], emulate_chunky, &count);
+	}
+
+    /* Check list of supported SDL screenmodes */
+    for (i = 0; i < mode_count; i++) {
+	int j;
+	int found = 0;
+	for (j = 0; j < MAX_SCREEN_MODES - 1; j++) {
+	    if (screenmode[i].w == x_size_table[j] &&
+		screenmode[i].h == y_size_table[j])
+	    {
+		found = 1;
+		break;
+	    }
+	}
+
+	/* If SDL mode is not a standard P96 mode (and thus already added to the
+	 * list, above) then add it */
+	if (!found)
+	    add_p96_mode (screenmode[i].w, screenmode[i].h, emulate_chunky, &count);
+    }
+
+    return count;
 }
 
-void gfx_set_picasso_modeinfo (int w, int h, int depth)
+void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 {
+    DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %i h: %i depth: %i rgbfmt: %i\n", w, h, depth, rgbfmt);
+
+    picasso_vidinfo.width = w;
+    picasso_vidinfo.height = h;
+    picasso_vidinfo.depth = depth;
+    picasso_vidinfo.pixbytes = bit_unit >> 3;
+    if (screen_is_picasso)
+	set_window_for_picasso();
 }
 
 void gfx_set_picasso_state (int on)
 {
+    DEBUG_LOG ("Function: gfx_set_picasso_state: %d\n", on);
+
+    if (on == screen_is_picasso)
+	return;
+
+    /* We can get called by drawing_init() when there's
+     * no window opened yet... */
+    if ( W == NULL)
+	return
+
+    graphics_subshutdown ();
+    screen_was_picasso = screen_is_picasso;
+    screen_is_picasso = on;
+
+    if (on) {
+	// Set height, width for Picasso gfx
+	current_width  = picasso_vidinfo.width;
+	current_height = picasso_vidinfo.height;
+	graphics_init ();
+    } else {
+	// Set height, width for Amiga gfx
+	current_width  = gfxvidinfo.width;
+	current_height = gfxvidinfo.height;
+	graphics_init ();
+    }
+
+    if (on)
+	DX_SetPalette (0, 256);
 }
 #endif
 
