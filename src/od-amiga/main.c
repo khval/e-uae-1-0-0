@@ -53,6 +53,9 @@ char* AMIGAOS_VERSION_TAG = "$VER: " UAE_VERSION_STRING " (" __DATE__ ")";
 
 #ifdef __amigaos4__
 
+
+#include <intuition/imageclass.h>
+
 struct Library *ExpansionBase = NULL;
 struct TimerIFace *ITimer = NULL;
 struct ExpansionIFace *IExpansion = NULL;
@@ -64,12 +67,23 @@ struct GfxBase          *GraphicsBase = NULL;
 struct Library          *LayersBase = NULL;
 struct Library          *AslBase = NULL;
 struct Library          *CyberGfxBase = NULL;
+struct Library          *IconBase = NULL;
+struct Library          *WorkbenchBase = NULL;
 
 struct AslIFace *IAsl = NULL;
 struct GraphicsIFace *IGraphics = NULL;
 struct LayersIFace *ILayers = NULL;
 struct IntuitionIFace *IIntuition = NULL;
 struct CyberGfxIFace *ICyberGfx = NULL;
+struct IconIFace *IIcon = NULL;
+struct WorkbenchIFace *IWorkbench = NULL;
+
+#include "../gfx-amigaos/window_icons.h"
+
+struct kIcon iconifyIcon = { NULL, NULL };
+struct kIcon zoomIcon = { NULL, NULL };
+struct kIcon padlockicon = { NULL, NULL };
+struct kIcon fullscreenicon = { NULL, NULL };
 
 #define closeLib(x) \
 	if (I ## x ) DropInterface ((struct Interface *) I ## x ); I ## x = NULL; \
@@ -83,8 +97,6 @@ struct CyberGfxIFace *ICyberGfx = NULL;
 
 static void free_libs (void)
 {
-
-printf("%s:%d\n",__FUNCTION__,__LINE__);
 
 #ifdef __amigaos4__
 	if (ITimer) DropInterface ((struct Interface *)ITimer);
@@ -102,6 +114,8 @@ printf("%s:%d\n",__FUNCTION__,__LINE__);
 	closeLib(Layers);
 	closeLib(Intuition);
 	closeLib(CyberGfx);
+	closeLib(Workbench);
+	closeLib(Icon);
 }
 
 
@@ -147,6 +161,14 @@ static BOOL init_libs (void)
 	AslBase = OpenLibrary ("asl.library", 53);
 	if (AslBase) IAsl = (struct AslIFace *) GetInterface (AslBase, "main", 1, NULL);
 	if (!IAsl)  return FALSE;
+
+	WorkbenchBase = OpenLibrary ("workbench.library", 53);
+	if (WorkbenchBase) IWorkbench = (struct WorkbenchIFace *) GetInterface (WorkbenchBase, "main", 1, NULL);
+	if (!IWorkbench)  return FALSE;
+
+	IconBase = OpenLibrary ("icon.library", 53);
+	if (IconBase) IIcon = (struct IconIFace *) GetInterface (IconBase, "main", 1, NULL);
+	if (!IIcon)  return FALSE;
 
 	if(!ITimer || !IExpansion) return FALSE;
 
