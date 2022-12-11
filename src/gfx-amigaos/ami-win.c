@@ -1875,61 +1875,6 @@ int fullscreen = 0;
 
 static int graphics_subinit (void)
 {
-	printf("not yet wokring!!!\n");
-}
-
-int graphics_init (void)
-{
-    int i, bitdepth;
-
-    use_delta_buffer = 0;
-    need_dither = 0;
-    use_cyb = 0;
-
-/* We'll ignore color_mode for now.
-    if (currprefs.color_mode > 5) {
-        write_log ("Bad color mode selected. Using default.\n");
-        currprefs.color_mode = 0;
-    }
-*/
-
-    gfxvidinfo.width  = currprefs.gfx_width_win;
-    gfxvidinfo.height = currprefs.gfx_height_win;
-
-    if (gfxvidinfo.width < 320)
-	gfxvidinfo.width = 320;
-    if (!currprefs.gfx_correct_aspect && (gfxvidinfo.width < 64))
-	gfxvidinfo.width = 200;
-
-    gfxvidinfo.width += 7;
-    gfxvidinfo.width &= ~7;
-
-#ifdef USE_CGX_OVERLAY
-	use_overlay = currprefs.amiga_use_overlay;
-	fullscreen = (currprefs.amiga_screen_type == UAESCREENTYPE_ASK) || (currprefs.amiga_screen_type == UAESCREENTYPE_CUSTOM);
-#endif
-
-    switch (currprefs.amiga_screen_type) {
-	case UAESCREENTYPE_ASK:
-	    if (setup_userscreen ())
-		break;
-	    write_log ("Trying on public screen...\n");
-	    /* fall trough */
-	case UAESCREENTYPE_PUBLIC:
-	    is_halfbrite = 0;
-	    if (setup_publicscreen ()) {
-		usepub = 1;
-		break;
-	    }
-	    write_log ("Trying on custom screen...\n");
-	    /* fall trough */
-	case UAESCREENTYPE_CUSTOM:
-	default:
-	    if (!setup_customscreen ())
-		return 0;
-	    break;
-    }
-
     set_prWindowPtr (W);
 
     Line = AllocVecTagList ((gfxvidinfo.width + 15) & ~15, tags_public );
@@ -2043,17 +1988,68 @@ int graphics_init (void)
 	write_log ("AMIGFX: Failed to init colors.\n");
 	return 0;
     }
+}
 
-    if (!usepub)
-	ScreenToFront (S);
+int graphics_init (void)
+{
+	int i, bitdepth;
 
-    reset_drawing ();
+	use_delta_buffer = 0;
+	need_dither = 0;
+	use_cyb = 0;
 
-    set_default_hotkeys (ami_hotkeys);
+	gfxvidinfo.width  = currprefs.gfx_width_win;
+	gfxvidinfo.height = currprefs.gfx_height_win;
 
-    pointer_state = DONT_KNOW;
+	if (gfxvidinfo.width < 320) gfxvidinfo.width = 320;
+	if (!currprefs.gfx_correct_aspect && (gfxvidinfo.width < 64)) gfxvidinfo.width = 200;
 
-   return 1;
+	gfxvidinfo.width += 7;
+	gfxvidinfo.width &= ~7;
+
+	switch (currprefs.amiga_screen_type)
+	{
+		case UAESCREENTYPE_ASK:
+
+			if (setup_userscreen ()) break;
+
+			write_log ("Trying on public screen...\n");
+			/* fall trough */
+
+	case UAESCREENTYPE_PUBLIC:
+
+			is_halfbrite = 0;
+			if (setup_publicscreen ())
+			{
+				usepub = 1;
+				break;
+			}
+			write_log ("Trying on custom screen...\n");
+			/* fall trough */
+
+	case UAESCREENTYPE_CUSTOM:
+
+	default:
+			if (!setup_customscreen ())
+			return 0;
+			break;
+	}
+
+	if (graphics_subinit () == 0) 
+	{
+		write_log ("AMIGFX: subsystem failed.\n");
+		return 0;
+	}
+
+	if (S) ScreenToFront (S);
+
+	reset_drawing ();
+
+	set_default_hotkeys (ami_hotkeys);
+
+	pointer_state = DONT_KNOW;
+
+	return 1;
 }
 
 /****************************************************************************/
@@ -2075,33 +2071,42 @@ void close_window()
 
 static void graphics_subshutdown (void)
 {
-    if (BitMap) {
-	WaitBlit ();
-	myFreeBitMap (BitMap);
-	BitMap = NULL;
-    }
+	if (BitMap)
+	{
+		WaitBlit ();
+		FreeBitMap (BitMap);
+		BitMap = NULL;
+	}
 
-    if (TempRPort) {
-	FreeVec (TempRPort);
-	TempRPort = NULL;
-    }
+	if (TempRPort)
+	{
+		FreeVec (TempRPort);
+		TempRPort = NULL;
+	}
 
-    if (Line) {
-	FreeVec (Line);
-	Line = NULL;
-    }
+	if (Line)
+	{
+		FreeVec (Line);
+		Line = NULL;
+	}
 
-    if (CybBuffer) {
-	FreeVec (CybBuffer);
-        CybBuffer = NULL;
-    }
+	if (CybBuffer)
+	{
+		FreeVec (CybBuffer);
+		CybBuffer = NULL;
+	}
 
+	if (comp_RP.BitMap)
+	{
+		FreeBitMap(comp_RP.BitMap);
+		comp_RP.BitMap = NULL;
+	}
 }
 
 void graphics_leave (void)
 {
-    closepseudodevices ();
-    appw_exit ();
+	closepseudodevices ();
+	appw_exit ();
 
 	if (CM)
 	{
@@ -2112,12 +2117,6 @@ void graphics_leave (void)
 	graphics_subshutdown();
 
 	close_window();
-
-	if (comp_RP.BitMap)
-	{
-		FreeBitMap(comp_RP.BitMap);
-		comp_RP.BitMap = NULL;
-	}
 
 	if (!usepub && S) 
 	{
