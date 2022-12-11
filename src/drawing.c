@@ -139,6 +139,8 @@ typedef void (*line_draw_func)(int, int);
 
 static char linestate[(MAXVPOS + 1) * 2 + 1];
 
+#define dprintf(fmt,...)
+
 uae_u8 line_data[(MAXVPOS + 1) * 2][MAX_PLANES * MAX_WORDS_PER_LINE * 2];
 
 /* Centering variables.  */
@@ -390,36 +392,38 @@ static void fill_line_32 (uae_u8 *buf, unsigned int start, unsigned int stop)
 
 STATIC_INLINE void fill_line (void)
 {
-    int shift;
-    int nints, nrem;
-    int *start;
-    xcolnr val;
+	int shift;
+	int nints, nrem;
+	int *start;
+	xcolnr val;
 
-    shift = 0;
-    if (gfxvidinfo.pixbytes == 2)
-	shift = 1;
-    if (gfxvidinfo.pixbytes == 4)
-	shift = 2;
+	shift = 0;
+	if (gfxvidinfo.pixbytes == 2) shift = 1;
+	if (gfxvidinfo.pixbytes == 4)shift = 2;
 
-    nints = gfxvidinfo.width >> (2-shift);
-    nrem = nints & 7;
-    nints &= ~7;
-    start = (int *)(((char *)xlinebuffer) + (visible_left_border << shift));
+	nints = gfxvidinfo.width >> (2-shift);
+	nrem = nints & 7;
+	nints &= ~7;
+
+	dprintf("%s:%d xlinebuffer: %08x\n",xlinebuffer);
+
+	start = (int *)(((char *)xlinebuffer) + (visible_left_border << shift));
 #ifdef AGA
-    val = brdblank ? 0 : colors_for_drawing.acolors[0];
+	val = brdblank ? 0 : colors_for_drawing.acolors[0];
 #else
-    val = colors_for_drawing.acolors[0];
+	val = colors_for_drawing.acolors[0];
 #endif
-    for (; nints > 0; nints -= 8, start += 8) {
-	*start = val;
-	*(start+1) = val;
-	*(start+2) = val;
-	*(start+3) = val;
-	*(start+4) = val;
-	*(start+5) = val;
-	*(start+6) = val;
-	*(start+7) = val;
-    }
+	for (; nints > 0; nints -= 8, start += 8)
+	{
+		*start = val;
+		*(start+1) = val;
+		*(start+2) = val;
+		*(start+3) = val;
+		*(start+4) = val;
+		*(start+5) = val;
+		*(start+6) = val;
+		*(start+7) = val;
+	}
 
     switch (nrem) {
      case 7:
@@ -1133,14 +1137,25 @@ STATIC_INLINE void do_flush_screen (int start, int stop)
        Should be corrected.
        (sjo 26.9.99) */
 
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
     if (gfxvidinfo.maxblocklines != 0 && first_block_line != NO_BLOCK) {
 	flush_block (first_block_line, last_block_line);
     }
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
     unlockscr ();
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
     if (start <= stop)
 	flush_screen (start, stop);
     else if (is_vsync ())
 	flush_screen (0, 0); /* vsync mode */
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
 }
 
 static int drawing_color_matches;
@@ -1318,171 +1333,245 @@ STATIC_INLINE void pfield_draw_line (int lineno, int gfx_ypos, int follow_ypos)
     int do_double = 0;
     enum double_how dh;
 
-    dp_for_drawing = line_decisions + lineno;
-    dip_for_drawing = curr_drawinfo + lineno;
-    mungedip (lineno);
-    switch (linestate[lineno]) {
-    case LINE_REMEMBERED_AS_PREVIOUS:
-	if (!warned)
-	    write_log ("Shouldn't get here... this is a bug.\n"), warned++;
-	return;
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
 
-    case LINE_BLACK:
-	linestate[lineno] = LINE_REMEMBERED_AS_BLACK;
-	border = 2;
-	break;
+	dp_for_drawing = line_decisions + lineno;
+	dip_for_drawing = curr_drawinfo + lineno;
+	mungedip (lineno);
 
-    case LINE_REMEMBERED_AS_BLACK:
-	return;
-
-    case LINE_AS_PREVIOUS:
-	dp_for_drawing--;
-	dip_for_drawing--;
-	linestate[lineno] = LINE_DONE_AS_PREVIOUS;
-	if (!dp_for_drawing->valid)
-	    return;
-	if (dp_for_drawing->plfleft == -1)
-	    border = 1;
-	break;
-
-    case LINE_DONE_AS_PREVIOUS:
-	/* fall through */
-    case LINE_DONE:
-	return;
-
-    case LINE_DECIDED_DOUBLE:
-	if (follow_ypos != -1) {
-	    do_double = 1;
-	    linestate[lineno + 1] = LINE_DONE_AS_PREVIOUS;
-	}
-
-	/* fall through */
-    default:
-	if (dp_for_drawing->plfleft == -1)
-	    border = 1;
-	linestate[lineno] = LINE_DONE;
-	break;
-    }
-
-    dh = dh_line;
-    xlinebuffer = gfxvidinfo.linemem;
-    if (xlinebuffer == 0 && do_double
-	&& (border == 0 || (border != 1 && dip_for_drawing->nr_color_changes > 0)))
-	xlinebuffer = gfxvidinfo.emergmem, dh = dh_emerg;
-    if (xlinebuffer == 0)
-	xlinebuffer = row_map[gfx_ypos], dh = dh_buf;
-    xlinebuffer -= linetoscr_x_adjust_bytes;
-
-    if (border == 0) {
-
-	pfield_expand_dp_bplcon ();
-
-	if (bplres == RES_LORES && ! currprefs.gfx_lores)
-	    currprefs.gfx_lores = 2;
-
-	pfield_init_linetoscr ();
-	pfield_doline (lineno);
-
-	adjust_drawing_colors (dp_for_drawing->ctable, dp_for_drawing->ham_seen || bplehb);
-
-	/* The problem is that we must call decode_ham() BEFORE we do the
-	   sprites. */
-	if (! border && dp_for_drawing->ham_seen) {
-	    init_ham_decoding ();
-	    if (dip_for_drawing->nr_color_changes == 0) {
-		/* The easy case: need to do HAM decoding only once for the
-		 * full line. */
-		decode_ham (visible_left_border, visible_right_border);
-	    } else /* Argh. */ {
-		do_color_changes (dummy_worker, decode_ham);
-		adjust_drawing_colors (dp_for_drawing->ctable, dp_for_drawing->ham_seen || bplehb);
-	    }
-	    bplham = dp_for_drawing->ham_at_start;
-	}
-	if (plf2pri > 5 && bplplanecnt == 5 && !(currprefs.chipset_mask & CSMASK_AGA))
-	    weird_bitplane_fix ();
-
+	switch (linestate[lineno])
 	{
-	    if (dip_for_drawing->nr_sprites) {
-		int i;
-#ifdef AGA
-		if (brdsprt)
-		    clear_bitplane_border_aga ();
-#endif
-		for (i = 0; i < dip_for_drawing->nr_sprites; i++) {
-#ifdef AGA
-		    if (currprefs.chipset_mask & CSMASK_AGA)
-			draw_sprites_aga (curr_sprite_entries + dip_for_drawing->first_sprite_entry + i);
-		    else
-#endif
-			draw_sprites_ecs (curr_sprite_entries + dip_for_drawing->first_sprite_entry + i);
+		case LINE_REMEMBERED_AS_PREVIOUS:
+		if (!warned)
+			write_log ("Shouldn't get here... this is a bug.\n"), warned++;
+			return;
+
+		case LINE_BLACK:
+			linestate[lineno] = LINE_REMEMBERED_AS_BLACK;
+			border = 2;
+			break;
+
+		case LINE_REMEMBERED_AS_BLACK:
+			return;
+
+		case LINE_AS_PREVIOUS:
+			dp_for_drawing--;
+			dip_for_drawing--;
+			linestate[lineno] = LINE_DONE_AS_PREVIOUS;
+			if (!dp_for_drawing->valid)	return;
+
+			if (dp_for_drawing->plfleft == -1)
+			border = 1;
+			break;
+
+		case LINE_DONE_AS_PREVIOUS:
+			/* fall through */
+		case LINE_DONE:
+			return;
+
+		case LINE_DECIDED_DOUBLE:
+			if (follow_ypos != -1)
+			{
+	   			do_double = 1;
+				linestate[lineno + 1] = LINE_DONE_AS_PREVIOUS;
+			}
+			/* fall through */
+
+		default:
+			if (dp_for_drawing->plfleft == -1)
+			border = 1;
+			linestate[lineno] = LINE_DONE;
+			break;
+	}
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+	dh = dh_line;
+	xlinebuffer = gfxvidinfo.linemem;
+
+	dprintf("%s:%d: gfxvidinfo.linemem %08x\n",__FUNCTION__,__LINE__, gfxvidinfo.linemem);
+
+	if (xlinebuffer == 0 && do_double && (border == 0 || (border != 1 && dip_for_drawing->nr_color_changes > 0)))
+	{
+		xlinebuffer = gfxvidinfo.emergmem, dh = dh_emerg;
+	}
+
+	dprintf("%s:%d - row_map %08x\n",__FUNCTION__,__LINE__, row_map);
+
+	if (xlinebuffer == 0)
+	{
+		xlinebuffer = row_map[gfx_ypos]; 
+		dh = dh_buf;
+	}
+
+	xlinebuffer -= linetoscr_x_adjust_bytes;
+
+	dprintf("%s:%d border: %d\n",__FUNCTION__,__LINE__, border);
+
+	if (border == 0)
+	{
+		pfield_expand_dp_bplcon ();
+
+		if (bplres == RES_LORES && ! currprefs.gfx_lores)
+			currprefs.gfx_lores = 2;
+
+		pfield_init_linetoscr ();
+		pfield_doline (lineno);
+
+		adjust_drawing_colors (dp_for_drawing->ctable, dp_for_drawing->ham_seen || bplehb);
+
+		/* The problem is that we must call decode_ham() BEFORE we do the sprites. */
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		if (! border && dp_for_drawing->ham_seen)
+		{
+			init_ham_decoding ();
+			if (dip_for_drawing->nr_color_changes == 0)
+			{
+				/* The easy case: need to do HAM decoding only once for the full line. */
+
+				decode_ham (visible_left_border, visible_right_border);
+			}
+			else /* Argh. */ 
+			{
+				do_color_changes (dummy_worker, decode_ham);
+				adjust_drawing_colors (dp_for_drawing->ctable, dp_for_drawing->ham_seen || bplehb);
+			}
+			bplham = dp_for_drawing->ham_at_start;
 		}
-	    }
-	}
 
-	do_color_changes (pfield_do_fill_line, pfield_do_linetoscr);
-	if (dh == dh_emerg)
-	    memcpy (row_map[gfx_ypos], xlinebuffer + linetoscr_x_adjust_bytes, gfxvidinfo.pixbytes * gfxvidinfo.width);
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
 
-	do_flush_line (gfx_ypos);
-	if (do_double) {
-	    if (dh == dh_emerg)
-		memcpy (row_map[follow_ypos], xlinebuffer + linetoscr_x_adjust_bytes, gfxvidinfo.pixbytes * gfxvidinfo.width);
-	    else if (dh == dh_buf)
-		memcpy (row_map[follow_ypos], row_map[gfx_ypos], gfxvidinfo.pixbytes * gfxvidinfo.width);
-	    do_flush_line (follow_ypos);
-	}
-	if (currprefs.gfx_lores == 2)
-	    currprefs.gfx_lores = 0;
+		if (plf2pri > 5 && bplplanecnt == 5 && !(currprefs.chipset_mask & CSMASK_AGA)) weird_bitplane_fix ();
 
-    } else if (border == 1) {
 
-	adjust_drawing_colors (dp_for_drawing->ctable, 0);
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
 
-	if (dip_for_drawing->nr_color_changes == 0) {
-	    fill_line ();
-	    do_flush_line (gfx_ypos);
+		if (dip_for_drawing->nr_sprites)
+		{
+			int i;
+#ifdef AGA
+			if (brdsprt)    clear_bitplane_border_aga ();
+#endif
 
-	    if (do_double) {
-		if (dh == dh_buf) {
-		    xlinebuffer = row_map[follow_ypos] - linetoscr_x_adjust_bytes;
-		    fill_line ();
+			for (i = 0; i < dip_for_drawing->nr_sprites; i++)
+			{
+#ifdef AGA
+				if (currprefs.chipset_mask & CSMASK_AGA)
+					draw_sprites_aga (curr_sprite_entries + dip_for_drawing->first_sprite_entry + i);
+				    else
+#endif
+					draw_sprites_ecs (curr_sprite_entries + dip_for_drawing->first_sprite_entry + i);
+			}
 		}
-		/* If dh == dh_line, do_flush_line will re-use the rendered line
-		 * from linemem.  */
-		do_flush_line (follow_ypos);
-	    }
-	    return;
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		do_color_changes (pfield_do_fill_line, pfield_do_linetoscr);
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		if (dh == dh_emerg)
+		{
+			memcpy (row_map[gfx_ypos], xlinebuffer + linetoscr_x_adjust_bytes, gfxvidinfo.pixbytes * gfxvidinfo.width);
+		}
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		do_flush_line (gfx_ypos);
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		if (do_double)
+		{
+			if (dh == dh_emerg)
+				memcpy (row_map[follow_ypos], xlinebuffer + linetoscr_x_adjust_bytes, gfxvidinfo.pixbytes * gfxvidinfo.width);
+			else if (dh == dh_buf)
+				memcpy (row_map[follow_ypos], row_map[gfx_ypos], gfxvidinfo.pixbytes * gfxvidinfo.width);
+			do_flush_line (follow_ypos);
+		}
+
+		if (currprefs.gfx_lores == 2) currprefs.gfx_lores = 0;
+
 	}
+	else if (border == 1)
+	{
 
-	playfield_start = visible_right_border;
-	playfield_end = visible_right_border;
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
 
-	do_color_changes (pfield_do_fill_line, pfield_do_fill_line);
+		adjust_drawing_colors (dp_for_drawing->ctable, 0);
 
-	if (dh == dh_emerg)
-	    memcpy (row_map[gfx_ypos], xlinebuffer + linetoscr_x_adjust_bytes, gfxvidinfo.pixbytes * gfxvidinfo.width);
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
 
-	do_flush_line (gfx_ypos);
-	if (do_double) {
-	    if (dh == dh_emerg)
-		memcpy (row_map[follow_ypos], xlinebuffer + linetoscr_x_adjust_bytes, gfxvidinfo.pixbytes * gfxvidinfo.width);
-	    else if (dh == dh_buf)
-		memcpy (row_map[follow_ypos], row_map[gfx_ypos], gfxvidinfo.pixbytes * gfxvidinfo.width);
-	    /* If dh == dh_line, do_flush_line will re-use the rendered line
-	     * from linemem.  */
-	    do_flush_line (follow_ypos);
+		if (dip_for_drawing->nr_color_changes == 0)
+		{
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+			fill_line ();
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+			do_flush_line (gfx_ypos);
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+			if (do_double)
+			{
+				if (dh == dh_buf)
+				{
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+					xlinebuffer = row_map[follow_ypos] - linetoscr_x_adjust_bytes;
+					fill_line ();
+				}
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+				/* If dh == dh_line, do_flush_line will re-use the rendered line from linemem.  */
+				do_flush_line (follow_ypos);
+			}
+			return;
+		}
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		playfield_start = visible_right_border;
+		playfield_end = visible_right_border;
+
+		do_color_changes (pfield_do_fill_line, pfield_do_fill_line);
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		if (dh == dh_emerg)
+			memcpy (row_map[gfx_ypos], xlinebuffer + linetoscr_x_adjust_bytes, gfxvidinfo.pixbytes * gfxvidinfo.width);
+
+		do_flush_line (gfx_ypos);
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		if (do_double)
+		{
+			if (dh == dh_emerg)
+				memcpy (row_map[follow_ypos], xlinebuffer + linetoscr_x_adjust_bytes, gfxvidinfo.pixbytes * gfxvidinfo.width);
+			else if (dh == dh_buf)
+				memcpy (row_map[follow_ypos], row_map[gfx_ypos], gfxvidinfo.pixbytes * gfxvidinfo.width);
+
+			/* If dh == dh_line, do_flush_line will re-use the rendered line from linemem.  */
+			do_flush_line (follow_ypos);
+		}
 	}
+	else
+	{
 
-    } else {
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
 
-	xcolnr tmp = colors_for_drawing.acolors[0];
-	colors_for_drawing.acolors[0] = getxcolor (0);
-	fill_line ();
-	do_flush_line (gfx_ypos);
-	colors_for_drawing.acolors[0] = tmp;
-
-    }
+		xcolnr tmp = colors_for_drawing.acolors[0];
+		colors_for_drawing.acolors[0] = getxcolor (0);
+		fill_line ();
+		do_flush_line (gfx_ypos);
+		colors_for_drawing.acolors[0] = tmp;
+	}
 }
 
 static void center_image (void)
@@ -1835,10 +1924,14 @@ void finish_drawing_frame (void)
 {
     int i;
 
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
     if (! lockscr ()) {
 	notice_screen_contents_lost ();
 	return;
     }
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
 
 #ifndef SMART_UPDATE
     /* @@@ This isn't exactly right yet. FIXME */
@@ -1848,24 +1941,48 @@ void finish_drawing_frame (void)
 	unlockscr ();
     return;
 #endif
-    for (i = 0; i < max_ypos_thisframe; i++) {
-	int where;
-	int i1;
-	int line = i + thisframe_y_adjust_real;
 
-	if (linestate[line] == LINE_UNDECIDED)
-	    break;
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
 
-	i1 = i + min_ypos_for_screen;
+	dprintf("%s:%d - linestate: %08x\n",__FUNCTION__,__LINE__, linestate);
+	dprintf("%s:%d - amiga2aspect_line_map: %08x\n",__FUNCTION__,__LINE__, amiga2aspect_line_map);
+	dprintf("%s:%d - max_ypos_thisframe: %08x\n",__FUNCTION__,__LINE__, max_ypos_thisframe);
+	dprintf("%s:%d - pfield_draw_line: %08x\n",__FUNCTION__,__LINE__, pfield_draw_line);
+	dprintf("%s:%d - linestate: %08x\n",__FUNCTION__,__LINE__, linestate);
 
-	where = amiga2aspect_line_map[i1];
-	if (where >= gfxvidinfo.height)
-	    break;
-	if (where == -1)
-	    continue;
+	for (i = 0; i < max_ypos_thisframe; i++) 
+	{
+		int where;
+		int i1;
+		int line = i + thisframe_y_adjust_real;
 
-	pfield_draw_line (line, where, amiga2aspect_line_map[i1 + 1]);
+		dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		if (linestate[line] == LINE_UNDECIDED)
+			    break;
+
+		i1 = i + min_ypos_for_screen;
+
+		dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		where = amiga2aspect_line_map[i1];
+
+		dprintf("%s:%d - where: %08x\n",__FUNCTION__,__LINE__, where);
+
+		if (where >= gfxvidinfo.height)	    break;
+
+		if (where == -1)    continue;
+
+		dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
+		pfield_draw_line (line, where, amiga2aspect_line_map[i1 + 1]);
+
+		dprintf("%s:%d\n",__FUNCTION__,__LINE__);
     }
+
+
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
     if (currprefs.leds_on_screen) {
 	int line = gfxvidinfo.height - TD_TOTAL_HEIGHT;
 	for (i = TD_TOTAL_HEIGHT; i--; line++) {
@@ -1874,7 +1991,10 @@ void finish_drawing_frame (void)
 	}
     }
 
+	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+
     do_flush_screen (first_drawn_line, last_drawn_line);
+
 }
 
 void hardware_line_completed (int lineno)
