@@ -1852,6 +1852,22 @@ static APTR setup_cgx_buffer (struct vidbuf_description *gfxinfo, const struct R
 int fullscreen = 0;
 #endif
 
+static int graphics_subinit_picasso(void)
+{
+	/* Initialize structure for Picasso96 video modes */
+
+//	picasso_vidinfo.rowbytes	= display->pitch;
+	picasso_vidinfo.extra_mem	= 1;
+	picasso_vidinfo.depth	= bitdepth;
+	picasso_has_invalid_lines	= 0;
+	picasso_invalid_start	= picasso_vidinfo.height + 1;
+	picasso_invalid_stop	= -1;
+
+	memset (picasso_invalid_lines, 0, sizeof picasso_invalid_lines);
+
+	return 1;
+}
+
 static int graphics_subinit (void)
 {
 	set_prWindowPtr (W);
@@ -1965,6 +1981,13 @@ DEBUG_LOG("%s:%d\n",__FUNCTION__,__LINE__);
 	write_log ("AMIGFX: Failed to init colors.\n");
 	return 0;
     }
+
+	if (screen_is_picasso)
+	{
+		return graphics_subinit_picasso ();
+	}
+
+	return 1;
 }
 
 int graphics_init (void)
