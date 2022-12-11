@@ -215,21 +215,6 @@ extern struct LayersIFace *ILayers;
 extern struct IntuitionIFace *IIntuition;
 extern struct CyberGfxIFace *ICyberGfx;
 
-#ifdef USE_CGX_OVERLAY
-int use_overlay = 0;
-UWORD * vlayer_baseaddress = NULL;
-APTR VLHandle = NULL;
-BOOL attached=FALSE;
-BOOL Bilinear=TRUE;
-
-void CloseOverlay(void);
-int  AttachOverlay(struct Window * window);
-APTR LockAddress(void);
-void UnlockAddress(void);
-void SwapBuffer(void);
-void ToggleBilinear(void);
-#endif
-
 bool empty_msg_queue(struct MsgPort *port);
 
 unsigned long            frame_num; /* for arexx */
@@ -247,13 +232,7 @@ extern struct kIcon iconifyIcon;
 extern struct kIcon padlockicon;
 extern struct kIcon fullscreenicon;
 
-#ifdef USE_CYBERGFX
-# ifdef USE_CYBERGFX_V41
 static uae_u8 *CybBuffer = NULL;
-# else
-static struct BitMap    *CybBitMap;
-# endif
-#endif
 static struct ColorMap  *CM = NULL;
 static int              XOffset,YOffset;
 
@@ -2453,8 +2432,6 @@ void LED (int on)
 static void add_p96_mode (int width, int height, int emulate_chunky, int *count)
 {
 	unsigned int i;
-
-	bit_unit = 32;
 
 	for (i = 0; i <= (emulate_chunky ? 1 : 0); i++)
 	{
