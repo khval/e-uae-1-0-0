@@ -29,6 +29,8 @@
 # endif
 #endif
 
+
+
 //#define DEBUG
 
 /****************************************************************************/
@@ -106,18 +108,24 @@
 
 #include "window_icons.h"
 
+#define DEBUG_LOG(fmt,...) DebugPrintF(fmt, ##__VA_ARGS__)
+
 // #define BitMap Picasso96BitMap  /* Argh! */
 
-#ifdef PICASSO96
-#undef PICASSO96
-#define PICASSO96_SUPPORTED
-#include "../include/picasso96.h"
+#ifdef PICASSO96_SUPPORTED
+#include "picasso96.h"
 #endif
+
+#undef LockBitMapTags
+#undef UnlockBitMap
+
+extern struct GraphicsIFace *IGraphics;
 
 #undef BitMap
 
 #ifdef PICASSO96
-static int screen_is_picasso;
+
+int screen_is_picasso = 0;
 static int screen_was_picasso;
 static char picasso_invalid_lines[1201];
 static int picasso_has_invalid_lines;
@@ -126,8 +134,7 @@ static int picasso_maxw = 0, picasso_maxh = 0;
 static int mode_count;
 extern struct picasso_vidbuf_description picasso_vidinfo;
 
-
-static int amigfx_bitdepth, bit_unit;
+static int bitdepth, bit_unit = 32;
 static int current_width, current_height;
 
 static int red_bits, green_bits, blue_bits;
@@ -141,21 +148,10 @@ struct p96colors
 	UBYTE b;
 };
 
-
-struct TagItem tags_any[] = {
-							{AVT_Type,MEMF_SHARED},
-							{TAG_DONE,0}
-						};
-
-struct TagItem tags_public[] = {
-							{AVT_Type,MEMF_SHARED},
-							{TAG_DONE,0}
-						};
-
 static struct p96colors p96Colors[256];
 
 /* Standard P96 screen modes */
-#define MAX_SCREEN_MODES 12
+#define MAX_SCREEN_MODES 11
 static int x_size_table[MAX_SCREEN_MODES] = { 320, 320, 320, 320, 640, 640, 640, 800, 1024, 1152, 1280 };
 static int y_size_table[MAX_SCREEN_MODES] = { 200, 240, 256, 400, 350, 480, 512, 600, 768,  864,  1024 };
 
@@ -179,6 +175,8 @@ static struct screen_rect screenmode[MAX_SDL_SCREENMODE];
 
 #define UAEIFF "UAEIFF"        /* env: var to trigger iff dump */
 #define UAESM  "UAESM"         /* env: var for screen mode */
+
+static void graphics_subshutdown (void);
 
 static void open_window(void);
 static void close_window(void);
@@ -225,28 +223,13 @@ extern struct LayersIFace *ILayers;
 extern struct IntuitionIFace *IIntuition;
 extern struct CyberGfxIFace *ICyberGfx;
 
-#ifdef USE_CGX_OVERLAY
-int use_overlay = 0;
-UWORD * vlayer_baseaddress = NULL;
-APTR VLHandle = NULL;
-BOOL attached=FALSE;
-BOOL Bilinear=TRUE;
-
-int  InitOverlay(struct Screen * screen, int width, int height);
-void CloseOverlay(void);
-int  AttachOverlay(struct Window * window);
-APTR LockAddress(void);
-void UnlockAddress(void);
-void SwapBuffer(void);
-void ToggleBilinear(void);
-#endif
-
 bool empty_msg_queue(struct MsgPort *port);
 
 unsigned long            frame_num; /* for arexx */
 
 struct RastPort  comp_RP;
 
+static UBYTE			*Line = NULL;
 static struct Screen		*S = NULL;;
 struct RastPort			*RP = NULL;
 struct Window			*W = NULL;
@@ -257,9 +240,7 @@ extern struct kIcon iconifyIcon;
 extern struct kIcon padlockicon;
 extern struct kIcon fullscreenicon;
 
-
-//static struct BitMap    *CybBitMap;
-
+static uae_u8 *CybBuffer = NULL;
 static struct ColorMap  *CM = NULL;
 static int              XOffset,YOffset;
 
@@ -280,14 +261,13 @@ static int grabTicks;
 
 /*****************************************************************************/
 
-static struct BitMap *myAllocBitMap(ULONG,ULONG,ULONG,ULONG,struct BitMap *);
 static void set_title(void);
-static void myFreeBitMap(struct BitMap *);
 static LONG ObtainColor(ULONG, ULONG, ULONG);
 static void ReleaseColors(void);
 static int  DoSizeWindow(struct Window *,int,int);
 static int  init_ham(void);
 static void ham_conv(UWORD *src, UBYTE *buf, UWORD len);
+static int  RPDepth(struct RastPort *RP);
 static int get_nearest_color(int r, int g, int b);
 
 /****************************************************************************/
@@ -360,22 +340,20 @@ static struct uae_hotkeyseq ami_hotkeys[] =
 
 extern UBYTE cidx[4][8*4096];
 
-#define DEBUG_LOG(...)
-
 
 /*
  * Dummy buffer locking methods
  */
-static int amigfx_lock (struct vidbuf_description *gfxinfo)
+static int dummy_lock (struct vidbuf_description *gfxinfo)
 {
-    return 1;
+	return 1;
 }
 
-static void amigfx_unlock (struct vidbuf_description *gfxinfo)
+static void dummy_unlock (struct vidbuf_description *gfxinfo)
 {
 }
 
-static void amigfx_flush_screen (struct vidbuf_description *gfxinfo, int first_line, int last_line)
+static void dummy_flush_screen (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
 }
 
@@ -465,10 +443,10 @@ STATIC_INLINE void flush_line_planar_dither (struct vidbuf_description *gfxinfo,
     CopyMem (src, dst, len * 2);
 
     /* Dither changed pixels to Line buffer */
-    DitherLine (gfxvidinfo.linemem, src, xs, line_no, (len + 3) & ~3, 8);
+    DitherLine (Line, src, xs, line_no, (len + 3) & ~3, 8);
 
     /* Blit dithered pixels from Line buffer to the display */
-    WritePixelLine8 (RP, xs + XOffset, line_no + YOffset, len, gfxvidinfo.linemem, TempRPort);
+    WritePixelLine8 (RP, xs + XOffset, line_no + YOffset, len, Line, TempRPort);
 }
 
 static void flush_block_planar_dither (struct vidbuf_description *gfxinfo, int first_line, int last_line)
@@ -487,8 +465,8 @@ STATIC_INLINE void flush_line_ham (struct vidbuf_description *gfxinfo, int line_
     int     len = gfxinfo->width;
     uae_u8 *src = gfxinfo->bufmem + (line_no * gfxinfo->rowbytes);
 
-    ham_conv ((void*) src, gfxvidinfo.linemem, len);
-    WritePixelLine8 (RP, 0, line_no, len, gfxvidinfo.linemem, TempRPort);
+    ham_conv ((void*) src, Line, len);
+    WritePixelLine8 (RP, 0, line_no, len, Line, TempRPort);
 
     return;
 }
@@ -531,7 +509,7 @@ static void flush_line_cgx_v41 (struct vidbuf_description *gfxinfo, int line_no)
 {
 	if (comp_RP.BitMap)
 	{
-		WritePixelArray (gfxvidinfo.bufmem,
+		WritePixelArray (CybBuffer,
 		     0 , line_no,
 		     gfxinfo->rowbytes,
 		     RP,
@@ -547,7 +525,7 @@ static void flush_block_cgx_v41 (struct vidbuf_description *gfxinfo, int first_l
 {
 	if (comp_RP.BitMap)
 	{
-		WritePixelArray (gfxvidinfo.bufmem,
+		WritePixelArray (CybBuffer,
 		     0 , first_line,
 		     gfxinfo->rowbytes,
 		     RP,
@@ -695,6 +673,25 @@ static void flush_clear_screen_gfxlib (struct vidbuf_description *gfxinfo)
 
 /****************************************************************************/
 
+
+static int RPDepth (struct RastPort *RP)
+{
+#ifdef USE_CYBERGFX
+	if (use_cyb)
+	{
+#ifdef USE_CGX_OVERLAY
+		if (use_overlay)
+			return 16;
+		else
+#endif
+			return GetCyberMapAttr (RP->BitMap, (LONG)CYBRMATTR_DEPTH);
+	}
+#endif
+    return RP->BitMap->Depth;
+}
+
+/****************************************************************************/
+
 static int get_color (int r, int g, int b, xcolnr *cnp)
 {
     int col;
@@ -758,7 +755,7 @@ static int get_nearest_color (int r, int g, int b)
 
     best    = 0;
     besterr = calc_err (0, 0, 0, 15, 15, 15);
-    colors  = is_halfbrite ? 32 :(1 << amigfx_bitdepth);
+    colors  = is_halfbrite ? 32 :(1 << RPDepth (RP));
 
     for (i = 0; i < colors; i++) {
 	long rgb;
@@ -890,7 +887,7 @@ static int init_colors (void)
 
     if (need_dither) {
 	/* first try color allocation */
-	int bitdepth = usepub ? 8 : amigfx_bitdepth;
+	int bitdepth = usepub ? 8 : RPDepth (RP);
 	int maxcol;
 
 	if (!currprefs.amiga_use_grey && bitdepth >= 3)
@@ -907,7 +904,7 @@ static int init_colors (void)
 	}
 
 	/* if that fail then try grey allocation */
-	maxcol = 1 << (usepub ? 8 : amigfx_bitdepth);
+	maxcol = 1 << (usepub ? 8 : RPDepth (RP));
 
 	do {
 	    get_color_failed = 0;
@@ -936,8 +933,7 @@ static int init_colors (void)
     }
 
     /* No dither */
-	switch (amigfx_bitdepth)
-	{
+    switch (RPDepth (RP)) {
 	case 6:
 	    if (is_halfbrite) {
 		static int tab[]= {
@@ -966,7 +962,7 @@ static int init_colors (void)
 	    }
 	    /* Fall through if !is_halfbrite && !is_ham */
 	case 1: case 2: case 3: case 4: case 5: case 7: case 8: {
-	    int maxcol = 1 << amigfx_bitdepth;
+	    int maxcol = 1 << RPDepth (RP);
 	    if (maxcol >= 8 && !currprefs.amiga_use_grey)
 		do {
 		    get_color_failed = 0;
@@ -1225,21 +1221,22 @@ STATIC_INLINE int min(int a, int b)
 static int setup_customscreen (void)
 {
     static struct NewWindow NewWindowStructure = {
-			0, 0, 800, 600, 0, 1,
-			IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY | IDCMP_DISKINSERTED | IDCMP_DISKREMOVED
-			| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW | IDCMP_MOUSEMOVE
-			| IDCMP_DELTAMOVE,
-			WFLG_SMART_REFRESH | WFLG_BACKDROP | WFLG_RMBTRAP | WFLG_NOCAREREFRESH
-			| WFLG_BORDERLESS | WFLG_ACTIVATE | WFLG_REPORTMOUSE,
-			NULL, NULL, NULL, NULL, NULL, 5, 5, 800, 600,
-			CUSTOMSCREEN};
+	0, 0, 800, 600, 0, 1,
+	IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY | IDCMP_DISKINSERTED | IDCMP_DISKREMOVED
+		| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW | IDCMP_MOUSEMOVE
+		| IDCMP_DELTAMOVE,
+	WFLG_SMART_REFRESH | WFLG_BACKDROP | WFLG_RMBTRAP | WFLG_NOCAREREFRESH
+	 | WFLG_BORDERLESS | WFLG_ACTIVATE | WFLG_REPORTMOUSE,
+	NULL, NULL, NULL, NULL, NULL, 5, 5, 800, 600,
+	CUSTOMSCREEN
+    };
 
-	ULONG width  = gfxvidinfo.width;
-	ULONG height = gfxvidinfo.height;
-	ULONG depth  = 0; // FIXME: Need to add some way of letting user specify preferred depth
-	ULONG mode   = INVALID_ID;
-	struct Screen *screen;
-	ULONG error;
+    ULONG width  = gfxvidinfo.width;
+    ULONG height = gfxvidinfo.height;
+    ULONG depth  = 0; // FIXME: Need to add some way of letting user specify preferred depth
+    ULONG mode   = INVALID_ID;
+    struct Screen *screen;
+    ULONG error;
 
 #ifdef USE_CYBERGFX
     /* First try to find an RTG screen that matches the requested size  */
@@ -1253,54 +1250,49 @@ static int setup_customscreen (void)
 	}
     }
 
-    if (mode != (ULONG) INVALID_ID)
-	{
-		if (depth > 8)
-		use_cyb = 1;
-	}
-	else
-	{
+    if (mode != (ULONG) INVALID_ID) {
+	if (depth > 8)
+	    use_cyb = 1;
+    } else {
 #endif
 	/* No (suitable) RTG screen available. Try a native mode */
-		depth = os39 ? 8 : (currprefs.gfx_lores ? 5 : 4);
-		mode = PAL_MONITOR_ID; // FIXME: should check whether to use PAL or NTSC.
-
-		if (currprefs.gfx_lores)
-			mode |= (gfxvidinfo.height > 256) ? LORESLACE_KEY : LORES_KEY;
-		else
-			mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
+	depth = os39 ? 8 : (currprefs.gfx_lores ? 5 : 4);
+	mode = PAL_MONITOR_ID; // FIXME: should check whether to use PAL or NTSC.
+	if (currprefs.gfx_lores)
+	    mode |= (gfxvidinfo.height > 256) ? LORESLACE_KEY : LORES_KEY;
+	else
+	    mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
 #ifdef USE_CYBERGFX
     }
 #endif
 
-	/* If the screen is larger than requested, centre UAE's display */
+    /* If the screen is larger than requested, centre UAE's display */
+    if (width > (ULONG) gfxvidinfo.width)	XOffset = (width - gfxvidinfo.width) / 2;
+    if (height > (ULONG) gfxvidinfo.height)	YOffset = (height - gfxvidinfo.height) / 2;
 
-	if (width > (ULONG) gfxvidinfo.width) 	XOffset = (width - gfxvidinfo.width) / 2;
-	if (height > (ULONG) gfxvidinfo.height) YOffset = (height - gfxvidinfo.height) / 2;
 
-	do
-	{
-		screen = OpenScreenTags (NULL,
-				SA_Width,     width,
-				SA_Height,    height,
-				SA_Depth,     depth,
-				SA_DisplayID, mode,
-				SA_Behind,    TRUE,
-				SA_ShowTitle, FALSE,
-				SA_Quiet,     TRUE,
-				SA_ErrorCode, (ULONG)&error,
-				TAG_DONE);
+    do {
+	screen = OpenScreenTags (NULL,
+				 SA_Width,     width,
+				 SA_Height,    height,
+				 SA_Depth,     depth,
+#ifdef USE_CGX_OVERLAY
+				 use_overlay ? TAG_IGNORE :
+#endif
+					SA_DisplayID, mode,
+				 SA_Behind,    TRUE,
+				 SA_ShowTitle, FALSE,
+				 SA_Quiet,     TRUE,
+				 SA_ErrorCode, (ULONG)&error,
+				 TAG_DONE);
+    } while (!screen && error == OSERR_TOODEEP && --depth > 1); /* Keep trying until we find a supported depth */
 
-	} while (!screen && error == OSERR_TOODEEP && --depth > 1); /* Keep trying until we find a supported depth */
-
-	if (!screen)
-	{
-		/* TODO; Make this error report more useful based on the error code we got */
-		write_log ("Error opening screen:%ld\n", error);
-
-		gui_message ("Cannot open custom screen for UAE.\n");
-		return 0;
-	}
+    if (!screen) {
+	/* TODO; Make this error report more useful based on the error code we got */
+	write_log ("Error opening screen:%ld\n", error);
+	gui_message ("Cannot open custom screen for UAE.\n");
+	return 0;
+    }
 
 	S  = screen;
 	CM = screen->ViewPort.ColorMap;
@@ -1319,7 +1311,7 @@ static int setup_customscreen (void)
 
 	hide_pointer (W);
 
-	return 1;
+    return 1;
 }
 
 /****************************************************************************/
@@ -1355,154 +1347,27 @@ static void open_window(void)
 	 	open_icon( W, POPUPIMAGE, GID_FULLSCREEN, &fullscreenicon );
 	 	open_icon( W, PADLOCKIMAGE, GID_PADLOCK, &padlockicon );
 	}
+
 }
-
-static int graphics_subinit (void)
-{
-	ULONG depth;
-
-	if (W)
-	{
-		CM           =  W -> WScreen ->ViewPort.ColorMap;
-		is_halfbrite = (W -> WScreen ->ViewPort.Modes & EXTRA_HALFBRITE);
-		is_ham       = (W -> WScreen ->ViewPort.Modes & HAM);
-	}
-
-	InitRastPort(&comp_RP);
-
-	depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
-	comp_RP.BitMap = AllocBitMap( gfxvidinfo.width, gfxvidinfo.height, depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
-
-	if (comp_RP.BitMap == NULL ) return 0;
-	RP = &comp_RP; 
-
-    	RectFillColor(RP, 0, 0, gfxvidinfo.width, gfxvidinfo.height, 0xFF000000);
-
-	gfxvidinfo.width  = (W->Width  - W->BorderRight - W->BorderLeft);
-	gfxvidinfo.height = (W->Height - W->BorderTop   - W->BorderBottom);
-
-	BitMap = myAllocBitMap (gfxvidinfo.width, 1, 8, BMF_CLEAR | BMF_MINPLANES, RP->BitMap);
-	if (!BitMap)
-	{
-		write_log ("Unable to allocate BitMap.\n");
-		return 0;
-	}
-
-	CopyMem (RP, TempRPort, sizeof (struct RastPort));
-	TempRPort->Layer  = NULL;
-    	TempRPort->BitMap = BitMap;
-
-	amigfx_bitdepth = RP->BitMap->Depth;
-
-	gfxvidinfo.emergmem = NULL;
-	gfxvidinfo.linemem  = NULL;
-
-	printf("bitdepth: %d\n",amigfx_bitdepth);
-
-	gfxvidinfo.pixbytes = GetBitMapAttr (RP->BitMap, BMA_BYTESPERPIXEL);
-
-	ULONG bytesPerRow = 0;
-
-	APTR lock = LockBitMapTags( TempRPort->BitMap,
-		LBM_BytesPerRow, &bytesPerRow,
-		TAG_END );
-
-	if (lock)
-	{
-		UnlockBitMap(lock);
-		lock = NULL;
-		printf("lock success\n");
-		if (bytesPerRow == 0) bytesPerRow = TempRPort -> BitMap -> BytesPerRow;
-	}
-	else
-	{
-		bytesPerRow = TempRPort -> BitMap -> BytesPerRow;
-		printf("AMIGFX: failed to get lock\n");
-		return 0;
-	}
-
-	gfxvidinfo.rowbytes = bytesPerRow;
-
-	printf("gfxvidinfo.rowbytes: %d gfxvidinfo.height: %d\n", bytesPerRow , gfxvidinfo.height );
-
-	gfxvidinfo.bufmem = AllocVecTagList (gfxvidinfo.rowbytes * gfxvidinfo.height, tags_any);
-	gfxvidinfo.linemem = AllocVecTagList ((gfxvidinfo.rowbytes + 15) & ~15, tags_public );
-
-	if ((!gfxvidinfo.bufmem) || (!gfxvidinfo.linemem))
-	{
-		if (amigfx_bitdepth > 8) 
-		{
-			amigfx_bitdepth = 8;
-			write_log ("AMIGFX: Failed to allocate off-screen buffer - falling back on 8-bit mode\n");
-		}
-	}
-
-	if (is_ham)
-	{
-		/* ham 6 */
-		use_delta_buffer       = 0; /* needless as the line must be fully recomputed */
-		need_dither            = 0;
-		gfxvidinfo.pixbytes    = 2;
-		gfxvidinfo.flush_line  = flush_line_ham;
-		gfxvidinfo.flush_block = flush_block_ham;
-	} 
-	else if (amigfx_bitdepth <= 8)
-	{
-		/* chunk2planar is slow so we define use_delta_buffer for all modes */
-
-		use_delta_buffer       = 1;
-		need_dither            = currprefs.amiga_use_dither || (amigfx_bitdepth <= 1);
-		gfxvidinfo.pixbytes    = need_dither ? 2 : 1;
-		gfxvidinfo.flush_line  = need_dither ? flush_line_planar_dither  : flush_line_planar_nodither;
-		gfxvidinfo.flush_block = need_dither ? flush_block_planar_dither : flush_block_planar_nodither;
-	}
-
-	gfxvidinfo.flush_line  = flush_line_cgx_v41;
-	gfxvidinfo.flush_block = flush_block_cgx_v41;
-	gfxvidinfo.flush_clear_screen = flush_clear_screen_gfxlib;
-	gfxvidinfo.flush_screen       = amigfx_flush_screen;
-	gfxvidinfo.lockscr            = amigfx_lock;
-	gfxvidinfo.unlockscr          = amigfx_unlock;
-
-	if ((!gfxvidinfo.bufmem) || (!gfxvidinfo.linemem))
-	{
-		write_log ("AMIGFX: Not enough memory for video bufmem.\n");
-		return 0;
-	}
-
-	if (use_delta_buffer) 
-	{
-		oldpixbuf = (uae_u8 *) calloc (gfxvidinfo.rowbytes, gfxvidinfo.height);
-		if (!oldpixbuf)
-		{
-			write_log ("AMIGFX: Not enough memory for oldpixbuf.\n");
-			return 0;
-		}
-	}
-
-	return 1;
-}
-
 
 static int setup_publicscreen(void)
 {
 	char *pubscreen = strlen (currprefs.amiga_publicscreen) ? currprefs.amiga_publicscreen : NULL;
 
 	S = LockPubScreen (pubscreen);
-
-	if (!S) 
+	if (!S)
 	{
 		gui_message ("Cannot open UAE window on public screen '%s'\n",
 			pubscreen ? pubscreen : "default");
-		return 0;
+			return 0;
 	}
-
 
 	CM = S->ViewPort.ColorMap;
 
-	if ((S->ViewPort.Modes & (HIRES | LACE)) == HIRES) 
+	if ((S->ViewPort.Modes & (HIRES | LACE)) == HIRES)
 	{
-		if (gfxvidinfo.height + S->BarHeight + 1 >= S->Height) {
+		if (gfxvidinfo.height + S->BarHeight + 1 >= S->Height)
+		{
 			gfxvidinfo.height >>= 1;
 			currprefs.gfx_correct_aspect = 1;
 		}
@@ -1519,10 +1384,20 @@ static int setup_publicscreen(void)
 		return 0;
 	}
 
+	gfxvidinfo.width  = (W->Width  - W->BorderRight - W->BorderLeft);
+	gfxvidinfo.height = (W->Height - W->BorderTop   - W->BorderBottom);
 	XOffset = 0;
 	YOffset = 0;
 
 	appw_init (W);
+
+#ifdef USE_CYBERGFX
+    if (CyberGfxBase && GetCyberMapAttr (RP->BitMap, (LONG)CYBRMATTR_ISCYBERGFX) &&
+			(GetCyberMapAttr (RP->BitMap, (LONG)CYBRMATTR_DEPTH) > 8)) {
+	use_cyb = 1;
+    }
+
+#endif
 
 	return 1;
 }
@@ -1578,6 +1453,11 @@ static int setup_userscreen (void)
     BOOL AutoScroll = TRUE;
     int release_asl = 0;
 
+#ifdef USE_CGX_OVERLAY
+    ULONG width  = gfxvidinfo.width;
+    ULONG height = gfxvidinfo.height;
+#endif
+
     ScreenRequest = AllocAslRequest (ASL_ScreenModeRequest, NULL);
 
     if (!ScreenRequest) {
@@ -1617,28 +1497,63 @@ static int setup_userscreen (void)
     if (DisplayID == (ULONG)INVALID_ID)
 	return 0;
 
-use_cyb = 1;
+#ifdef USE_CYBERGFX
+    if (CyberGfxBase && IsCyberModeID (DisplayID) && (Depth > 8)) {
+	use_cyb = 1;
 
+    }
+#endif
     if ((DisplayID & HAM_KEY) && !use_cyb )
 	Depth = 6; /* only ham6 for the moment */
+#if 0
+    if(DisplayID & DIPF_IS_HAM) Depth = 6; /* only ham6 for the moment */
+#endif
+
+#ifndef __amigaos4__
+
+	// AmigaOS4 uses compsition, and can scale to the window, we don't need any hacks...
+	// to center the screen..
+
+    /* If chosen screen is smaller than UAE display size then clip
+     * display to screen size */
+    if (ScreenWidth  < gfxvidinfo.width) gfxvidinfo.width = ScreenWidth;
+    if (ScreenHeight < gfxvidinfo.width) gfxvidinfo.height = ScreenHeight;
+
+#ifdef USE_CGX_OVERLAY
+	if (use_overlay)
+	{
+		width  = gfxvidinfo.width;
+		height = gfxvidinfo.height;
+	}
+	else
+	{
+#endif
+	    /* If chosen screen is larger, than centre UAE's display */
+	    if (ScreenWidth > gfxvidinfo.width)	 XOffset = (ScreenWidth - gfxvidinfo.width) / 2;
+	    if (ScreenHeight > gfxvidinfo.width) YOffset = (ScreenHeight - gfxvidinfo.height) / 2;
+
+#ifdef USE_CGX_OVERLAY
+	}
+#endif
+
+#endif
 
 	S = OpenScreenTags (NULL,
-			SA_DisplayID,			 DisplayID,
-			SA_Width,				 ScreenWidth,
-			SA_Height,			 ScreenHeight,
-			SA_Depth,			 Depth,
-			SA_Overscan,			 OverscanType,
-			SA_AutoScroll,			 AutoScroll,
-			SA_ShowTitle,			 FALSE,
-			SA_Quiet,				 TRUE,
-			SA_Behind,			 TRUE,
-			SA_PubName,			 (ULONG)"UAE",
+			SA_DisplayID,			DisplayID,
+			SA_Width,				ScreenWidth,
+			SA_Height,			ScreenHeight,
+			SA_Depth,			Depth,
+			SA_Overscan,			OverscanType,
+			SA_AutoScroll,			AutoScroll,
+			SA_ShowTitle,			FALSE,
+			SA_Quiet,				TRUE,
+			SA_Behind,			TRUE,
+			SA_PubName,			(ULONG)"UAE",
 			/* v39 stuff here: */
 			(os39 ? SA_BackFill : TAG_DONE), (ULONG)LAYERS_NOBACKFILL,
-			SA_SharePens,			 TRUE,
-			SA_Exclusive,			 (use_cyb ? TRUE : FALSE),
-			SA_Draggable,			 (use_cyb ? FALSE : TRUE),
-			SA_Interleaved,			 TRUE,
+			SA_SharePens,			TRUE,
+			SA_Interleaved,			TRUE,
+			SA_Exclusive,			FALSE,
 			TAG_DONE);
 	if (!S)
 	{
@@ -1646,12 +1561,19 @@ use_cyb = 1;
 		return 0;
 	}
 
-	ULONG x, Width, Height;
+	CM           =  S->ViewPort.ColorMap;
+	is_halfbrite = (S->ViewPort.Modes & EXTRA_HALFBRITE);
+	is_ham       = (S->ViewPort.Modes & HAM);
+
+	ULONG x;
+	ULONG Width;
+	ULONG Height;
 
 	Width = gfxvidinfo.width * S -> Height / gfxvidinfo.height ;
 	Height = S -> Height ;
 	
 	x = (S -> Width -  Width) / 2;		// calulate edge, two edges.
+
 
 	W = OpenWindowTags (NULL,
 			WA_Left, 			x,
@@ -1684,10 +1606,20 @@ use_cyb = 1;
 		return 0;
 	}
 
-
 	hide_pointer (W);
 
-	PubScreenStatus (S, 0);
+
+    PubScreenStatus (S, 0);
+
+#ifdef USE_CGX_OVERLAY
+	if (use_overlay)
+	{
+		XOffset	= (S->Width - min(S->Width, (S->Height*4)/3))/2;
+		YOffset	= (S->Height - min(S->Height, (S->Width*3)/4))/2;
+	}
+
+	FillPixelArray(RP, 0, 0, S->Width, S->Height, 0);
+#endif
 
     write_log ("AMIGFX: Using screenmode: 0x%lx:%ld (%lu:%ld)\n",
 	DisplayID, Depth, DisplayID, Depth);
@@ -1738,57 +1670,78 @@ static void restore_prWindowPtr (void)
 
 /****************************************************************************/
 
+struct TagItem tags_any[] = {
+							{AVT_Type,MEMF_SHARED},
+							{TAG_DONE,0}
+						};
 
+struct TagItem tags_public[] = {
+							{AVT_Type,MEMF_SHARED},
+							{TAG_DONE,0}
+						};
 
-
-int graphics_init (void)
+static APTR setup_amigfx_buffer (struct vidbuf_description *gfxinfo, const struct RastPort *rp)
 {
-	int i, bitdepth;
-	use_delta_buffer = 0;
-	need_dither = 0;
+	int bytes_per_row   = GetCyberMapAttr (rp->BitMap, CYBRMATTR_XMOD);
+	int bytes_per_pixel = GetCyberMapAttr (rp->BitMap, CYBRMATTR_BPPIX);
+	APTR buffer;
 
-	if (currprefs.color_mode > 5)
+	buffer = AllocVecTagList (bytes_per_row * gfxinfo->height, tags_any);
+
+	if (buffer)
 	{
-		write_log ("Bad color mode selected. Using default.\n");
-		currprefs.color_mode = 0;
+		gfxinfo->bufmem      = buffer;
+		gfxinfo->pixbytes    = bytes_per_pixel;
+		gfxinfo->rowbytes    = bytes_per_row;
+		gfxinfo->flush_line  = flush_line_cgx_v41;
+		gfxinfo->flush_block = flush_block_cgx_v41;
 	}
 
-	fixup_prefs_dimensions (&currprefs);
+	return buffer;
+}
 
-	current_width  = currprefs.gfx_width_win;
-	current_height = currprefs.gfx_height_win;
+static int comp_subinit( int w, int h)
+{
+	ULONG depth;
 
-	gfxvidinfo.width  = current_width;
-	gfxvidinfo.height = current_height;
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
 
-	if (gfxvidinfo.width < 320)	gfxvidinfo.width = 320;
-	if (!currprefs.gfx_correct_aspect && (gfxvidinfo.width < 64))	gfxvidinfo.width = 200;
+	InitRastPort(&comp_RP);
 
-	gfxvidinfo.width += 7;
-	gfxvidinfo.width &= ~7;
+	depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
+	comp_RP.BitMap = AllocBitMap( w,h , depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
 
-	switch (currprefs.amiga_screen_type)
+	if (comp_RP.BitMap == NULL )
 	{
-		case UAESCREENTYPE_ASK:
-			if (setup_userscreen ())
-			break;
-
-		case UAESCREENTYPE_PUBLIC:
-			is_halfbrite = 0;
-			if (setup_publicscreen ())
-			{
-				usepub = 1;
-				break;
-			}
-
-		case UAESCREENTYPE_CUSTOM:
-		default:
-			if (!setup_customscreen ())
-			return 0;
-			break;
+		printf("comp_subinit failed!!\n"); 
+		return 0;
 	}
 
-    	if (W) set_prWindowPtr (W);
+	RP = &comp_RP; 
+    	RectFillColor(RP, 0, 0, gfxvidinfo.width, gfxvidinfo.height, 0xFF000000);
+
+	return 1;
+}
+
+static int graphics_subinit_native (void)
+{
+	set_prWindowPtr (W);
+
+DEBUG_LOG("%s:%d\n",__FUNCTION__,__LINE__);
+
+	Line = AllocVecTagList ((gfxvidinfo.width + 15) & ~15, tags_public );
+	if (!Line)
+	{
+		write_log ("Unable to allocate raster buffer.\n");
+		return 0;
+	}
+
+	BitMap = AllocBitMap (gfxvidinfo.width, 1, 8, BMF_CLEAR | BMF_MINPLANES, RP->BitMap);
+	if (!BitMap)
+	{
+		write_log ("Unable to allocate BitMap.\n");
+		return 0;
+	}
 
 	TempRPort = AllocVecTagList (sizeof (struct RastPort), tags_public );
 	if (!TempRPort)
@@ -1797,7 +1750,88 @@ int graphics_init (void)
 		return 0;
 	}
 
-	graphics_subinit();
+	CopyMem (RP, TempRPort, sizeof (struct RastPort));
+	TempRPort->Layer  = NULL;
+	TempRPort->BitMap = BitMap;
+
+	if (usepub) set_title ();
+
+	bitdepth = RPDepth (RP);
+
+	printf("bitdepth: %d\n", bitdepth);
+
+	gfxvidinfo.emergmem = 0;
+	gfxvidinfo.linemem  = 0;
+
+	/*
+	 * If using P96/CGX for output try to allocate on off-screen bitmap
+	 * as the display buffer
+	 *
+	 * We do this now, so if it fails we can easily fall back on using
+	 * graphics.library and palette-based rendering.
+	 */
+
+	CybBuffer = setup_amigfx_buffer (&gfxvidinfo, RP);
+	if (!CybBuffer)
+	{
+	    /*
+	     * Failed to allocate bitmap - we need to fall back on gfx.lib rendering
+	     */
+		gfxvidinfo.bufmem = NULL;
+		use_cyb = 0;
+		if (bitdepth > 8)
+		{
+			bitdepth = 8;
+			write_log ("AMIGFX: Failed to allocate off-screen buffer - falling back on 8-bit mode\n");
+	   	}
+	}
+
+	currprefs.amiga_use_dither = 0;
+
+	if (is_ham)
+	{
+		/* ham 6 */
+		use_delta_buffer       = 0; /* needless as the line must be fully recomputed */
+		need_dither            = 0;
+		gfxvidinfo.pixbytes    = 2;
+		gfxvidinfo.flush_line  = flush_line_ham;
+		gfxvidinfo.flush_block = flush_block_ham;
+	} else if (bitdepth <= 8) 
+	{
+		/* chunk2planar is slow so we define use_delta_buffer for all modes */
+		use_delta_buffer       = 1;
+		need_dither            = currprefs.amiga_use_dither || (bitdepth <= 1);
+		gfxvidinfo.pixbytes    = need_dither ? 2 : 1;
+		gfxvidinfo.flush_line  = need_dither ? flush_line_planar_dither  : flush_line_planar_nodither;
+		gfxvidinfo.flush_block = need_dither ? flush_block_planar_dither : flush_block_planar_nodither;
+	}
+
+	gfxvidinfo.flush_clear_screen = flush_clear_screen_gfxlib;
+	gfxvidinfo.flush_screen       = dummy_flush_screen;
+	gfxvidinfo.lockscr            = dummy_lock;
+	gfxvidinfo.unlockscr          = dummy_unlock;
+
+	if (!use_cyb) 
+	{
+		gfxvidinfo.rowbytes = gfxvidinfo.pixbytes * gfxvidinfo.width;
+		gfxvidinfo.bufmem   = (uae_u8 *) calloc (gfxvidinfo.rowbytes, gfxvidinfo.height + 1);
+	}
+
+	if (!gfxvidinfo.bufmem)
+	{
+		write_log ("AMIGFX: Not enough memory for video bufmem.\n");
+		return 0;
+	}
+
+	if (use_delta_buffer)
+	{
+		oldpixbuf = (uae_u8 *) calloc (gfxvidinfo.rowbytes, gfxvidinfo.height);
+		if (!oldpixbuf)
+		{
+			write_log ("AMIGFX: Not enough memory for oldpixbuf.\n");
+			return 0;
+		}
+   	}
 
 	gfxvidinfo.maxblocklines = MAXBLOCKLINES_MAX;
 
@@ -1807,15 +1841,102 @@ int graphics_init (void)
 		return 0;
 	}
 
+	return 1;
+}
+
+
+static int graphics_subinit_picasso(void)
+{
+	/* Initialize structure for Picasso96 video modes */
+
+//	picasso_vidinfo.rowbytes	= display->pitch;
+	picasso_vidinfo.extra_mem	= 1;
+	picasso_vidinfo.depth	= bitdepth;
+	picasso_has_invalid_lines	= 0;
+	picasso_invalid_start	= picasso_vidinfo.height + 1;
+	picasso_invalid_stop	= -1;
+
+	memset (picasso_invalid_lines, 0, sizeof picasso_invalid_lines);
+
+	return 1;
+}
+
+static int graphics_subinit(void)
+{
+	if (screen_is_picasso)
+	{
+		comp_subinit( picasso_vidinfo.width, picasso_vidinfo.height );
+		if (graphics_subinit_native () == 0) return 0;
+		return graphics_subinit_picasso ();
+	}
+	else
+	{
+		comp_subinit( gfxvidinfo.width, gfxvidinfo.height );
+		return graphics_subinit_native ();
+	}
+}
+
+int graphics_init (void)
+{
+	int i, bitdepth;
+	use_delta_buffer = 0;
+	need_dither = 0;
+	use_cyb = 0;
+
+	DEBUG_LOG("%s:%d\n",__FUNCTION__,__LINE__);
+
+	gfxvidinfo.width  = currprefs.gfx_width_win;
+	gfxvidinfo.height = currprefs.gfx_height_win;
+
+	if (gfxvidinfo.width < 320) gfxvidinfo.width = 320;
+	if (!currprefs.gfx_correct_aspect && (gfxvidinfo.width < 64)) gfxvidinfo.width = 200;
+
+	gfxvidinfo.width += 7;
+	gfxvidinfo.width &= ~7;
+
+	switch (currprefs.amiga_screen_type)
+	{
+		case UAESCREENTYPE_ASK:
+
+			if (setup_userscreen ()) break;
+
+			write_log ("Trying on public screen...\n");
+			/* fall trough */
+
+	case UAESCREENTYPE_PUBLIC:
+
+			is_halfbrite = 0;
+			if (setup_publicscreen ())
+			{
+				usepub = 1;
+				break;
+			}
+			write_log ("Trying on custom screen...\n");
+			/* fall trough */
+
+	case UAESCREENTYPE_CUSTOM:
+
+	default:
+			if (!setup_customscreen ())
+			return 0;
+			break;
+	}
+
+	if (graphics_subinit () == 0) 
+	{
+		write_log ("AMIGFX: subsystem failed.\n");
+		return 0;
+	}
+
 	if (S) ScreenToFront (S);
-	
+
 	reset_drawing ();
 
 	set_default_hotkeys (ami_hotkeys);
 
 	pointer_state = DONT_KNOW;
 
-   return 1;
+	return 1;
 }
 
 /****************************************************************************/
@@ -1835,39 +1956,44 @@ void close_window()
 	free_pointer ();
 }
 
-void graphics_leave (void)
+static void graphics_subshutdown (void)
 {
-	closepseudodevices ();
-	appw_exit ();
-
-	if (gfxvidinfo.bufmem)
-	{
-		printf("-- free gfxvidinfo.bufmem\n");
-
-		FreeVec (gfxvidinfo.bufmem);
-		gfxvidinfo.bufmem = NULL;
-	}
-
-	if (gfxvidinfo.linemem)
-	{
-		printf("-- free gfxvidinfo.linemem\n");
-
-		FreeVec (gfxvidinfo.linemem);
-		gfxvidinfo.linemem = NULL;
-	}
-
 	if (BitMap)
 	{
 		WaitBlit ();
-		myFreeBitMap (BitMap);
+		FreeBitMap (BitMap);
 		BitMap = NULL;
 	}
-	
+
 	if (TempRPort)
 	{
 		FreeVec (TempRPort);
 		TempRPort = NULL;
 	}
+
+	if (Line)
+	{
+		FreeVec (Line);
+		Line = NULL;
+	}
+
+	if (CybBuffer)
+	{
+		FreeVec (CybBuffer);
+		CybBuffer = NULL;
+	}
+
+	if (comp_RP.BitMap)
+	{
+		FreeBitMap(comp_RP.BitMap);
+		comp_RP.BitMap = NULL;
+	}
+}
+
+void graphics_leave (void)
+{
+	closepseudodevices ();
+	appw_exit ();
 
 	if (CM)
 	{
@@ -1875,13 +2001,9 @@ void graphics_leave (void)
 		CM = NULL;
 	}
 
-	close_window();
+	graphics_subshutdown();
 
-	if (comp_RP.BitMap)
-	{
-		FreeBitMap(comp_RP.BitMap);
-		comp_RP.BitMap = NULL;
-	}
+	close_window();
 
 	if (!usepub && S) 
 	{
@@ -2219,107 +2341,23 @@ void LED (int on)
 
 static void add_p96_mode (int width, int height, int emulate_chunky, int *count)
 {
-    unsigned int i;
+	unsigned int i;
 
-    for (i = 0; i <= (emulate_chunky ? 1 : 0); i++) {
-	if (*count < MAX_PICASSO_MODES) {
-	    DisplayModes[*count].res.width  = width;
-	    DisplayModes[*count].res.height = height;
-	    DisplayModes[*count].depth      = (i == 1) ? 1 : bit_unit >> 3;
-	    DisplayModes[*count].refresh    = 75;
-	    (*count)++;
-
-	    write_log ("SDLGFX: Added P96 mode: %dx%dx%d\n", width, height, (i == 1) ? 8 : amigfx_bitdepth);
-	}
-    }
-    return;
-}
-
-APTR p96_lock = NULL;
-
-uae_u8 *gfx_lock_picasso (void)
-{
-	APTR address = NULL;
-
-	if (!p96_lock) gfx_unlock_picasso ();
-
-	p96_lock = LockBitMapTags(comp_RP.BitMap,
-			LBM_BaseAddress, (APTR *) &address,
-			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
-			TAG_END	);
-
-	return address;
-}
-
-void gfx_unlock_picasso (void)
-{
-    DEBUG_LOG ("Function: gfx_unlock_picasso\n");
-
-	if (p96_lock)
+	for (i = 0; i <= (emulate_chunky ? 1 : 0); i++)
 	{
-		UnLockBitMap( p96_lock );
-		p96_lock = NULL;
+		if (*count < MAX_PICASSO_MODES)
+		{
+			DisplayModes[*count].res.width  = width;
+			DisplayModes[*count].res.height = height;
+			DisplayModes[*count].depth      = (i == 1) ? 1 : bit_unit >> 3;
+			DisplayModes[*count].refresh    = 75;
+			(*count)++;
+
+			write_log ("AMIGFX: Added P96 mode: %dx%dx%d\n", width, height, (i == 1) ? 8 : bit_unit);
+		}
 	}
 }
 
-#define is_hwsurface true
-
-void DX_Invalidate (int first, int last)
-{
-    DEBUG_LOG ("Function: DX_Invalidate %i - %i\n", first, last);
-
-    if (is_hwsurface)
-	return;
-
-    if (first > last)
-	return;
-
-    picasso_has_invalid_lines = 1;
-    if (first < picasso_invalid_start)
-	picasso_invalid_start = first;
-
-    if (last > picasso_invalid_stop)
-	picasso_invalid_stop = last;
-
-    while (first <= last) {
-	picasso_invalid_lines[first] = 1;
-	first++;
-    }
-}
-
-int DX_BitsPerCannon (void)
-{
-    return 8;
-}
-
-void DX_SetPalette (int start, int count)
-{
-    DEBUG_LOG ("Function: DX_SetPalette\n");
-
-    if (! screen_is_picasso || picasso96_state.RGBFormat != RGBFB_CHUNKY)
-	return;
-
-    if (picasso_vidinfo.pixbytes != 1) {
-	/* This is the case when we're emulating a 256 color display. */
-	while (count-- > 0) {
-	    int r = picasso96_state.CLUT[start].Red;
-	    int g = picasso96_state.CLUT[start].Green;
-	    int b = picasso96_state.CLUT[start].Blue;
-	    picasso_vidinfo.clut[start++] =
-				 (doMask256 (r, red_bits, red_shift)
-				| doMask256 (g, green_bits, green_shift)
-				| doMask256 (b, blue_bits, blue_shift));
-	}
-    } else {
-	int i;
-	for (i = start; i < start+count && i < 256;  i++) {
-	    p96Colors[i].r = picasso96_state.CLUT[i].Red;
-	    p96Colors[i].g = picasso96_state.CLUT[i].Green;
-	    p96Colors[i].b = picasso96_state.CLUT[i].Blue;
-	}
-//	SDL_SetColors (screen, &p96Colors[start], start, count);
-    }
-}
 
 int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT_OPCODE opcode)
 {
@@ -2376,6 +2414,59 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 	return result;
 }
 
+#define is_hwsurface true
+
+void DX_Invalidate (int first, int last)
+{
+//    DEBUG_LOG ("Function: DX_Invalidate %d - %d\n", first, last);
+
+	if (is_hwsurface) return;
+	if (first > last) return;
+
+	picasso_has_invalid_lines = 1;
+	if (first < picasso_invalid_start) picasso_invalid_start = first;
+	if (last > picasso_invalid_stop) picasso_invalid_stop = last;
+
+	while (first <= last)
+	{
+		picasso_invalid_lines[first] = 1;
+		first++;
+	}
+}
+
+int DX_BitsPerCannon (void)
+{
+	return 8;
+}
+
+void DX_SetPalette (int start, int count)
+{
+    DEBUG_LOG ("Function: DX_SetPalette\n");
+
+    if (! screen_is_picasso || picasso96_state.RGBFormat != RGBFB_CHUNKY)
+	return;
+
+    if (picasso_vidinfo.pixbytes != 1) {
+	/* This is the case when we're emulating a 256 color display. */
+	while (count-- > 0) {
+	    int r = picasso96_state.CLUT[start].Red;
+	    int g = picasso96_state.CLUT[start].Green;
+	    int b = picasso96_state.CLUT[start].Blue;
+	    picasso_vidinfo.clut[start++] =
+				 (doMask256 (r, red_bits, red_shift)
+				| doMask256 (g, green_bits, green_shift)
+				| doMask256 (b, blue_bits, blue_shift));
+	}
+    } else {
+	int i;
+	for (i = start; i < start+count && i < 256;  i++) {
+	    p96Colors[i].r = picasso96_state.CLUT[i].Red;
+	    p96Colors[i].g = picasso96_state.CLUT[i].Green;
+	    p96Colors[i].b = picasso96_state.CLUT[i].Blue;
+	}
+//	SDL_SetColors (screen, &p96Colors[start], start, count);
+    }
+}
 
 void DX_SetPalette_vsync(void)
 {
@@ -2436,6 +2527,43 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
     return count;
 }
 
+APTR p96_lock = NULL;
+
+uae_u8 *gfx_lock_picasso (void)
+{
+	APTR address = NULL;
+
+	if (p96_lock) gfx_unlock_picasso ();
+
+	if (comp_RP.BitMap)
+	{
+		p96_lock = IGraphics -> LockBitMapTags(comp_RP.BitMap,
+			LBM_BaseAddress, (APTR *) &address,
+			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
+			TAG_END	);
+
+		if (!p96_lock)
+		{
+			DEBUG_LOG ("Function: gfx_lock_picasso, failed to get lock!\n");
+			DEBUG_LOG ("Bitmap BytesPerRow: %d, Rows: %d, Depth: %d\n", comp_RP.BitMap -> BytesPerRow, comp_RP.BitMap -> Rows, comp_RP.BitMap -> Depth);
+		}
+	}
+
+//	DEBUG_LOG ("Function: gfx_lock_picasso, address: %08x, bpr: %d\n",address, picasso_vidinfo.rowbytes);
+
+	return address;
+}
+
+void gfx_unlock_picasso (void)
+{
+//	DEBUG_LOG ("Function: gfx_unlock_picasso\n");
+
+	if (p96_lock)
+	{
+		IGraphics -> UnlockBitMap( p96_lock );
+		p96_lock = NULL;
+	}
+}
 
 static void set_window_for_picasso (void)
 {
@@ -2453,14 +2581,14 @@ static void set_window_for_picasso (void)
 
 void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 {
-    DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %i h: %i depth: %i rgbfmt: %i\n", w, h, depth, rgbfmt);
+    DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %d h: %d depth: %d rgbfmt: %d\n", w, h, depth, rgbfmt);
 
     picasso_vidinfo.width = w;
     picasso_vidinfo.height = h;
     picasso_vidinfo.depth = depth;
     picasso_vidinfo.pixbytes = bit_unit >> 3;
-    if (screen_is_picasso)
-	set_window_for_picasso();
+
+    if (screen_is_picasso) set_window_for_picasso();
 }
 
 void gfx_set_picasso_state (int on)
@@ -2475,7 +2603,7 @@ void gfx_set_picasso_state (int on)
     if ( W == NULL)
 	return
 
-    graphics_leave ();
+    graphics_subshutdown ();
     screen_was_picasso = screen_is_picasso;
     screen_is_picasso = on;
 
@@ -2483,12 +2611,12 @@ void gfx_set_picasso_state (int on)
 	// Set height, width for Picasso gfx
 	current_width  = picasso_vidinfo.width;
 	current_height = picasso_vidinfo.height;
-	graphics_init ();
+	graphics_subinit ();
     } else {
 	// Set height, width for Amiga gfx
 	current_width  = gfxvidinfo.width;
 	current_height = gfxvidinfo.height;
-	graphics_init ();
+	graphics_subinit ();
     }
 
     if (on)
@@ -2505,97 +2633,52 @@ static int led_state[5];
 static void set_title (void)
 {
 #if 0
-    static char title[80];
-    static char ScreenTitle[200];
 
-    if (!usepub)
-	return;
+	static char title[80];
+	static char ScreenTitle[200];
 
-    sprintf (title,"%sPower: [%c] Drives: [%c] [%c] [%c] [%c]",
-	     inhibit_frame? WINDOW_TITLE " (PAUSED) - " : WINDOW_TITLE,
-	     led_state[0] ? 'X' : ' ',
-	     led_state[1] ? '0' : ' ',
-	     led_state[2] ? '1' : ' ',
-	     led_state[3] ? '2' : ' ',
-	     led_state[4] ? '3' : ' ');
+	if (!usepub) return;
 
-    if (!*ScreenTitle) {
+	sprintf (title,"%sPower: [%c] Drives: [%c] [%c] [%c] [%c]",
+		inhibit_frame? WINDOW_TITLE " (PAUSED) - " : WINDOW_TITLE,
+		led_state[0] ? 'X' : ' ',
+		led_state[1] ? '0' : ' ',
+		led_state[2] ? '1' : ' ',
+		led_state[3] ? '2' : ' ',
+		led_state[4] ? '3' : ' ');
+
 	sprintf (ScreenTitle,
-                 "UAE-%d.%d.%d (%s%s%s)  by Bernd Schmidt & contributors, "
+		"UAE-%d.%d.%d (%s%s%s)  by Bernd Schmidt & contributors, "
                  "Amiga Port by Samuel Devulder.",
-		  UAEMAJOR, UAEMINOR, UAESUBREV,
-		  currprefs.cpu_level==0?"68000":
-		  currprefs.cpu_level==1?"68010":
-		  currprefs.cpu_level==2?"68020":"68020/68881",
-		  currprefs.address_space_24?" 24bits":"",
-		  currprefs.cpu_compatible?" compat":"");
-        SetWindowTitles(W, title, ScreenTitle);
-    } else SetWindowTitles(W, title, (char*)-1);
-#endif
+		UAEMAJOR, UAEMINOR, UAESUBREV,
+		currprefs.cpu_level==0?"68000":
+		currprefs.cpu_level==1?"68010":
+		currprefs.cpu_level==2?"68020":"68020/68881",
+		currprefs.address_space_24?" 24bits":"",
+		currprefs.cpu_compatible?" compat":"");
 
-    const char *title = inhibit_frame ? WINDOW_TITLE " (Display off)" : WINDOW_TITLE;
-    SetWindowTitles (W, title, (char*)-1);
+        SetWindowTitles(W, title, ScreenTitle);
+
+#else
+
+	const char *title = inhibit_frame ? WINDOW_TITLE " (Display off)" : WINDOW_TITLE;
+	SetWindowTitles (W, title, (char*)-1);
+
+#endif
 }
 
 /****************************************************************************/
 
 void main_window_led (int led, int on)                /* is used in amigui.c */
 {
+
 #if 0
-    if (led >= 0 && led <= 4)
-	led_state[led] = on;
+	if (led >= 0 && led <= 4) led_state[led] = on;
 #endif
-    set_title ();
+
+	set_title ();
 }
 
-/****************************************************************************/
-/*
- * Routines for OS2.0 (code taken out of mpeg_play by Michael Balzer)
- */
-static struct BitMap *myAllocBitMap(ULONG sizex, ULONG sizey, ULONG depth,
-                                    ULONG flags, struct BitMap *friend_bitmap)
-{
-    struct BitMap *bm;
-
-#if !defined __amigaos4__ && !defined __MORPHOS__ && !defined __AROS__
-    if (!os39) {
-	unsigned long extra = (depth > 8) ? depth - 8 : 0;
-	bm = AllocVec (sizeof *bm + (extra * 4), MEMF_CLEAR);
-	if (bm) {
-	    ULONG i;
-	    InitBitMap (bm, depth, sizex, sizey);
-	    for (i = 0; i<depth; i++) {
-		if (!(bm->Planes[i] = AllocRaster (sizex, sizey))) {
-		    while (i--)
-			FreeRaster (bm->Planes[i], sizex, sizey);
-		    FreeVec (bm);
-		    bm = 0;
-		    break;
-		}
-	    }
-	}
-    } else
-#endif
-	bm = AllocBitMap (sizex, sizey, depth, flags, friend_bitmap);
-
-    return bm;
-}
-
-/****************************************************************************/
-
-static void myFreeBitMap(struct BitMap *bm)
-{
-#if !defined __amigaos4__ && !defined __MORPHOS__ && !defined __AROS__
-    if (!os39) {
-	while(bm->Depth--)
-	    FreeRaster(bm->Planes[bm->Depth], bm->BytesPerRow*8, bm->Rows);
-	FreeVec(bm);
-    } else
-#endif
-	FreeBitMap (bm);
-
-    return;
-}
 
 /****************************************************************************/
 /*
@@ -2621,7 +2704,7 @@ static LONG ObtainColor (ULONG r,ULONG g,ULONG b)
         return i;
     }
 
-    colors = is_halfbrite ? 32 : (1 << amigfx_bitdepth);
+    colors = is_halfbrite ? 32 : (1 << RPDepth (RP));
 
     /* private screen => standard allocation */
     if (!usepub) {
@@ -3053,36 +3136,26 @@ static const char *screen_type[] = { "custom", "public", "ask", 0 };
 
 void gfx_default_options (struct uae_prefs *p)
 {
-    p->amiga_screen_type     = UAESCREENTYPE_PUBLIC;
-    p->amiga_publicscreen[0] = '\0';
-    p->amiga_use_dither      = 1;
-    p->amiga_use_grey        = 0;
-#ifdef USE_CGX_OVERLAY
-	p->amiga_use_overlay     = 0;
-#endif
+	p->amiga_screen_type     = UAESCREENTYPE_PUBLIC;
+	p->amiga_publicscreen[0] = '\0';
+	p->amiga_use_dither      = 1;
+	p->amiga_use_grey        = 0;
 }
 
 void gfx_save_options (FILE *f, const struct uae_prefs *p)
 {
-    cfgfile_write (f, GFX_NAME ".screen_type=%s\n",  screen_type[p->amiga_screen_type]);
-    cfgfile_write (f, GFX_NAME ".publicscreen=%s\n", p->amiga_publicscreen);
-    cfgfile_write (f, GFX_NAME ".use_dither=%s\n",   p->amiga_use_dither ? "true" : "false");
-    cfgfile_write (f, GFX_NAME ".use_grey=%s\n",     p->amiga_use_grey ? "true" : "false");
-#ifdef USE_CGX_OVERLAY
-	cfgfile_write (f, GFX_NAME ".use_overlay=%s\n",     p->amiga_use_overlay ? "true" : "false");
-#endif
+	cfgfile_write (f, GFX_NAME ".screen_type=%s\n",  screen_type[p->amiga_screen_type]);
+	cfgfile_write (f, GFX_NAME ".publicscreen=%s\n", p->amiga_publicscreen);
+	cfgfile_write (f, GFX_NAME ".use_dither=%s\n",   p->amiga_use_dither ? "true" : "false");
+	cfgfile_write (f, GFX_NAME ".use_grey=%s\n",     p->amiga_use_grey ? "true" : "false");
 }
 
 int gfx_parse_option (struct uae_prefs *p, const char *option, const char *value)
 {
-    return (cfgfile_yesno  (option, value, "use_dither",   &p->amiga_use_dither)
-	 || cfgfile_yesno  (option, value, "use_grey",	 &p->amiga_use_grey)
-#ifdef USE_CGX_OVERLAY
-	 || cfgfile_yesno  (option, value, "use_overlay",   &p->amiga_use_overlay)
-#endif
-     || cfgfile_strval (option, value, "screen_type",  &p->amiga_screen_type, screen_type, 0)
-     || cfgfile_string (option, value, "publicscreen", &p->amiga_publicscreen[0], 256)
-    );
+	return (cfgfile_yesno  (option, value, "use_dither",   &p->amiga_use_dither)
+		|| cfgfile_yesno  (option, value, "use_grey",	 &p->amiga_use_grey)
+		|| cfgfile_strval (option, value, "screen_type",  &p->amiga_screen_type, screen_type, 0)
+		|| cfgfile_string (option, value, "publicscreen", &p->amiga_publicscreen[0], 256));
 }
 
 /****************************************************************************/
