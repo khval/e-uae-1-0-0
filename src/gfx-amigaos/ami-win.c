@@ -276,9 +276,7 @@ static int grabTicks;
 
 /*****************************************************************************/
 
-static struct BitMap *myAllocBitMap(ULONG,ULONG,ULONG,ULONG,struct BitMap *);
 static void set_title(void);
-static void myFreeBitMap(struct BitMap *);
 static LONG ObtainColor(ULONG, ULONG, ULONG);
 static void ReleaseColors(void);
 static int  DoSizeWindow(struct Window *,int,int);
@@ -1284,44 +1282,9 @@ static int setup_customscreen (void)
 #endif
 
     /* If the screen is larger than requested, centre UAE's display */
-    if (width > (ULONG) gfxvidinfo.width)
-	XOffset = (width - gfxvidinfo.width) / 2;
-    if (height > (ULONG) gfxvidinfo.height)
-	YOffset = (height - gfxvidinfo.height) / 2;
+    if (width > (ULONG) gfxvidinfo.width)	XOffset = (width - gfxvidinfo.width) / 2;
+    if (height > (ULONG) gfxvidinfo.height)	YOffset = (height - gfxvidinfo.height) / 2;
 
-#ifdef USE_CGX_OVERLAY
-	if (use_overlay)
-	{
-		struct Screen * s = LockPubScreen("Workbench");
-
-		if (s)
-		{
-			struct DrawInfo * dri = GetScreenDrawInfo(s);
-
-			width  = s->Width;
-			height = s->Height;
-
-			if (dri)
-			{
-				ULONG id = GetVPModeID(&s->ViewPort);
-				depth = GetCyberIDAttr(CYBRIDATTR_DEPTH, id);
-			}
-			else
-			{
-				write_log("Can't get screen drawinfo\n");
-				UnlockPubScreen(NULL, s);
-				return 0;
-			}
-
-			UnlockPubScreen(NULL, s);
-		}
-		else
-		{
-			write_log ("Can't lock workbench screen\n");
-			return 0;
-		}
-	}
-#endif
 
     do {
 	screen = OpenScreenTags (NULL,
@@ -1346,9 +1309,9 @@ static int setup_customscreen (void)
 	return 0;
     }
 
-    S  = screen;
-    CM = screen->ViewPort.ColorMap;
-    RP = &screen->RastPort;
+	S  = screen;
+	CM = screen->ViewPort.ColorMap;
+	RP = &screen->RastPort;
 
 	NewWindowStructure.Width  = screen->Width;
 	NewWindowStructure.Height = screen->Height;
@@ -1361,17 +1324,7 @@ static int setup_customscreen (void)
 		return 0;
 	}
 
-#ifdef USE_CGX_OVERLAY
-	if (use_overlay)
-	{
-		XOffset	= (screen->Width - min(screen->Width, (screen->Height*4)/3))/2;
-		YOffset	= (screen->Height - min(screen->Height, (screen->Width*3)/4))/2;
-	}
-
-	FillPixelArray(RP, 0, 0, screen->Width, screen->Height, 0);
-#endif
-
-    hide_pointer (W);
+	hide_pointer (W);
 
     return 1;
 }
@@ -1399,11 +1352,8 @@ static void open_window(void)
 					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
 					| WFLG_SMART_REFRESH,
 
-
 			WA_MaxWidth, ~0,
 			WA_MaxHeight, ~0,
-
-//			WA_Zoom,         (ULONG)ZoomArray,
 			TAG_DONE);
 
 	if (W)
@@ -1417,32 +1367,26 @@ static void open_window(void)
 
 static int setup_publicscreen(void)
 {
-/*
-    UWORD ZoomArray[4] = {0, 0, 0, 0};
+	char *pubscreen = strlen (currprefs.amiga_publicscreen) ? currprefs.amiga_publicscreen : NULL;
 
-    ZoomArray[2] = 128;
-    ZoomArray[3] = S->BarHeight + 1;
-*/
-
-    char *pubscreen = strlen (currprefs.amiga_publicscreen)
-	? currprefs.amiga_publicscreen : NULL;
-
-    S = LockPubScreen (pubscreen);
-    if (!S) {
-	gui_message ("Cannot open UAE window on public screen '%s'\n",
-		pubscreen ? pubscreen : "default");
-	return 0;
-    }
-
-
-    CM = S->ViewPort.ColorMap;
-
-    if ((S->ViewPort.Modes & (HIRES | LACE)) == HIRES) {
-	if (gfxvidinfo.height + S->BarHeight + 1 >= S->Height) {
-	    gfxvidinfo.height >>= 1;
-	    currprefs.gfx_correct_aspect = 1;
+	S = LockPubScreen (pubscreen);
+	if (!S)
+	{
+		gui_message ("Cannot open UAE window on public screen '%s'\n",
+			pubscreen ? pubscreen : "default");
+			return 0;
 	}
-    }
+
+	CM = S->ViewPort.ColorMap;
+
+	if ((S->ViewPort.Modes & (HIRES | LACE)) == HIRES)
+	{
+		if (gfxvidinfo.height + S->BarHeight + 1 >= S->Height)
+		{
+			gfxvidinfo.height >>= 1;
+			currprefs.gfx_correct_aspect = 1;
+		}
+	}
 
 	open_window();
 
@@ -1455,22 +1399,10 @@ static int setup_publicscreen(void)
 		return 0;
 	}
 
-
-#ifdef USE_CGX_OVERLAY
-	gfxvidinfo.width  = currprefs.gfx_width_win;
-	gfxvidinfo.height = currprefs.gfx_height_win;
-#else
-    gfxvidinfo.width  = (W->Width  - W->BorderRight - W->BorderLeft);
-    gfxvidinfo.height = (W->Height - W->BorderTop   - W->BorderBottom);
-#endif
-
-#if 0
-	XOffset = W->BorderLeft;
-	YOffset = W->BorderTop;
-#else
+	gfxvidinfo.width  = (W->Width  - W->BorderRight - W->BorderLeft);
+	gfxvidinfo.height = (W->Height - W->BorderTop   - W->BorderBottom);
 	XOffset = 0;
 	YOffset = 0;
-#endif
 
 	InitRastPort(&comp_RP);
 
@@ -1485,16 +1417,7 @@ static int setup_publicscreen(void)
 
     	RectFillColor(RP, 0, 0, gfxvidinfo.width, gfxvidinfo.height, 0xFF000000);
 
-//	RP = W->RPort;
-
-#ifdef USE_CGX_OVERLAY
-	if (use_overlay)
-	{
-		SizeWindow(W, 0, - currprefs.gfx_height_win + currprefs.gfx_width_win*S->Height/S->Width);
-	}
-#endif
-
-    appw_init (W);
+	appw_init (W);
 
 #ifdef USE_CYBERGFX
     if (CyberGfxBase && GetCyberMapAttr (RP->BitMap, (LONG)CYBRMATTR_ISCYBERGFX) &&
@@ -1504,7 +1427,7 @@ static int setup_publicscreen(void)
 
 #endif
 
-    return 1;
+	return 1;
 }
 
 /****************************************************************************/
@@ -1891,7 +1814,7 @@ static APTR setup_cgx_buffer (struct vidbuf_description *gfxinfo, const struct R
     int bitdepth = RPDepth (RP);
     struct BitMap *bitmap;
 
-    bitmap = myAllocBitMap (gfxinfo->width, gfxinfo->height + 1,
+    bitmap = AllocBitMap (gfxinfo->width, gfxinfo->height + 1,
 			    bitdepth,
 			    (pixfmt << 24) | BMF_SPECIALFMT | BMF_MINPLANES,
 			    rp->BitMap);
@@ -2014,7 +1937,7 @@ int graphics_init (void)
 	write_log ("Unable to allocate raster buffer.\n");
 	return 0;
     }
-    BitMap = myAllocBitMap (gfxvidinfo.width, 1, 8, BMF_CLEAR | BMF_MINPLANES, RP->BitMap);
+    BitMap = AllocBitMap (gfxvidinfo.width, 1, 8, BMF_CLEAR | BMF_MINPLANES, RP->BitMap);
     if (!BitMap) {
 	write_log ("Unable to allocate BitMap.\n");
 	return 0;
@@ -2105,7 +2028,6 @@ int graphics_init (void)
 	write_log ("AMIGFX: Not enough memory for video bufmem.\n");
 	return 0;
     }
-
 
     if (use_delta_buffer) {
 	oldpixbuf = (uae_u8 *) calloc (gfxvidinfo.rowbytes, gfxvidinfo.height);
@@ -2861,54 +2783,6 @@ void main_window_led (int led, int on)                /* is used in amigui.c */
     set_title ();
 }
 
-/****************************************************************************/
-/*
- * Routines for OS2.0 (code taken out of mpeg_play by Michael Balzer)
- */
-static struct BitMap *myAllocBitMap(ULONG sizex, ULONG sizey, ULONG depth,
-                                    ULONG flags, struct BitMap *friend_bitmap)
-{
-    struct BitMap *bm;
-
-#if !defined __amigaos4__ && !defined __MORPHOS__ && !defined __AROS__
-    if (!os39) {
-	unsigned long extra = (depth > 8) ? depth - 8 : 0;
-	bm = AllocVec (sizeof *bm + (extra * 4), MEMF_CLEAR);
-	if (bm) {
-	    ULONG i;
-	    InitBitMap (bm, depth, sizex, sizey);
-	    for (i = 0; i<depth; i++) {
-		if (!(bm->Planes[i] = AllocRaster (sizex, sizey))) {
-		    while (i--)
-			FreeRaster (bm->Planes[i], sizex, sizey);
-		    FreeVec (bm);
-		    bm = 0;
-		    break;
-		}
-	    }
-	}
-    } else
-#endif
-	bm = AllocBitMap (sizex, sizey, depth, flags, friend_bitmap);
-
-    return bm;
-}
-
-/****************************************************************************/
-
-static void myFreeBitMap(struct BitMap *bm)
-{
-#if !defined __amigaos4__ && !defined __MORPHOS__ && !defined __AROS__
-    if (!os39) {
-	while(bm->Depth--)
-	    FreeRaster(bm->Planes[bm->Depth], bm->BytesPerRow*8, bm->Rows);
-	FreeVec(bm);
-    } else
-#endif
-	FreeBitMap (bm);
-
-    return;
-}
 
 /****************************************************************************/
 /*
