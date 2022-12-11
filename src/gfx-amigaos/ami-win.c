@@ -2455,20 +2455,23 @@ void LED (int on)
 
 static void add_p96_mode (int width, int height, int emulate_chunky, int *count)
 {
-    unsigned int i;
+	unsigned int i;
 
-    for (i = 0; i <= (emulate_chunky ? 1 : 0); i++) {
-	if (*count < MAX_PICASSO_MODES) {
-	    DisplayModes[*count].res.width  = width;
-	    DisplayModes[*count].res.height = height;
-	    DisplayModes[*count].depth      = (i == 1) ? 1 : bit_unit >> 3;
-	    DisplayModes[*count].refresh    = 75;
-	    (*count)++;
+	bit_unit = 32;
 
-	    write_log ("SDLGFX: Added P96 mode: %dx%dx%d\n", width, height, (i == 1) ? 8 : bitdepth);
+	for (i = 0; i <= (emulate_chunky ? 1 : 0); i++)
+	{
+		if (*count < MAX_PICASSO_MODES)
+		{
+			DisplayModes[*count].res.width  = width;
+			DisplayModes[*count].res.height = height;
+			DisplayModes[*count].depth      = (i == 1) ? 1 : bit_unit >> 3;
+			DisplayModes[*count].refresh    = 75;
+			(*count)++;
+
+			write_log ("AMIGFX: Added P96 mode: %dx%dx%d\n", width, height, (i == 1) ? 8 : bit_unit);
+		}
 	}
-    }
-    return;
 }
 
 
