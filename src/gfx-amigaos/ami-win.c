@@ -106,6 +106,8 @@
 
 #include "window_icons.h"
 
+#define DEBUG_LOG(...)
+
 // #define BitMap Picasso96BitMap  /* Argh! */
 
 #ifdef PICASSO96
@@ -222,7 +224,6 @@ APTR VLHandle = NULL;
 BOOL attached=FALSE;
 BOOL Bilinear=TRUE;
 
-int  InitOverlay(struct Screen * screen, int width, int height);
 void CloseOverlay(void);
 int  AttachOverlay(struct Window * window);
 APTR LockAddress(void);
@@ -271,93 +272,6 @@ static UBYTE pen[256];
 static int mouseGrabbed;
 static int grabTicks;
 #define GRAB_TIMEOUT 50
-#endif
-
-
-/*****************************************************************************/
-/* Overlay window under CGX */
-#ifdef USE_CGX_OVERLAY
-int InitOverlay(struct Screen * screen, int width, int height)
-{
-	if (!(VLHandle = CreateVLayerHandleTags(screen, VOA_SrcType, SRCFMT_RGB16,
-		  VOA_SrcWidth, width, VOA_SrcHeight, height,
-		  VOA_UseColorKey, TRUE, VOA_UseBackfill, TRUE,
-		  VOA_UseFilter, Bilinear,
-		  TAG_DONE)))
-		return 0;
-	return 1;
-}
-
-int AttachOverlay(struct Window * window)
-{
-	int pubscreen = currprefs.amiga_screen_type == UAESCREENTYPE_PUBLIC ? TRUE : FALSE;
-
-	if (AttachVLayerTags(VLHandle, window,
-						pubscreen ? TAG_IGNORE : VOA_LeftIndent, XOffset,
-						pubscreen ? TAG_IGNORE : VOA_RightIndent, XOffset,
-						pubscreen ? TAG_IGNORE : VOA_TopIndent,  YOffset,
-						pubscreen ? TAG_IGNORE : VOA_BottomIndent, YOffset,
-						TAG_DONE)!=0)
-	{
-		 return 0;
-	}
-	else
-	{
-		attached=TRUE;
-
-		if (pubscreen)
-		{
-			FillPixelArray (RP, XOffset, YOffset,
-						window->Width - 2*XOffset,
-						window->Height - 2*YOffset,
-						GetVLayerAttr(VLHandle, VOA_ColorKey));
-		}
-	}
-	return 1;
-}
-
-APTR LockAddress(void)
-{
-	if (LockVLayer(VLHandle))
-		return (APTR) GetVLayerAttr(VLHandle, VOA_BaseAddress);
-	else
-		return NULL;
-}
-
-void UnlockAddress(void)
-{
-	UnlockVLayer(VLHandle);
-}
-
-void SwapBuffer(void)
-{
-}
-
-void CloseOverlay(void)
-{
-	if (VLHandle)
-	{
-		if (attached)
-		{
-			DetachVLayer(VLHandle);
-			attached=FALSE;
-		}
-		DeleteVLayerHandle(VLHandle);
-
-		VLHandle = NULL;
-	}
-}
-
-void ToggleBilinear(void)
-{
-	if (Bilinear)
-		Bilinear = FALSE;
-	else
-		Bilinear = TRUE;
-
-	if (VLHandle)
-		SetVLayerAttrTags(VLHandle, VOA_UseFilter, Bilinear, TAG_DONE);
-}
 #endif
 
 /*****************************************************************************/
@@ -1850,7 +1764,7 @@ int graphics_setup (void)
 	init_pointer ();
 	initpseudodevices ();
 
-	atexit (graphics_subshutdown);
+	atexit (graphics_leave);
 
 	return 1;
 }
@@ -2035,6 +1949,11 @@ static APTR setup_cgx_buffer (struct vidbuf_description *gfxinfo, const struct R
 #ifdef USE_CGX_OVERLAY
 int fullscreen = 0;
 #endif
+
+static int graphics_subinit (void)
+{
+	printf("not yet wokring!!!\n");
+}
 
 int graphics_init (void)
 {
@@ -2234,50 +2153,41 @@ void close_window()
 
 static void graphics_subshutdown (void)
 {
-    closepseudodevices ();
-    appw_exit ();
-
-#ifdef USE_CYBERGFX
-# ifdef USE_CYBERGFX_V41
-    if (CybBuffer) {
-	FreeVec (CybBuffer);
-        CybBuffer = NULL;
-    }
-# else
-    if (CybBitMap) {
-	WaitBlit ();
-	myFreeBitMap (CybBitMap);
-	CybBitMap = NULL;
-    }
-# endif
-
-#ifdef USE_CGX_OVERLAY
-	if (use_overlay)
-	{
-		CloseOverlay();
-	}
-#endif
-
-#endif
     if (BitMap) {
 	WaitBlit ();
 	myFreeBitMap (BitMap);
 	BitMap = NULL;
     }
+
     if (TempRPort) {
 	FreeVec (TempRPort);
 	TempRPort = NULL;
     }
+
     if (Line) {
 	FreeVec (Line);
 	Line = NULL;
     }
+
+    if (CybBuffer) {
+	FreeVec (CybBuffer);
+        CybBuffer = NULL;
+    }
+
+}
+
+void graphics_leave (void)
+{
+    closepseudodevices ();
+    appw_exit ();
 
 	if (CM)
 	{
 		ReleaseColors();
 		CM = NULL;
 	}
+
+	graphics_subshutdown();
 
 	close_window();
 
@@ -2639,6 +2549,62 @@ static void add_p96_mode (int width, int height, int emulate_chunky, int *count)
     return;
 }
 
+
+int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT_OPCODE opcode)
+{
+	int result = 0;
+
+	DEBUG_LOG ("DX_Blit (sx:%d sy:%d dx:%d dy:%d w:%d h:%d op:%d)\n", srcx, srcy, dstx, dsty, width, height, opcode);
+
+	if (opcode == BLIT_SRC ) 
+	{
+		ULONG error = BltBitMapTags(
+			BLITA_SrcType, BLITT_BITMAP,
+			BLITA_DestType, BLITT_BITMAP,
+			BLITA_Source, comp_RP.BitMap,
+			BLITA_Dest, comp_RP.BitMap,
+			BLITA_SrcX, srcx,
+			BLITA_SrcY, srcy,
+			BLITA_Width,  width,
+			BLITA_Height, height,
+			BLITA_DestX, dstx,
+			BLITA_DestY, dsty,
+			TAG_END);
+
+		if (error == 0)
+		{
+			DX_Invalidate (dsty, dsty + height - 1);
+			result = 1;
+		}
+	}
+
+	return result;
+}
+
+int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE rgbtype)
+{
+	int result = 0;
+
+//	SDL_Rect rect = {dstx, dsty, width, height};
+
+	DEBUG_LOG ("DX_Fill (x:%d y:%d w:%d h:%d color=%08x)\n", dstx, dsty, width, height, color);
+
+	if (comp_RP.BitMap)
+	{
+		RectFillColor(&comp_RP, 
+			dstx, 
+			dsty, 
+			dstx + width, 
+			dsty + height,
+			color);
+
+		DX_Invalidate (dsty, dsty + height - 1);
+		result = 1;
+	}
+
+	return result;
+}
+
 #define is_hwsurface true
 
 void DX_Invalidate (int first, int last)
@@ -2694,7 +2660,7 @@ void DX_SetPalette (int start, int count)
 	    p96Colors[i].g = picasso96_state.CLUT[i].Green;
 	    p96Colors[i].b = picasso96_state.CLUT[i].Blue;
 	}
-	SDL_SetColors (screen, &p96Colors[start], start, count);
+//	SDL_SetColors (screen, &p96Colors[start], start, count);
     }
 }
 
@@ -2755,6 +2721,47 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
     }
 
     return count;
+}
+
+APTR p96_lock = NULL;
+
+uae_u8 *gfx_lock_picasso (void)
+{
+	APTR address = NULL;
+
+	if (!p96_lock) gfx_unlock_picasso ();
+
+	p96_lock = LockBitMapTags(comp_RP.BitMap,
+			LBM_BaseAddress, (APTR *) &address,
+			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
+			TAG_END	);
+
+	return address;
+}
+
+void gfx_unlock_picasso (void)
+{
+    DEBUG_LOG ("Function: gfx_unlock_picasso\n");
+
+	if (p96_lock)
+	{
+		UnLockBitMap( p96_lock );
+		p96_lock = NULL;
+	}
+}
+
+static void set_window_for_picasso (void)
+{
+    DEBUG_LOG ("Function: set_window_for_picasso\n");
+
+    if (screen_was_picasso && current_width == picasso_vidinfo.width && current_height == picasso_vidinfo.height)
+	return;
+
+    screen_was_picasso = 1;
+    graphics_leave();
+    current_width  = picasso_vidinfo.width;
+    current_height = picasso_vidinfo.height;
+    graphics_subinit();
 }
 
 void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
