@@ -106,12 +106,12 @@
 
 #include "window_icons.h"
 
-#define DEBUG_LOG(...)
+#define DEBUG_LOG(fmt,...) DebugPrintF(fmt, ##__VA_ARGS__)
 
 // #define BitMap Picasso96BitMap  /* Argh! */
 
 #ifdef PICASSO96_SUPPORTED
-#include "../include/picasso96.h"
+#include "picasso96.h"
 #endif
 
 #undef BitMap
@@ -126,7 +126,7 @@ static int picasso_maxw = 0, picasso_maxh = 0;
 static int mode_count;
 extern struct picasso_vidbuf_description picasso_vidinfo;
 
-static int bitdepth, bit_unit;
+static int bitdepth, bit_unit = 32;
 static int current_width, current_height;
 
 static int red_bits, green_bits, blue_bits;
@@ -143,7 +143,7 @@ struct p96colors
 static struct p96colors p96Colors[256];
 
 /* Standard P96 screen modes */
-#define MAX_SCREEN_MODES 12
+#define MAX_SCREEN_MODES 11
 static int x_size_table[MAX_SCREEN_MODES] = { 320, 320, 320, 320, 640, 640, 640, 800, 1024, 1152, 1280 };
 static int y_size_table[MAX_SCREEN_MODES] = { 200, 240, 256, 400, 350, 480, 512, 600, 768,  864,  1024 };
 
@@ -1544,22 +1544,21 @@ static int setup_userscreen (void)
 #endif
 
 	S = OpenScreenTags (NULL,
-			SA_DisplayID,			 DisplayID,
-			SA_Width,				 ScreenWidth,
-			SA_Height,			 ScreenHeight,
-			SA_Depth,			 Depth,
-			SA_Overscan,			 OverscanType,
-			SA_AutoScroll,			 AutoScroll,
-			SA_ShowTitle,			 FALSE,
-			SA_Quiet,				 TRUE,
-			SA_Behind,			 TRUE,
-			SA_PubName,			 (ULONG)"UAE",
+			SA_DisplayID,			DisplayID,
+			SA_Width,				ScreenWidth,
+			SA_Height,			ScreenHeight,
+			SA_Depth,			Depth,
+			SA_Overscan,			OverscanType,
+			SA_AutoScroll,			AutoScroll,
+			SA_ShowTitle,			FALSE,
+			SA_Quiet,				TRUE,
+			SA_Behind,			TRUE,
+			SA_PubName,			(ULONG)"UAE",
 			/* v39 stuff here: */
 			(os39 ? SA_BackFill : TAG_DONE), (ULONG)LAYERS_NOBACKFILL,
-			SA_SharePens,			 TRUE,
-			SA_Exclusive,			 (use_cyb ? TRUE : FALSE),
-			SA_Draggable,			 (use_cyb ? FALSE : TRUE),
-			SA_Interleaved,			 TRUE,
+			SA_SharePens,			TRUE,
+			SA_Interleaved,			TRUE,
+			SA_Exclusive,			FALSE,
 			TAG_DONE);
 	if (!S)
 	{
@@ -1852,37 +1851,42 @@ int fullscreen = 0;
 
 static int graphics_subinit (void)
 {
-    set_prWindowPtr (W);
+	set_prWindowPtr (W);
 
-    Line = AllocVecTagList ((gfxvidinfo.width + 15) & ~15, tags_public );
-    if (!Line) {
-	write_log ("Unable to allocate raster buffer.\n");
-	return 0;
-    }
-    BitMap = AllocBitMap (gfxvidinfo.width, 1, 8, BMF_CLEAR | BMF_MINPLANES, RP->BitMap);
-    if (!BitMap) {
-	write_log ("Unable to allocate BitMap.\n");
-	return 0;
-    }
-    TempRPort = AllocVecTagList (sizeof (struct RastPort), tags_public );
-    if (!TempRPort) {
-	write_log ("Unable to allocate RastPort.\n");
-	return 0;
-    }
-    CopyMem (RP, TempRPort, sizeof (struct RastPort));
-    TempRPort->Layer  = NULL;
-    TempRPort->BitMap = BitMap;
+DEBUG_LOG("%s:%d\n",__FUNCTION__,__LINE__);
 
-    if (usepub)
-	set_title ();
+	Line = AllocVecTagList ((gfxvidinfo.width + 15) & ~15, tags_public );
+	if (!Line)
+	{
+		write_log ("Unable to allocate raster buffer.\n");
+		return 0;
+	}
 
-    bitdepth = RPDepth (RP);
+	BitMap = AllocBitMap (gfxvidinfo.width, 1, 8, BMF_CLEAR | BMF_MINPLANES, RP->BitMap);
+	if (!BitMap)
+	{
+		write_log ("Unable to allocate BitMap.\n");
+		return 0;
+	}
 
-    gfxvidinfo.emergmem = 0;
-    gfxvidinfo.linemem  = 0;
+	TempRPort = AllocVecTagList (sizeof (struct RastPort), tags_public );
+	if (!TempRPort)
+	{
+		write_log ("Unable to allocate RastPort.\n");
+		return 0;
+	}
 
-#ifdef USE_CYBERGFX
-    if (use_cyb) {
+	CopyMem (RP, TempRPort, sizeof (struct RastPort));
+	TempRPort->Layer  = NULL;
+	TempRPort->BitMap = BitMap;
+
+	if (usepub) set_title ();
+
+	bitdepth = RPDepth (RP);
+
+	gfxvidinfo.emergmem = 0;
+	gfxvidinfo.linemem  = 0;
+
 	/*
 	 * If using P96/CGX for output try to allocate on off-screen bitmap
 	 * as the display buffer
@@ -1891,28 +1895,21 @@ static int graphics_subinit (void)
 	 * graphics.library and palette-based rendering.
 	 */
 
-
-# ifdef USE_CYBERGFX_V41
 	CybBuffer = setup_cgx41_buffer (&gfxvidinfo, RP);
+	if (!CybBuffer)
+	{
 
-	if (!CybBuffer) {
-# else
-	CybBitMap = setup_cgx_buffer (&gfxvidinfo, RP);
-
-	if (!CybBitMap) {
-# endif
 	    /*
 	     * Failed to allocate bitmap - we need to fall back on gfx.lib rendering
 	     */
-	    gfxvidinfo.bufmem = NULL;
-	    use_cyb = 0;
-	    if (bitdepth > 8) {
-		bitdepth = 8;
-		write_log ("AMIGFX: Failed to allocate off-screen buffer - falling back on 8-bit mode\n");
-	    }
+		gfxvidinfo.bufmem = NULL;
+		use_cyb = 0;
+		if (bitdepth > 8)
+		{
+			bitdepth = 8;
+			write_log ("AMIGFX: Failed to allocate off-screen buffer - falling back on 8-bit mode\n");
+	   	}
 	}
-    }
-#endif
 
     if (is_ham) {
 	/* ham 6 */
@@ -1970,10 +1967,11 @@ static int graphics_subinit (void)
 int graphics_init (void)
 {
 	int i, bitdepth;
-
 	use_delta_buffer = 0;
 	need_dither = 0;
 	use_cyb = 0;
+
+	DEBUG_LOG("%s:%d\n",__FUNCTION__,__LINE__);
 
 	gfxvidinfo.width  = currprefs.gfx_width_win;
 	gfxvidinfo.height = currprefs.gfx_height_win;
@@ -2508,30 +2506,25 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 
 void DX_Invalidate (int first, int last)
 {
-    DEBUG_LOG ("Function: DX_Invalidate %i - %i\n", first, last);
+//    DEBUG_LOG ("Function: DX_Invalidate %d - %d\n", first, last);
 
-    if (is_hwsurface)
-	return;
+	if (is_hwsurface) return;
+	if (first > last) return;
 
-    if (first > last)
-	return;
+	picasso_has_invalid_lines = 1;
+	if (first < picasso_invalid_start) picasso_invalid_start = first;
+	if (last > picasso_invalid_stop) picasso_invalid_stop = last;
 
-    picasso_has_invalid_lines = 1;
-    if (first < picasso_invalid_start)
-	picasso_invalid_start = first;
-
-    if (last > picasso_invalid_stop)
-	picasso_invalid_stop = last;
-
-    while (first <= last) {
-	picasso_invalid_lines[first] = 1;
-	first++;
-    }
+	while (first <= last)
+	{
+		picasso_invalid_lines[first] = 1;
+		first++;
+	}
 }
 
 int DX_BitsPerCannon (void)
 {
-    return 8;
+	return 8;
 }
 
 void DX_SetPalette (int start, int count)
@@ -2628,19 +2621,21 @@ uae_u8 *gfx_lock_picasso (void)
 {
 	APTR address = NULL;
 
-	if (!p96_lock) gfx_unlock_picasso ();
+	if (p96_lock) gfx_unlock_picasso ();
 
 	p96_lock = LockBitMapTags(comp_RP.BitMap,
 			LBM_BaseAddress, (APTR *) &address,
 			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
 			TAG_END	);
 
+	DEBUG_LOG ("Function: gfx_lock_picasso, address: %08x, bpr: %d\n",address, picasso_vidinfo.rowbytes);
+
 	return address;
 }
 
 void gfx_unlock_picasso (void)
 {
-    DEBUG_LOG ("Function: gfx_unlock_picasso\n");
+	DEBUG_LOG ("Function: gfx_unlock_picasso\n");
 
 	if (p96_lock)
 	{
@@ -2665,14 +2660,14 @@ static void set_window_for_picasso (void)
 
 void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 {
-    DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %i h: %i depth: %i rgbfmt: %i\n", w, h, depth, rgbfmt);
+    DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %d h: %d depth: %d rgbfmt: %d\n", w, h, depth, rgbfmt);
 
     picasso_vidinfo.width = w;
     picasso_vidinfo.height = h;
     picasso_vidinfo.depth = depth;
     picasso_vidinfo.pixbytes = bit_unit >> 3;
-    if (screen_is_picasso)
-	set_window_for_picasso();
+
+    if (screen_is_picasso) set_window_for_picasso();
 }
 
 void gfx_set_picasso_state (int on)
@@ -2717,36 +2712,38 @@ static int led_state[5];
 static void set_title (void)
 {
 #if 0
-    static char title[80];
-    static char ScreenTitle[200];
 
-    if (!usepub)
-	return;
+	static char title[80];
+	static char ScreenTitle[200];
 
-    sprintf (title,"%sPower: [%c] Drives: [%c] [%c] [%c] [%c]",
-	     inhibit_frame? WINDOW_TITLE " (PAUSED) - " : WINDOW_TITLE,
-	     led_state[0] ? 'X' : ' ',
-	     led_state[1] ? '0' : ' ',
-	     led_state[2] ? '1' : ' ',
-	     led_state[3] ? '2' : ' ',
-	     led_state[4] ? '3' : ' ');
+	if (!usepub) return;
 
-    if (!*ScreenTitle) {
+	sprintf (title,"%sPower: [%c] Drives: [%c] [%c] [%c] [%c]",
+		inhibit_frame? WINDOW_TITLE " (PAUSED) - " : WINDOW_TITLE,
+		led_state[0] ? 'X' : ' ',
+		led_state[1] ? '0' : ' ',
+		led_state[2] ? '1' : ' ',
+		led_state[3] ? '2' : ' ',
+		led_state[4] ? '3' : ' ');
+
 	sprintf (ScreenTitle,
-                 "UAE-%d.%d.%d (%s%s%s)  by Bernd Schmidt & contributors, "
+		"UAE-%d.%d.%d (%s%s%s)  by Bernd Schmidt & contributors, "
                  "Amiga Port by Samuel Devulder.",
-		  UAEMAJOR, UAEMINOR, UAESUBREV,
-		  currprefs.cpu_level==0?"68000":
-		  currprefs.cpu_level==1?"68010":
-		  currprefs.cpu_level==2?"68020":"68020/68881",
-		  currprefs.address_space_24?" 24bits":"",
-		  currprefs.cpu_compatible?" compat":"");
-        SetWindowTitles(W, title, ScreenTitle);
-    } else SetWindowTitles(W, title, (char*)-1);
-#endif
+		UAEMAJOR, UAEMINOR, UAESUBREV,
+		currprefs.cpu_level==0?"68000":
+		currprefs.cpu_level==1?"68010":
+		currprefs.cpu_level==2?"68020":"68020/68881",
+		currprefs.address_space_24?" 24bits":"",
+		currprefs.cpu_compatible?" compat":"");
 
-    const char *title = inhibit_frame ? WINDOW_TITLE " (Display off)" : WINDOW_TITLE;
-    SetWindowTitles (W, title, (char*)-1);
+        SetWindowTitles(W, title, ScreenTitle);
+
+#else
+
+	const char *title = inhibit_frame ? WINDOW_TITLE " (Display off)" : WINDOW_TITLE;
+	SetWindowTitles (W, title, (char*)-1);
+
+#endif
 }
 
 /****************************************************************************/
@@ -3217,36 +3214,26 @@ static const char *screen_type[] = { "custom", "public", "ask", 0 };
 
 void gfx_default_options (struct uae_prefs *p)
 {
-    p->amiga_screen_type     = UAESCREENTYPE_PUBLIC;
-    p->amiga_publicscreen[0] = '\0';
-    p->amiga_use_dither      = 1;
-    p->amiga_use_grey        = 0;
-#ifdef USE_CGX_OVERLAY
-	p->amiga_use_overlay     = 0;
-#endif
+	p->amiga_screen_type     = UAESCREENTYPE_PUBLIC;
+	p->amiga_publicscreen[0] = '\0';
+	p->amiga_use_dither      = 1;
+	p->amiga_use_grey        = 0;
 }
 
 void gfx_save_options (FILE *f, const struct uae_prefs *p)
 {
-    cfgfile_write (f, GFX_NAME ".screen_type=%s\n",  screen_type[p->amiga_screen_type]);
-    cfgfile_write (f, GFX_NAME ".publicscreen=%s\n", p->amiga_publicscreen);
-    cfgfile_write (f, GFX_NAME ".use_dither=%s\n",   p->amiga_use_dither ? "true" : "false");
-    cfgfile_write (f, GFX_NAME ".use_grey=%s\n",     p->amiga_use_grey ? "true" : "false");
-#ifdef USE_CGX_OVERLAY
-	cfgfile_write (f, GFX_NAME ".use_overlay=%s\n",     p->amiga_use_overlay ? "true" : "false");
-#endif
+	cfgfile_write (f, GFX_NAME ".screen_type=%s\n",  screen_type[p->amiga_screen_type]);
+	cfgfile_write (f, GFX_NAME ".publicscreen=%s\n", p->amiga_publicscreen);
+	cfgfile_write (f, GFX_NAME ".use_dither=%s\n",   p->amiga_use_dither ? "true" : "false");
+	cfgfile_write (f, GFX_NAME ".use_grey=%s\n",     p->amiga_use_grey ? "true" : "false");
 }
 
 int gfx_parse_option (struct uae_prefs *p, const char *option, const char *value)
 {
-    return (cfgfile_yesno  (option, value, "use_dither",   &p->amiga_use_dither)
-	 || cfgfile_yesno  (option, value, "use_grey",	 &p->amiga_use_grey)
-#ifdef USE_CGX_OVERLAY
-	 || cfgfile_yesno  (option, value, "use_overlay",   &p->amiga_use_overlay)
-#endif
-     || cfgfile_strval (option, value, "screen_type",  &p->amiga_screen_type, screen_type, 0)
-     || cfgfile_string (option, value, "publicscreen", &p->amiga_publicscreen[0], 256)
-    );
+	return (cfgfile_yesno  (option, value, "use_dither",   &p->amiga_use_dither)
+		|| cfgfile_yesno  (option, value, "use_grey",	 &p->amiga_use_grey)
+		|| cfgfile_strval (option, value, "screen_type",  &p->amiga_screen_type, screen_type, 0)
+		|| cfgfile_string (option, value, "publicscreen", &p->amiga_publicscreen[0], 256));
 }
 
 /****************************************************************************/
