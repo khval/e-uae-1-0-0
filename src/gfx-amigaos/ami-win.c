@@ -2750,11 +2750,12 @@ static void set_title (void)
 
 void main_window_led (int led, int on)                /* is used in amigui.c */
 {
+
 #if 0
-    if (led >= 0 && led <= 4)
-	led_state[led] = on;
+	if (led >= 0 && led <= 4) led_state[led] = on;
 #endif
-    set_title ();
+
+	set_title ();
 }
 
 
