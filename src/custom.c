@@ -42,7 +42,7 @@
 #include "autoconf.h"
 #include "traps.h"
 #include "gui.h"
-#include "picasso96.h"
+#include "include/picasso96.h"
 #include "drawing.h"
 #include "savestate.h"
 #include "ar.h"
