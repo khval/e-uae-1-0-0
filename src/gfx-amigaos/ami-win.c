@@ -110,9 +110,7 @@
 
 // #define BitMap Picasso96BitMap  /* Argh! */
 
-#ifdef PICASSO96
-#undef PICASSO96
-#define PICASSO96_SUPPORTED
+#ifdef PICASSO96_SUPPORTED
 #include "../include/picasso96.h"
 #endif
 

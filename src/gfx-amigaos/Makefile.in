@@ -114,7 +114,7 @@ am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
 libgfxdep_a_AR = $(AR) $(ARFLAGS)
 libgfxdep_a_LIBADD =
-am_libgfxdep_a_OBJECTS = ami-win.$(OBJEXT) ami-appw.$(OBJEXT)
+am_libgfxdep_a_OBJECTS = ami-win.$(OBJEXT) ami-appw.$(OBJEXT) comp.$(OBJEXT) window_icons.$(OBJEXT)
 libgfxdep_a_OBJECTS = $(am_libgfxdep_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -340,7 +340,7 @@ AM_CPPFLAGS = @UAE_CPPFLAGS@ -I$(top_srcdir)/src/include \
 	-I$(top_builddir)/src -I$(top_srcdir)/src
 AM_CFLAGS = @UAE_CFLAGS@
 noinst_LIBRARIES = libgfxdep.a
-libgfxdep_a_SOURCES = ami-win.c ami-appw.c
+libgfxdep_a_SOURCES = ami-win.c ami-appw.c comp.c window_icons.c
 noinst_HEADERS = gfx.h
 all: all-am
 

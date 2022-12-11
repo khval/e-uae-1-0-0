@@ -4,6 +4,6 @@ AM_CFLAGS    = @UAE_CFLAGS@
 
 noinst_LIBRARIES = libgfxdep.a
 
-libgfxdep_a_SOURCES = ami-win.c ami-appw.c
+libgfxdep_a_SOURCES = ami-win.c ami-appw.c comp.c window_icons.c
 
 noinst_HEADERS = gfx.h
