@@ -191,8 +191,7 @@ CCASDEPMODE = depmode=gcc3
 CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CDOBJS = 
-CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=    
-CFLAGS += -D__USE_INLINE__ -DPICASSO96 -Wno-implicit-fallthrough
+CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=   -DPICASSO96_SUPPORTED
 CPP = gcc -E
 CPPFLAGS =     -DCPUEMU_0 -DCPUEMU_5 -DCPUEMU_6 -DFPUEMU -D__USE_INLINE__ -DJIT -DDRIVESOUND -DAGA -DAUTOCONFIG -DFILESYS -DSUPPORT_THREADS -DFDI2RAW -DDEBUGGER -DSAVESTATE -DENFORCER -DACTION_REPLAY -DXARCADE 
 CPUOBJS = cpuemu_0.$(OBJEXT) cpuemu_5.$(OBJEXT) cpuemu_6.$(OBJEXT) fpp.$(OBJEXT)

@@ -11,9 +11,12 @@
 #include <proto/graphics.h>
 #include <proto/layers.h>
 
-//#include "options.h"
-//#include "custom.h"
-//#include "gui.h"
+#ifdef PICASSO96_SUPPORTED
+#include "sysconfig.h"
+#include "sysdeps.h"
+#include "picasso96.h"
+extern int screen_is_picasso;
+#endif
 
 #define ASM_SYM_FOR_FUNC(x) 
 
@@ -23,6 +26,8 @@
 
 #include "uae_types.h"
 #include "xwin.h"
+
+
 
 struct BackFillArgs
 {
@@ -104,6 +109,8 @@ void BackFill_Func(struct RastPort *ArgRP, struct BackFillArgs *MyArgs)
 
 void set_target_hookData( void )
 {
+ 	float scaleX,scaleY;
+
  	rect.MinX = W->BorderLeft;
  	rect.MinY = W->BorderTop;
  	rect.MaxX = W->Width - W->BorderRight - 1;
@@ -111,8 +118,17 @@ void set_target_hookData( void )
 
  	float destWidth = rect.MaxX - rect.MinX + 1;
  	float destHeight = rect.MaxY - rect.MinY + 1;
- 	float scaleX = (destWidth + 0.5f) / gfxvidinfo.width;
- 	float scaleY = (destHeight + 0.5f) / gfxvidinfo.height;
+
+	if (screen_is_picasso)
+	{
+	 	scaleX = (destWidth + 0.5f) / picasso_vidinfo.width;
+	 	scaleY = (destHeight + 0.5f) / picasso_vidinfo.height;
+	}
+	else
+	{
+	 	scaleX = (destWidth + 0.5f) / gfxvidinfo.width;
+	 	scaleY = (destHeight + 0.5f) / gfxvidinfo.height;
+	}
 
 	hookData.srcBitMap = comp_RP.BitMap;
 	hookData.srcWidth = gfxvidinfo.width;
