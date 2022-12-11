@@ -298,7 +298,7 @@ CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CDOBJS = 
 CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=    
-CFLAGS += -D__USE_INLINE__ -DPICASSO96
+CFLAGS += -D__USE_INLINE__ -DPICASSO96_SUPPORTED
 CPP = gcc -E
 CPPFLAGS =     -DCPUEMU_0 -DCPUEMU_5 -DCPUEMU_6 -DFPUEMU -D__USE_INLINE__ -DJIT -DDRIVESOUND -DAGA -DAUTOCONFIG -DFILESYS -DSUPPORT_THREADS -DFDI2RAW -DDEBUGGER -DSAVESTATE -DENFORCER -DACTION_REPLAY -DXARCADE 
 CPUOBJS = cpuemu_0.$(OBJEXT) cpuemu_5.$(OBJEXT) cpuemu_6.$(OBJEXT) fpp.$(OBJEXT)
@@ -591,7 +591,7 @@ uae_DEPENDENCIES = \
 uae_LDADD = md-ppc-gcc/libmachdep.a jd-amigainput/libjoydep.a \
 	sd-amigaos/libsnddep.a gfx-amigaos/libgfxdep.a \
 	gui-muirexx/libguidep.a keymap/libkeymap.a dms/libdms.a \
-	caps/libcaps.a blitfunc.o blittable.o cpustbl.o cpudefs.o \
+	caps/libcaps.a blitfunc.o blittable.o cpustbl.o cpudefs.o  \
 	libcpuemu.a writelog.$(OBJEXT) filesys.$(OBJEXT) fsdb.$(OBJEXT) fsusage.$(OBJEXT) hardfile.$(OBJEXT) filesys_unix.$(OBJEXT) fsdb_unix.$(OBJEXT) hardfile_unix.$(OBJEXT) bsdsocket.$(OBJEXT) scsi-none.$(OBJEXT) \
 	 debug.$(OBJEXT) ppc_disasm.$(OBJEXT) identify.$(OBJEXT)  td-amigaos/libthreaddep.a \
 	od-amiga/libosdep.a -lz  -lm -lamiga
