@@ -108,16 +108,19 @@
 
 #define DEBUG_LOG(fmt,...) DebugPrintF(fmt, ##__VA_ARGS__)
 
-// #define BitMap Picasso96BitMap  /* Argh! */
-
 #ifdef PICASSO96_SUPPORTED
 #include "picasso96.h"
 #endif
 
+#undef LockBitMapTags
+#undef UnlockBitMap
+extern struct GraphicsIFace *IGraphics;
+
 #undef BitMap
 
 #ifdef PICASSO96
-static int screen_is_picasso;
+
+int screen_is_picasso = 0;
 static int screen_was_picasso;
 static char picasso_invalid_lines[1201];
 static int picasso_has_invalid_lines;
@@ -2623,12 +2626,19 @@ uae_u8 *gfx_lock_picasso (void)
 
 	if (p96_lock) gfx_unlock_picasso ();
 
-	p96_lock = LockBitMapTags(comp_RP.BitMap,
+	if (comp_RP.BitMap)
+	{
+		p96_lock = IGraphics -> LockBitMapTags(comp_RP.BitMap,
 			LBM_BaseAddress, (APTR *) &address,
 			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
 			TAG_END	);
 
-	DEBUG_LOG ("Function: gfx_lock_picasso, address: %08x, bpr: %d\n",address, picasso_vidinfo.rowbytes);
+		if (!p96_lock)
+		{
+			DEBUG_LOG ("Function: gfx_lock_picasso, failed to get lock!\n");
+			DEBUG_LOG ("Bitmap BytesPerRow: %d, Rows: %d, Depth: %d\n", comp_RP.BitMap -> BytesPerRow, comp_RP.BitMap -> Rows, comp_RP.BitMap -> Depth);
+		}
+	}
 
 	return address;
 }
@@ -2639,7 +2649,7 @@ void gfx_unlock_picasso (void)
 
 	if (p96_lock)
 	{
-		UnLockBitMap( p96_lock );
+		IGraphics -> UnlockBitMap( p96_lock );
 		p96_lock = NULL;
 	}
 }
