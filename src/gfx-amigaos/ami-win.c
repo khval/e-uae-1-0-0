@@ -3031,7 +3031,7 @@ int is_vsync (void)
 
 void toggle_fullscreen (void)
 {
-    graphics_subshutdown ();
+    graphics_leave ();
     currprefs.amiga_screen_type = 2;
     notice_screen_contents_lost ();
     XOffset = 0;
