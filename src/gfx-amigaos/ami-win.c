@@ -2690,12 +2690,12 @@ void gfx_set_picasso_state (int on)
 	// Set height, width for Picasso gfx
 	current_width  = picasso_vidinfo.width;
 	current_height = picasso_vidinfo.height;
-	graphics_init ();
+	graphics_subinit ();
     } else {
 	// Set height, width for Amiga gfx
 	current_width  = gfxvidinfo.width;
 	current_height = gfxvidinfo.height;
-	graphics_init ();
+	graphics_subinit ();
     }
 
     if (on)
