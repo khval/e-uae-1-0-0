@@ -343,9 +343,10 @@ extern UBYTE cidx[4][8*4096];
 /*
  * Dummy buffer locking methods
  */
+
 static int dummy_lock (struct vidbuf_description *gfxinfo)
 {
-    return 1;
+	return 1;
 }
 
 static void dummy_unlock (struct vidbuf_description *gfxinfo)
@@ -355,7 +356,6 @@ static void dummy_unlock (struct vidbuf_description *gfxinfo)
 static void dummy_flush_screen (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
 }
-
 
 /*
  * Buffer methods for planar screens with no dithering.
@@ -1373,6 +1373,15 @@ void init_comp( struct Window *W )
 	}
 	
 	if (comp_RP.BitMap == NULL ) return 0;
+
+
+#ifdef USE_CYBERGFX
+    if (CyberGfxBase && GetCyberMapAttr (RP->BitMap, (LONG)CYBRMATTR_ISCYBERGFX) &&
+			(GetCyberMapAttr (RP->BitMap, (LONG)CYBRMATTR_DEPTH) > 8)) {
+	use_cyb = 1;
+    }
+
+#endif
 }
 
 
@@ -1415,17 +1424,8 @@ static int setup_publicscreen(void)
 	XOffset = 0;
 	YOffset = 0;
 
-	init_comp(W);
-
-	appw_init (W);
-
-#ifdef USE_CYBERGFX
-    if (CyberGfxBase && GetCyberMapAttr (RP->BitMap, (LONG)CYBRMATTR_ISCYBERGFX) &&
-			(GetCyberMapAttr (RP->BitMap, (LONG)CYBRMATTR_DEPTH) > 8)) {
-	use_cyb = 1;
-    }
-
-#endif
+//	init_comp(W);
+//	appw_init (W);
 
 	return 1;
 }
@@ -1636,7 +1636,7 @@ static int setup_userscreen (void)
 
 	hide_pointer (W);
 
-	init_comp(W);
+//	init_comp(W);
 
 	PubScreenStatus (S, 0);
 
@@ -1865,6 +1865,9 @@ static int graphics_subinit_picasso(void)
 
 static int graphics_subinit (void)
 {
+	init_comp(W);
+	appw_init (W);
+
 	set_prWindowPtr (W);
 
 DEBUG_LOG("%s:%d\n",__FUNCTION__,__LINE__);
@@ -2067,6 +2070,8 @@ void close_window()
 
 static void graphics_subshutdown (void)
 {
+	appw_exit ();
+
 	if (BitMap)
 	{
 		WaitBlit ();
@@ -2102,7 +2107,6 @@ static void graphics_subshutdown (void)
 void graphics_leave (void)
 {
 	closepseudodevices ();
-	appw_exit ();
 
 	if (CM)
 	{
