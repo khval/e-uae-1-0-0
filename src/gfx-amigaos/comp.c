@@ -123,16 +123,18 @@ void set_target_hookData( void )
 	{
 	 	scaleX = (destWidth + 0.5f) / picasso_vidinfo.width;
 	 	scaleY = (destHeight + 0.5f) / picasso_vidinfo.height;
+		hookData.srcWidth = picasso_vidinfo.width;
+		hookData.srcHeight = picasso_vidinfo.height;
 	}
 	else
 	{
 	 	scaleX = (destWidth + 0.5f) / gfxvidinfo.width;
 	 	scaleY = (destHeight + 0.5f) / gfxvidinfo.height;
+		hookData.srcWidth = gfxvidinfo.width;
+		hookData.srcHeight = gfxvidinfo.height;
 	}
 
 	hookData.srcBitMap = comp_RP.BitMap;
-	hookData.srcWidth = gfxvidinfo.width;
-	hookData.srcHeight = gfxvidinfo.height;
 	hookData.offsetX = W->BorderLeft;
 	hookData.offsetY = W->BorderTop;
 	hookData.scaleX = COMP_FLOAT_TO_FIX(scaleX);
