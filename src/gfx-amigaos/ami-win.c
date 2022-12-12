@@ -2508,8 +2508,6 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 {
 	int result = 0;
 
-//	SDL_Rect rect = {dstx, dsty, width, height};
-
 	DEBUG_LOG ("DX_Fill (x:%d y:%d w:%d h:%d color=%08x)\n", dstx, dsty, width, height, color);
 
 	if (comp_RP.BitMap)
@@ -2517,8 +2515,8 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 		RectFillColor(&comp_RP, 
 			dstx, 
 			dsty, 
-			dstx + width, 
-			dsty + height,
+			dstx + width - 1, 
+			dsty + height - 1,
 			color);
 
 		DX_Invalidate (dsty, dsty + height - 1);
