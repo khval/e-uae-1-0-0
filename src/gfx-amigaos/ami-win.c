@@ -1345,6 +1345,33 @@ static void open_window(void)
 
 }
 
+void init_comp( struct Window *W )
+{
+	ULONG depth =0;
+
+	InitRastPort(&comp_RP);
+	
+	depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
+
+	if (screen_is_picasso)
+	{
+		comp_RP.BitMap = AllocBitMap( picasso_vidinfo.width, picasso_vidinfo.height, depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
+
+		RP = &comp_RP; 
+    		RectFillColor(RP, 0, 0, picasso_vidinfo.width, picasso_vidinfo.height, 0xFF00FF00);
+	}
+	else
+	{
+		comp_RP.BitMap = AllocBitMap( gfxvidinfo.width, gfxvidinfo.height, depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
+
+		RP = &comp_RP; 
+    		RectFillColor(RP, 0, 0, gfxvidinfo.width, gfxvidinfo.height, 0xFF0000FF);
+	}
+	
+	if (comp_RP.BitMap == NULL ) return 0;
+}
+
+
 static int setup_publicscreen(void)
 {
 	char *pubscreen = strlen (currprefs.amiga_publicscreen) ? currprefs.amiga_publicscreen : NULL;
@@ -1384,18 +1411,7 @@ static int setup_publicscreen(void)
 	XOffset = 0;
 	YOffset = 0;
 
-	InitRastPort(&comp_RP);
-
-	{
-		ULONG depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
-		comp_RP.BitMap = AllocBitMap( gfxvidinfo.width, gfxvidinfo.height, depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
-	}
-
-	if (comp_RP.BitMap == NULL ) return 0;
-
-	RP = &comp_RP; 
-
-    	RectFillColor(RP, 0, 0, gfxvidinfo.width, gfxvidinfo.height, 0xFF000000);
+	init_comp(W);
 
 	appw_init (W);
 
@@ -1616,34 +1632,9 @@ static int setup_userscreen (void)
 
 	hide_pointer (W);
 
-#ifdef __amigaos4__
+	init_comp(W);
 
-	InitRastPort(&comp_RP);
-	{
-		ULONG depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
-		comp_RP.BitMap = AllocBitMap( gfxvidinfo.width, gfxvidinfo.height, depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
-	}
-
-	if (comp_RP.BitMap == NULL ) return 0;
-	RP = &comp_RP; 
-
-#else
- 
-//	RP = W->RPort; /* &S->Rastport if screen is not public */
-
-#endif
-
-    PubScreenStatus (S, 0);
-
-#ifdef USE_CGX_OVERLAY
-	if (use_overlay)
-	{
-		XOffset	= (S->Width - min(S->Width, (S->Height*4)/3))/2;
-		YOffset	= (S->Height - min(S->Height, (S->Width*3)/4))/2;
-	}
-
-	FillPixelArray(RP, 0, 0, S->Width, S->Height, 0);
-#endif
+	PubScreenStatus (S, 0);
 
     write_log ("AMIGFX: Using screenmode: 0x%lx:%ld (%lu:%ld)\n",
 	DisplayID, Depth, DisplayID, Depth);
