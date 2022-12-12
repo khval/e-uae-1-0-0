@@ -106,7 +106,11 @@
 
 #include "window_icons.h"
 
+#if 0
 #define DEBUG_LOG(fmt,...) DebugPrintF(fmt, ##__VA_ARGS__)
+#else
+#define DEBUG_LOG(fmt,...) 
+#endif
 
 #ifdef PICASSO96_SUPPORTED
 #include "picasso96.h"
