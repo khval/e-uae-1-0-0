@@ -51,7 +51,8 @@ void set_target_hookData( void );
 
 extern struct Window    *W;
 
-extern struct RastPort comp_RP;
+extern struct RastPort comp_aga_RP;
+extern struct RastPort comp_p96_RP;
 
 struct Hook BackFill_Hook =
 {
@@ -125,6 +126,7 @@ void set_target_hookData( void )
 	 	scaleY = (destHeight + 0.5f) / picasso_vidinfo.height;
 		hookData.srcWidth = picasso_vidinfo.width;
 		hookData.srcHeight = picasso_vidinfo.height;
+		hookData.srcBitMap = comp_p96_RP.BitMap;
 	}
 	else
 	{
@@ -132,9 +134,9 @@ void set_target_hookData( void )
 	 	scaleY = (destHeight + 0.5f) / gfxvidinfo.height;
 		hookData.srcWidth = gfxvidinfo.width;
 		hookData.srcHeight = gfxvidinfo.height;
+		hookData.srcBitMap = comp_aga_RP.BitMap;
 	}
 
-	hookData.srcBitMap = comp_RP.BitMap;
 	hookData.offsetX = W->BorderLeft;
 	hookData.offsetY = W->BorderTop;
 	hookData.scaleX = COMP_FLOAT_TO_FIX(scaleX);
