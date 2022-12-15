@@ -108,6 +108,9 @@ int init_sound (void)
     /* SOUND: device handler */
     int rate;
 
+	// if sound is already open, close it.. so we can safely reopen it.
+	if (ahiopen) close_sound ();
+
     atexit (close_sound); /* if only amiga os had resource tracking */
 
     /* determine the clock */
@@ -180,6 +183,8 @@ void close_sound (void)
     if (sound_available) {
 	sound_available = 0;
     }
+
+	ahiopen = FALSE;
 }
 
 void pause_sound (void)
