@@ -2606,11 +2606,11 @@ static void set_window_for_picasso (void)
     if (screen_was_picasso && current_width == picasso_vidinfo.width && current_height == picasso_vidinfo.height)
 	return;
 
-    screen_was_picasso = 1;
-    graphics_leave();
-    current_width  = picasso_vidinfo.width;
-    current_height = picasso_vidinfo.height;
-    graphics_subinit();
+	screen_was_picasso = 1;
+	graphics_subshutdown();
+	current_width  = picasso_vidinfo.width;
+	current_height = picasso_vidinfo.height;
+	graphics_subinit();
 }
 
 void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
