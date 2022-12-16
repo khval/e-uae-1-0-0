@@ -1733,8 +1733,14 @@ static int graphics_subinit_picasso(void)
 
 static int graphics_subinit (void)
 {
+	if (comp_aga_RP.BitMap)
+		printf("WTF!! comp_aga_RP.BitMap is not freed\n");
+
+	if (comp_p96_RP.BitMap)
+		printf("WTF!! comp_p96_RP.BitMap is not freed\n");
 
 	init_comp(W);
+
 	appw_init (W);
 	set_prWindowPtr (W);
 
