@@ -122,6 +122,13 @@ extern struct GraphicsIFace *IGraphics;
 
 #undef BitMap
 
+struct 
+{
+	int x,y;
+	int bw,bh;
+	int w,h
+} save_window = {0,0,0,0,0,0} ;
+
 #ifdef PICASSO96
 
 int screen_is_picasso = 0;
@@ -258,6 +265,8 @@ static int mouseGrabbed;
 static int grabTicks;
 #define GRAB_TIMEOUT 50
 #endif
+
+BOOL is_fullscreen_state = FALSE;
 
 /*****************************************************************************/
 
@@ -1140,7 +1149,7 @@ static int setup_customscreen (void)
 		height = gfxvidinfo.height;
 	}
 
-#ifdef output_is_true_colorERGFX
+
     /* First try to find an RTG screen that matches the requested size  */
     {
 	unsigned int i;
@@ -1156,7 +1165,7 @@ static int setup_customscreen (void)
 	if (depth > 8)
 	    output_is_true_color = 1;
     } else {
-#endif
+
 	/* No (suitable) RTG screen available. Try a native mode */
 	depth = os39 ? 8 : (currprefs.gfx_lores ? 5 : 4);
 	mode = PAL_MONITOR_ID; // FIXME: should check whether to use PAL or NTSC.
@@ -1164,9 +1173,8 @@ static int setup_customscreen (void)
 	    mode |= (gfxvidinfo.height > 256) ? LORESLACE_KEY : LORES_KEY;
 	else
 	    mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
-#ifdef output_is_true_colorERGFX
     }
-#endif
+
 
 	/* If the screen is larger than requested, centre UAE's display */
 	if (width > (ULONG) gfxvidinfo.width)	XOffset = (width - gfxvidinfo.width) / 2;
@@ -1180,10 +1188,7 @@ static int setup_customscreen (void)
 				 SA_Width,     width,
 				 SA_Height,    height,
 				 SA_Depth,     depth,
-#ifdef USE_CGX_OVERLAY
-				 use_overlay ? TAG_IGNORE :
-#endif
-					SA_DisplayID, mode,
+				SA_DisplayID, mode,
 				 SA_Behind,    TRUE,
 				 SA_ShowTitle, FALSE,
 				 SA_Quiet,     TRUE,
@@ -1216,10 +1221,53 @@ static int setup_customscreen (void)
 
 	hide_pointer (W);
 
+	is_fullscreen_state = TRUE;
+
     return 1;
 }
 
 /****************************************************************************/
+
+static void open_window_as_last(void)
+{
+	W = OpenWindowTags (NULL,
+			WA_Title,        (ULONG)PACKAGE_NAME,
+			WA_AutoAdjust,   TRUE,
+
+			WA_Left, save_window.x,
+			WA_Top, save_window.y,
+			WA_InnerWidth, save_window.w - save_window.bw,
+			WA_InnerHeight, save_window.h - save_window.bh,
+
+			WA_PubScreen,    (ULONG)S,
+
+			WA_IDCMP,        IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
+					| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW
+					| IDCMP_MOUSEMOVE    | IDCMP_DELTAMOVE
+					| IDCMP_CLOSEWINDOW  | IDCMP_REFRESHWINDOW
+					| IDCMP_NEWSIZE | IDCMP_INTUITICKS | IDCMP_GADGETUP,
+
+			WA_Flags,	 WFLG_DRAGBAR     | WFLG_DEPTHGADGET
+					| WFLG_REPORTMOUSE | WFLG_RMBTRAP
+					| WFLG_ACTIVATE    | WFLG_CLOSEGADGET
+					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
+					| WFLG_SMART_REFRESH,
+
+			WA_MinWidth, gfxvidinfo.width + save_window.bw,
+			WA_MinHeight, gfxvidinfo.height + save_window.bh,
+
+			WA_MaxWidth, ~0,
+			WA_MaxHeight, ~0,
+			TAG_DONE);
+
+	if (W)
+	{
+	 	open_icon( W, ICONIFYIMAGE, GID_ICONIFY, &iconifyIcon );
+	 	open_icon( W, POPUPIMAGE, GID_FULLSCREEN, &fullscreenicon );
+	 	open_icon( W, PADLOCKIMAGE, GID_PADLOCK, &padlockicon );
+	}
+}
+
 
 static void open_window(void)
 {
@@ -1252,7 +1300,6 @@ static void open_window(void)
 	 	open_icon( W, POPUPIMAGE, GID_FULLSCREEN, &fullscreenicon );
 	 	open_icon( W, PADLOCKIMAGE, GID_PADLOCK, &padlockicon );
 	}
-
 }
 
 
@@ -1335,7 +1382,14 @@ static int setup_publicscreen(void)
 		}
 	}
 
-	open_window();
+	if (save_window.w)
+	{
+		open_window_as_last();
+	}
+	else
+	{
+		open_window();
+	}
 
 	UnlockPubScreen (NULL, S);
 
@@ -1346,10 +1400,10 @@ static int setup_publicscreen(void)
 		return 0;
 	}
 
-	gfxvidinfo.width  = (W->Width  - W->BorderRight - W->BorderLeft);
-	gfxvidinfo.height = (W->Height - W->BorderTop   - W->BorderBottom);
 	XOffset = 0;
 	YOffset = 0;
+
+	is_fullscreen_state = FALSE;
 
 	return 1;
 }
@@ -1527,6 +1581,8 @@ static int setup_userscreen (void)
 	PubScreenStatus (S, 0);
 
 	write_log ("AMIGFX: Using screenmode: 0x%lx:%ld (%lu:%ld)\n",DisplayID, Depth, DisplayID, Depth);
+
+	is_fullscreen_state = TRUE;
 
 	return 1;
 }
@@ -1891,6 +1947,17 @@ void close_window()
 	 	dispose_icon( W, &iconifyIcon );
 	 	dispose_icon( W, &padlockicon );
 		dispose_icon( W, &fullscreenicon );
+
+		if (is_fullscreen_state == FALSE)
+		{
+			save_window.x = W -> LeftEdge;
+			save_window.y = W -> TopEdge;
+			save_window.bw = W -> BorderLeft - W -> BorderRight;
+			save_window.bh = W -> BorderTop - W -> BorderBottom;
+			save_window.w = W -> Width  ;
+			save_window.h = W -> Height  ;
+		}
+
 		CloseWindow (W);
 		W = NULL;
 	}
@@ -2120,7 +2187,14 @@ void handle_events(void)
 	{
 		if (is_uniconifyed())
 		{
-			open_window();
+			if (save_window.w)
+			{
+				open_window_as_last();
+			}
+			else
+			{
+				open_window();
+			}
 			dispose_Iconify();
 		}
 
@@ -2829,7 +2903,7 @@ void toggle_mousegrab (void)
 
 int is_fullscreen (void)
 {
-    return S ? 1: 0;
+    return is_fullscreen_state ? 1: 0;
 }
 
 int is_vsync (void)
