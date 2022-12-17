@@ -155,25 +155,14 @@ struct p96colors
 };
 
 static struct p96colors p96Colors[256];
-
-/* Standard P96 screen modes */
-#define MAX_SCREEN_MODES 11
-static int x_size_table[MAX_SCREEN_MODES] = { 320, 320, 320, 320, 640, 640, 640, 800, 1024, 1152, 1280 };
-static int y_size_table[MAX_SCREEN_MODES] = { 200, 240, 256, 400, 350, 480, 512, 600, 768,  864,  1024 };
-
 static int palette_update_start = 256;
 static int palette_update_end   = 0;
-
-/* Supported SDL screen modes */
-#define MAX_SDL_SCREENMODE 32
 
 struct screen_rect
 {
 	int w;
 	int h;
 };
-
-static struct screen_rect screenmode[MAX_SDL_SCREENMODE];
 
 #endif
 
@@ -291,6 +280,8 @@ extern void closepseudodevices(void);
 extern void appw_init(struct Window *W);
 extern void appw_exit(void);
 extern void appw_events(void);
+
+BOOL has_p96_mode( uae_u32 width, uae_u32 height, int depth, int max_modes );
 
 extern int ievent_alive;
 
@@ -1016,100 +1007,64 @@ static POINTER_STATE get_pointer_state (const struct Window *w, int mousex, int 
 
 /****************************************************************************/
 
-#ifdef output_is_true_colorERGFX
 /*
  * Try to find a CGX/P96 screen mode which suits the requested size and depth
  */
 static ULONG find_rtg_mode (ULONG *width, ULONG *height, ULONG depth)
 {
-    ULONG mode           = INVALID_ID;
+	ULONG mode           = INVALID_ID;
+	ULONG best_mode      = INVALID_ID;
+	ULONG best_width     = (ULONG) -1L;
+	ULONG best_height    = (ULONG) -1L;
 
-    ULONG best_mode      = INVALID_ID;
-    ULONG best_width     = (ULONG) -1L;
-    ULONG best_height    = (ULONG) -1L;
+	ULONG largest_mode   = INVALID_ID;
+	ULONG largest_width  = 0;
+	ULONG largest_height = 0;
 
-    ULONG largest_mode   = INVALID_ID;
-    ULONG largest_width  = 0;
-    ULONG largest_height = 0;
+	while ((mode = NextDisplayInfo (mode)) != (ULONG)INVALID_ID)
+	{
+		if (IsCyberModeID (mode))
+		{
+			ULONG cwidth  = GetCyberIDAttr (CYBRIDATTR_WIDTH, mode);
+			ULONG cheight = GetCyberIDAttr (CYBRIDATTR_HEIGHT, mode);
+			ULONG cdepth  = GetCyberIDAttr (CYBRIDATTR_DEPTH, mode);
 
-#ifdef DEBUG
-    write_log ("Looking for RTG mode: w:%ld h:%ld d:%d\n", width, height, depth);
-#endif
+			if (cdepth == depth)
+			{
+				if (cheight >= largest_height && cwidth >= largest_width)
+				{
+					largest_mode = mode;
+					largest_width = cwidth;
+					largest_height = cheight;
+				}
 
-    if (CyberGfxBase) {
-	while ((mode = NextDisplayInfo (mode)) != (ULONG)INVALID_ID) {
-	    if (IsCyberModeID (mode)) {
-		ULONG cwidth  = GetCyberIDAttr (CYBRIDATTR_WIDTH, mode);
-		ULONG cheight = GetCyberIDAttr (CYBRIDATTR_HEIGHT, mode);
-		ULONG cdepth  = GetCyberIDAttr (CYBRIDATTR_DEPTH, mode);
-#ifdef DEBUG
-		write_log ("Checking mode:%08x w:%d h:%d d:%d -> ", mode, cwidth, cheight, cdepth);
-#endif
-		if (cdepth == depth) {
-		    /*
-		     * If this mode has the largest screen size we've seen so far,
-		     * remember it, just in case we don't find one big enough
-		     */
-		    if (cheight >= largest_height && cwidth >= largest_width) {
-			largest_mode   = mode;
-			largest_width  = cwidth;
-			largest_height = cheight;
-		    }
-
-		    /*
-		     * Is it large enough for our requirements?
-		     */
-		    if (cwidth >= *width && cheight >= *height) {
-#ifdef DEBUG
-			write_log ("large enough\n");
-#endif
-			/*
-			 * Yes. Is it the best fit that we've seen so far?
-			 */
-			if (cwidth <= best_width && cheight <= best_height) {
-			    best_width  = cwidth;
-			    best_height = cheight;
-			    best_mode   = mode;
+				if (cwidth >= *width && cheight >= *height)
+				{
+					if (cwidth <= best_width && cheight <= best_height)
+					{
+						best_width = cwidth;
+						best_height = cheight;
+						best_mode = mode;
+					}
+				}
 			}
-		    }
-#ifdef DEBUG
-		    else
-			write_log ("too small\n");
-#endif
-
-		} /* if (cdepth == depth) */
-#ifdef DEBUG
-		else
-		    write_log ("wrong depth\n");
-#endif
-	    } /* if (IsCyberModeID (mode)) */
-	} /* while */
-
-	if (best_mode != (ULONG)INVALID_ID) {
-#ifdef DEBUG
-	    write_log ("Found match!\n");
-#endif
-	    /* We found a match. Return it */
-	    *height = best_height;
-	    *width  = best_width;
-	} else if (largest_mode != (ULONG)INVALID_ID) {
-#ifdef DEBUG
-	    write_log ("No match found!\n");
-#endif
-	    /* We didn't find a large enough mode. Return the largest
-	     * mode found at the depth - if we found one */
-	    best_mode = largest_mode;
-	    *height   = largest_height;
-	    *width    = largest_width;
+		}
 	}
-#ifdef DEBUG
-	if (best_mode != (ULONG) INVALID_ID)
-	    write_log ("Best mode: %08x w:%d h:%d d:%d\n", best_mode, *width, *height, depth);
-#endif
-    }
-    return best_mode;
+
+	if (best_mode != (ULONG)INVALID_ID)
+	{
+		*height = best_height;
+		*width  = best_width;
+	}
+	else if (largest_mode != (ULONG)INVALID_ID)
+	{
+		best_mode = largest_mode;
+		*height   = largest_height;
+		*width    = largest_width;
+	}
+
+	return best_mode;
 }
-#endif
 
 STATIC_INLINE int min(int a, int b)
 {
@@ -1542,10 +1497,23 @@ static int setup_userscreen (void)
 	ULONG Width;
 	ULONG Height;
 
-	Width = gfxvidinfo.width * S -> Height / gfxvidinfo.height ;
-	Height = S -> Height ;
+	if (screen_is_picasso)
+	{
+		printf("+++++++ picasso %d,%d\n", Width = picasso_vidinfo.width, picasso_vidinfo.height );
+
+		Width = picasso_vidinfo.width * S -> Height / picasso_vidinfo.height ;
+		Height = S -> Height ;
+	}
+	else
+	{
+		Width = gfxvidinfo.width * S -> Height / gfxvidinfo.height ;
+		Height = S -> Height ;
+	}
 	
 	x = (S -> Width -  Width) / 2;		// calulate edge, two edges.
+
+	printf("screen size: %d,%d\n", S -> Width, S -> Height);
+	printf("window x %d size: %d,%d\n", x, Width, Height);
 
 	W = OpenWindowTags (NULL,
 			WA_Left, 			x,
@@ -1580,7 +1548,7 @@ static int setup_userscreen (void)
 	hide_pointer (W);
 	PubScreenStatus (S, 0);
 
-	write_log ("AMIGFX: Using screenmode: 0x%lx:%ld (%lu:%ld)\n",DisplayID, Depth, DisplayID, Depth);
+	write_log ("AMIGFX: Using screenmode: 0x%lx: bits: %ld\n",DisplayID, Depth);
 
 	is_fullscreen_state = TRUE;
 
@@ -2382,23 +2350,40 @@ void LED (int on)
  * Add a screenmode to the emulated P96 display database
  */
 
-static void add_p96_mode (int width, int height, int emulate_chunky, int *count)
+static void add_p96_mode (int width, int height, int depth, int *count)
 {
 	unsigned int i;
 
-	for (i = 0; i <= (emulate_chunky ? 1 : 0); i++)
+	if (*count < MAX_PICASSO_MODES)
 	{
-		if (*count < MAX_PICASSO_MODES)
-		{
-			DisplayModes[*count].res.width  = width;
-			DisplayModes[*count].res.height = height;
-			DisplayModes[*count].depth      = (i == 1) ? 1 : bit_unit >> 3;
-			DisplayModes[*count].refresh    = 75;
-			(*count)++;
+		DisplayModes[*count].res.width  = width;
+		DisplayModes[*count].res.height = height;
+		DisplayModes[*count].depth      = depth >> 3;
+		DisplayModes[*count].refresh    = 75;
+		(*count)++;
 
-			write_log ("AMIGFX: Added P96 mode: %dx%dx%d\n", width, height, (i == 1) ? 8 : bit_unit);
-		}
+		write_log ("AMIGFX: Added P96 mode: %dx%dx%d\n", width, height, depth);
 	}
+}
+
+BOOL has_p96_mode( uae_u32 width, uae_u32 height, int depth, int max_modes )
+{
+	struct PicassoResolution *i;
+
+	if (max_modes>MAX_PICASSO_MODES) max_modes = MAX_PICASSO_MODES;
+	
+	printf("looking for: %d,%d,%d\n",width,height,depth);
+
+	for (i = DisplayModes; i < DisplayModes + max_modes ; i++ )
+	{
+		printf("CHK %d,%d,%d\n",i -> res.width,i -> res.height,i -> depth);
+
+		if ((i -> res.width == width) &&
+			(i -> res.height == height) &&
+			((i -> depth << 3) == depth)) return TRUE;
+	}
+
+	return FALSE;
 }
 
 
@@ -2520,11 +2505,38 @@ void DX_SetPalette_vsync(void)
 }
 
 
+void add_native_modes( int depth, int *count )
+{
+	ULONG ID;
+	struct DisplayInfo dispi;
+	struct DimensionInfo di;
+	int w,h;
+
+	for( ID = NextDisplayInfo( INVALID_ID ) ; ID !=INVALID_ID ;  ID = NextDisplayInfo( ID ) )
+	{
+		if (
+			(GetDisplayInfoData( NULL, &di, sizeof(di) , DTAG_DIMS, ID)) &&
+			(GetDisplayInfoData( NULL, &dispi, sizeof(dispi) ,  DTAG_DISP, ID))
+		)
+		{
+			if (depth == (di.MaxDepth == 24 ?  32 : di.MaxDepth) )
+			{
+				w =  di.Nominal.MaxX -di.Nominal.MinX +1;
+				h =  di.Nominal.MaxY -di.Nominal.MinY +1;
+
+				if ( has_p96_mode( w,  h, depth, *count ) == FALSE )
+				{
+					add_p96_mode ( w, h, depth, count);
+				}
+			}
+		}
+	}
+}
+
 int DX_FillResolutions (uae_u16 *ppixel_format)
 {
     int i;
     int count = 0;
-    int emulate_chunky = 0;
 
     DEBUG_LOG ("Function: DX_FillResolutions\n");
 
@@ -2533,39 +2545,26 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
 	else
 		picasso_vidinfo.rgbformat = RGBFB_A8R8G8B8;
 
-    *ppixel_format = 1 << picasso_vidinfo.rgbformat;
-    if (bit_unit == 16 || bit_unit == 32) {
-	*ppixel_format |= RGBFF_CHUNKY;
-	emulate_chunky = 1;
-    }
+	*ppixel_format = 1 << picasso_vidinfo.rgbformat;
+	if (bit_unit == 16 || bit_unit == 32)
+	{
+		*ppixel_format |= RGBFF_CHUNKY;
+	}
 
     /* Check list of standard P96 screenmodes */
 
+/*
 	for (i = 0; i < MAX_SCREEN_MODES; i++)
 	{
-		add_p96_mode (x_size_table[i], y_size_table[i], emulate_chunky, &count);
+		add_p96_mode (x_size_table[i], y_size_table[i], 32, &count);
 	}
+*/
 
-    /* Check list of supported SDL screenmodes */
-    for (i = 0; i < mode_count; i++) {
-	int j;
-	int found = 0;
-	for (j = 0; j < MAX_SCREEN_MODES - 1; j++) {
-	    if (screenmode[i].w == x_size_table[j] &&
-		screenmode[i].h == y_size_table[j])
-	    {
-		found = 1;
-		break;
-	    }
-	}
+	add_native_modes( 32, &count );
+	add_native_modes( 8, &count );
 
-	/* If SDL mode is not a standard P96 mode (and thus already added to the
-	 * list, above) then add it */
-	if (!found)
-	    add_p96_mode (screenmode[i].w, screenmode[i].h, emulate_chunky, &count);
-    }
 
-    return count;
+	return count;
 }
 
 APTR p96_lock = NULL;
