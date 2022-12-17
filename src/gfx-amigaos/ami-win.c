@@ -1733,6 +1733,8 @@ static int graphics_subinit_picasso(void)
 
 static int graphics_subinit (void)
 {
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+
 	if (comp_aga_RP.BitMap)
 		printf("WTF!! comp_aga_RP.BitMap is not freed\n");
 
@@ -1973,6 +1975,7 @@ void close_window()
 
 static void graphics_subshutdown (void)
 {
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
 
 	appw_exit ();
 
@@ -2016,6 +2019,8 @@ static void graphics_subshutdown (void)
 
 void graphics_leave (void)
 {
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+
 	closepseudodevices ();
 
 	if (CM)
@@ -2601,6 +2606,8 @@ void gfx_unlock_picasso (void)
 
 static void set_window_for_picasso (void)
 {
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+
     DEBUG_LOG ("Function: set_window_for_picasso\n");
 
     if (screen_was_picasso && current_width == picasso_vidinfo.width && current_height == picasso_vidinfo.height)
@@ -2627,34 +2634,43 @@ void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 
 void gfx_set_picasso_state (int on)
 {
-    DEBUG_LOG ("Function: gfx_set_picasso_state: %d\n", on);
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+	DEBUG_LOG ("Function: gfx_set_picasso_state: %d\n", on);
 
-    if (on == screen_is_picasso)
-	return;
+	if (on == screen_is_picasso)
+	{
+		return;
+	}
 
     /* We can get called by drawing_init() when there's
      * no window opened yet... */
-    if ( W == NULL)
-	return
 
-    graphics_subshutdown ();
-    screen_was_picasso = screen_is_picasso;
-    screen_is_picasso = on;
+	if ( W == NULL)
+	{
+		printf("no window open... so nothing to do?\n");
+		return;
+	}
 
-    if (on) {
-	// Set height, width for Picasso gfx
-	current_width  = picasso_vidinfo.width;
-	current_height = picasso_vidinfo.height;
-	graphics_subinit ();
-    } else {
-	// Set height, width for Amiga gfx
-	current_width  = gfxvidinfo.width;
-	current_height = gfxvidinfo.height;
-	graphics_subinit ();
-    }
+	graphics_subshutdown ();
+	screen_was_picasso = screen_is_picasso;
+	screen_is_picasso = on;
 
-    if (on)
-	DX_SetPalette (0, 256);
+	if (on)
+	{
+		// Set height, width for Picasso gfx
+		current_width  = picasso_vidinfo.width;
+		current_height = picasso_vidinfo.height;
+		graphics_subinit ();
+	}
+	else
+	{
+		// Set height, width for Amiga gfx
+		current_width  = gfxvidinfo.width;
+		current_height = gfxvidinfo.height;
+		graphics_subinit ();
+	}
+
+    if (on) DX_SetPalette (0, 256);
 }
 #endif
 
