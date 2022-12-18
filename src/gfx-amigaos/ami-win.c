@@ -1140,15 +1140,15 @@ static int setup_customscreen (void)
 	{
 
 		screen = OpenScreenTags (NULL,
-				 SA_Width,     width,
-				 SA_Height,    height,
-				 SA_Depth,     depth,
+				SA_Width,     width,
+				SA_Height,    height,
+				SA_Depth,     depth,
 				SA_DisplayID, mode,
-				 SA_Behind,    TRUE,
-				 SA_ShowTitle, FALSE,
-				 SA_Quiet,     TRUE,
-				 SA_ErrorCode, (ULONG)&error,
-				 TAG_DONE);
+				SA_Behind,    TRUE,
+				SA_ShowTitle, FALSE,
+				SA_Quiet,     TRUE,
+				SA_ErrorCode, (ULONG)&error,
+				TAG_DONE);
 
 	} while (!screen && error == OSERR_TOODEEP && --depth > 1); /* Keep trying until we find a supported depth */
 
@@ -1288,6 +1288,13 @@ int init_comp( struct Window *W )
 	{
 		ULONG depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
 	
+		RectFillColor(W -> RPort, 
+			0, 
+			0, 
+			W -> Width , 
+			W -> Height,
+			0xFF000000);
+
 		if (screen_is_picasso) 
 			init_comp_one( W,  depth, &comp_p96_RP, picasso_vidinfo.width, picasso_vidinfo.height );
 
@@ -1493,32 +1500,9 @@ static int setup_userscreen (void)
 	is_halfbrite = (S->ViewPort.Modes & EXTRA_HALFBRITE);
 	is_ham       = (S->ViewPort.Modes & HAM);
 
-	ULONG x;
-	ULONG Width;
-	ULONG Height;
-
-	if (screen_is_picasso)
-	{
-		printf("+++++++ picasso %d,%d\n", Width = picasso_vidinfo.width, picasso_vidinfo.height );
-
-		Width = picasso_vidinfo.width * S -> Height / picasso_vidinfo.height ;
-		Height = S -> Height ;
-	}
-	else
-	{
-		Width = gfxvidinfo.width * S -> Height / gfxvidinfo.height ;
-		Height = S -> Height ;
-	}
-	
-	x = (S -> Width -  Width) / 2;		// calulate edge, two edges.
-
-	printf("screen size: %d,%d\n", S -> Width, S -> Height);
-	printf("window x %d size: %d,%d\n", x, Width, Height);
-
 	W = OpenWindowTags (NULL,
-			WA_Left, 			x,
-			WA_Width,		Width,
-			WA_Height,		Height,
+			WA_Width,		S -> Width,
+			WA_Height,		S -> Height,
 			WA_CustomScreen,	(ULONG)S,
 			WA_Backdrop,		TRUE,
 			WA_Borderless,	TRUE,
@@ -1526,13 +1510,13 @@ static int setup_userscreen (void)
 			WA_Activate,		TRUE,
 			WA_ReportMouse,	TRUE,
 			WA_IDCMP,		IDCMP_MOUSEBUTTONS
-					      | IDCMP_RAWKEY
-					      | IDCMP_DISKINSERTED
-					      | IDCMP_DISKREMOVED
-					      | IDCMP_ACTIVEWINDOW
-					      | IDCMP_INACTIVEWINDOW
-					      | IDCMP_MOUSEMOVE
-					      | IDCMP_DELTAMOVE,
+					     | IDCMP_RAWKEY
+					     | IDCMP_DISKINSERTED
+					     | IDCMP_DISKREMOVED
+					     | IDCMP_ACTIVEWINDOW
+					     | IDCMP_INACTIVEWINDOW
+					     | IDCMP_MOUSEMOVE
+					     | IDCMP_DELTAMOVE,
 			(os39 ? WA_BackFill : TAG_IGNORE),   (ULONG) LAYERS_NOBACKFILL,
 			TAG_DONE);
 
@@ -1544,6 +1528,13 @@ static int setup_userscreen (void)
 		CM = NULL;
 		return 0;
 	}
+
+	RectFillColor(W -> RPort, 
+		0, 
+		0, 
+		W -> Width , 
+		W -> Height,
+		0xFF000000);
 
 	hide_pointer (W);
 	PubScreenStatus (S, 0);
@@ -1809,8 +1800,8 @@ static int graphics_subinit (void)
 	 */
 	gfxvidinfo.rowbytes = gfxvidinfo.pixbytes * gfxvidinfo.width;
 	gfxvidinfo.bufmem   = (uae_u8 *) calloc (gfxvidinfo.rowbytes, gfxvidinfo.height + 1);
-	/*									       ^^^ */
-	/*				       This is because DitherLine may read one extra row */
+	/*									      ^^^ */
+	/*				      This is because DitherLine may read one extra row */
     }
 
 	if (!gfxvidinfo.bufmem)
@@ -1873,6 +1864,12 @@ int graphics_init (void)
 	output_is_true_color = 0;
 
 	update_gfxvidinfo_width_height();
+
+/*
+    currprefs.gfx_correct_aspect;
+    currprefs.gfx_afullscreen;
+    currprefs.gfx_pfullscreen;
+*/
 
 	switch (currprefs.amiga_screen_type)
 	{
@@ -1997,10 +1994,8 @@ void graphics_leave (void)
 		CM = NULL;
 	}
 
-
 	graphics_subshutdown();
 	close_window();
-
 
 	if (!usepub && S) 
 	{
@@ -2020,15 +2015,17 @@ void graphics_leave (void)
 
 int do_inhibit_frame (int onoff)
 {
-    if (onoff != -1) {
-	inhibit_frame = onoff ? 1 : 0;
-	if (inhibit_frame)
-	    write_log ("display disabled\n");
-	else
-	    write_log ("display enabled\n");
-	set_title ();
-    }
-    return inhibit_frame;
+	if (onoff != -1) 
+	{
+		inhibit_frame = onoff ? 1 : 0;
+
+		if (inhibit_frame)
+			write_log ("display disabled\n");
+		else
+			write_log ("display enabled\n");
+		set_title ();
+	}
+	return inhibit_frame;
 }
 
 /***************************************************************************/
@@ -2156,10 +2153,11 @@ void handle_events(void)
      * This is a hack to simulate ^C as is seems that break_handler
      * is lost when system() is called.
      */
-    if (SetSignal (0L, SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_D) &
-		(SIGBREAKF_CTRL_C|SIGBREAKF_CTRL_D)) {
-	activate_debugger ();
-    }
+
+	if (SetSignal (0L, SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_D) & (SIGBREAKF_CTRL_C|SIGBREAKF_CTRL_D)) 
+	{
+		activate_debugger ();
+	}
 #endif
 
 	if (iconifyPort)		// iconifyed mode..
@@ -2372,11 +2370,11 @@ BOOL has_p96_mode( uae_u32 width, uae_u32 height, int depth, int max_modes )
 
 	if (max_modes>MAX_PICASSO_MODES) max_modes = MAX_PICASSO_MODES;
 	
-	printf("looking for: %d,%d,%d\n",width,height,depth);
+//	printf("looking for: %d,%d,%d\n",width,height,depth);
 
 	for (i = DisplayModes; i < DisplayModes + max_modes ; i++ )
 	{
-		printf("CHK %d,%d,%d\n",i -> res.width,i -> res.height,i -> depth);
+//		printf("CHK %d,%d,%d\n",i -> res.width,i -> res.height,i -> depth);
 
 		if ((i -> res.width == width) &&
 			(i -> res.height == height) &&
@@ -2479,7 +2477,7 @@ void DX_SetPalette (int start, int count)
 	    int g = picasso96_state.CLUT[start].Green;
 	    int b = picasso96_state.CLUT[start].Blue;
 	    picasso_vidinfo.clut[start++] =
-				 (doMask256 (r, red_bits, red_shift)
+				(doMask256 (r, red_bits, red_shift)
 				| doMask256 (g, green_bits, green_shift)
 				| doMask256 (b, blue_bits, blue_shift));
 	}
@@ -2553,16 +2551,8 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
 
     /* Check list of standard P96 screenmodes */
 
-/*
-	for (i = 0; i < MAX_SCREEN_MODES; i++)
-	{
-		add_p96_mode (x_size_table[i], y_size_table[i], 32, &count);
-	}
-*/
-
 	add_native_modes( 32, &count );
 	add_native_modes( 8, &count );
-
 
 	return count;
 }
@@ -2605,12 +2595,10 @@ void gfx_unlock_picasso (void)
 
 static void set_window_for_picasso (void)
 {
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
+	DEBUG_LOG ("Function: set_window_for_picasso\n");
 
-    DEBUG_LOG ("Function: set_window_for_picasso\n");
-
-    if (screen_was_picasso && current_width == picasso_vidinfo.width && current_height == picasso_vidinfo.height)
-	return;
+	if (screen_was_picasso && current_width == picasso_vidinfo.width && current_height == picasso_vidinfo.height)
+		return;
 
 	screen_was_picasso = 1;
 	graphics_subshutdown();
@@ -2621,14 +2609,14 @@ static void set_window_for_picasso (void)
 
 void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 {
-    DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %d h: %d depth: %d rgbfmt: %d\n", w, h, depth, rgbfmt);
+	DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %d h: %d depth: %d rgbfmt: %d\n", w, h, depth, rgbfmt);
 
-    picasso_vidinfo.width = w;
-    picasso_vidinfo.height = h;
-    picasso_vidinfo.depth = depth;
-    picasso_vidinfo.pixbytes = bit_unit >> 3;
+	picasso_vidinfo.width = w;
+	picasso_vidinfo.height = h;
+	picasso_vidinfo.depth = depth;
+	picasso_vidinfo.pixbytes = bit_unit >> 3;
 
-    if (screen_is_picasso) set_window_for_picasso();
+	if (screen_is_picasso) set_window_for_picasso();
 }
 
 void gfx_set_picasso_state (int on)
@@ -2735,48 +2723,51 @@ void main_window_led (int led, int on)                /* is used in amigui.c */
  */
 static LONG ObtainColor (ULONG r,ULONG g,ULONG b)
 {
-    int i, crgb;
-    int colors;
+	int i, crgb;
+	int colors;
 
-    if (os39 && usepub && CM) {
-	i = ObtainBestPen (CM, r, g, b,
-			   OBP_Precision, (use_approx_color ? PRECISION_GUI
-							    : PRECISION_EXACT),
-			   OBP_FailIfBad, TRUE,
-			   TAG_DONE);
-	if (i != -1) {
-	    if (maxpen<256)
-		pen[maxpen++] = i;
-	    else
-		i = -1;
-        }
-        return i;
-    }
+	if (os39 && usepub && CM)
+	{
+		i = ObtainBestPen (CM, r, g, b,
+			OBP_Precision, (use_approx_color ? PRECISION_GUI : PRECISION_EXACT),
+			OBP_FailIfBad, TRUE,
+			TAG_DONE);
+		if (i != -1)
+		{
+			if (maxpen<256) pen[maxpen++] = i;
+			else	i = -1;
+		}
+		return i;
+	}
 
-    colors = is_halfbrite ? 32 : (1 << RPDepth (&comp_aga_RP));
+	colors = is_halfbrite ? 32 : (1 << RPDepth (&comp_aga_RP));
 
-    /* private screen => standard allocation */
-    if (!usepub) {
-	if (maxpen >= colors)
-	    return -1; /* no more colors available */
-	if (os39)
-	    SetRGB32 (&S->ViewPort, maxpen, r, g, b);
-	else
-	    SetRGB4 (&S->ViewPort, maxpen, r >> 28, g >> 28, b >> 28);
-	return maxpen++;
-    }
+	// private screen => standard allocation //
+	if (!usepub)
+	{
+		if (maxpen >= colors) return -1; // no more colors available //
+	
+		if (os39)
+			SetRGB32 (&S->ViewPort, maxpen, r, g, b);
+		else
+			SetRGB4 (&S->ViewPort, maxpen, r >> 28, g >> 28, b >> 28);
+		return maxpen++;
+	}
 
-    /* public => find exact match */
-    r >>= 28; g >>= 28; b >>= 28;
-    if (use_approx_color)
-	return get_nearest_color (r, g, b);
-    crgb = (r << 8) | (g << 4) | b;
-    for (i = 0; i < colors; i++ ) {
-	int rgb = GetRGB4 (CM, i);
-	if (rgb == crgb)
-	    return i;
-    }
-    return -1;
+	// public => find exact match //
+	r >>= 28; g >>= 28; b >>= 28;
+
+	if (use_approx_color) return get_nearest_color (r, g, b);
+
+	crgb = (r << 8) | (g << 4) | b;
+
+	for (i = 0; i < colors; i++ )
+	{
+		int rgb = GetRGB4 (CM, i);
+
+		if (rgb == crgb) return i;
+	}
+	return -1;
 }
 
 /****************************************************************************/
@@ -2943,15 +2934,15 @@ int is_vsync (void)
 
 void toggle_fullscreen (void)
 {
-    graphics_leave ();
-    currprefs.amiga_screen_type = 2;
-    notice_screen_contents_lost ();
-    XOffset = 0;
-    YOffset = 0;
-    usepub = 0;
-    graphics_setup();
-    graphics_init ();
-    notice_new_xcolors();
+	graphics_leave ();
+	currprefs.amiga_screen_type = 2;
+	notice_screen_contents_lost ();
+	XOffset = 0;
+	YOffset = 0;
+	usepub = 0;
+	graphics_setup();
+	graphics_init ();
+	notice_new_xcolors();
 }
 
 void screenshot (int type)

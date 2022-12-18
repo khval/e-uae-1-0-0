@@ -112,13 +112,35 @@ void set_target_hookData( void )
 {
  	float scaleX,scaleY;
 
- 	rect.MinX = W->BorderLeft;
- 	rect.MinY = W->BorderTop;
- 	rect.MaxX = W->Width - W->BorderRight - 1;
- 	rect.MaxY = W->Height - W->BorderBottom - 1;
+	if (W->BorderTop)	// this window, is a wb window.
+	{
+	 	rect.MinX = W->BorderLeft;
+ 		rect.MinY = W->BorderTop;
+ 		rect.MaxX = W->Width - W->BorderRight - 1;
+ 		rect.MaxY = W->Height - W->BorderBottom - 1;
+	}
+	else
+	{
+		int SHeight = W -> WScreen -> Height; 
+		int Width;
+
+		if (screen_is_picasso)
+		{
+			Width = picasso_vidinfo.width * SHeight / picasso_vidinfo.height ;
+		}
+		else
+		{
+			Width = gfxvidinfo.width * SHeight / gfxvidinfo.height ;
+		}
+
+		rect.MinY = 0;
+		rect.MinX = (W -> WScreen -> Width -  Width) / 2;		// calulate edge, two edges.
+		rect.MaxX = rect.MinX + Width - 1;
+		rect.MaxY = W -> Height - 1;
+	}
 
  	float destWidth = rect.MaxX - rect.MinX + 1;
- 	float destHeight = rect.MaxY - rect.MinY + 1;
+		float destHeight = rect.MaxY - rect.MinY + 1;
 
 	if (screen_is_picasso)
 	{
@@ -137,8 +159,8 @@ void set_target_hookData( void )
 		hookData.srcBitMap = comp_aga_RP.BitMap;
 	}
 
-	hookData.offsetX = W->BorderLeft;
-	hookData.offsetY = W->BorderTop;
+	hookData.offsetX = rect.MinX ;
+	hookData.offsetY = rect.MinY;
 	hookData.scaleX = COMP_FLOAT_TO_FIX(scaleX);
 	hookData.scaleY = COMP_FLOAT_TO_FIX(scaleY);
 	hookData.retCode = COMPERR_Success;
