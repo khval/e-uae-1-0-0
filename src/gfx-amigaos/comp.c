@@ -27,6 +27,9 @@ extern int screen_is_picasso;
 #include "uae_types.h"
 #include "xwin.h"
 
+static struct Rectangle rect;
+static struct Rectangle fullscreen_rect;
+struct Rectangle *rect_ptr = &rect;
 
 
 struct BackFillArgs
@@ -42,7 +45,7 @@ typedef struct CompositeHookData_s {
 	uint32 retCode; // The return code from CompositeTags()
 } CompositeHookData;
 
-static struct Rectangle rect;
+;
 static struct Hook hook;
 static CompositeHookData hookData;
 
@@ -96,6 +99,7 @@ static ULONG compositeHookFunc(
 
 void BackFill_Func(struct RastPort *ArgRP, struct BackFillArgs *MyArgs)
 {
+	struct Rectangle rect;
 	if (W)
 	{
 		set_target_hookData();
@@ -103,9 +107,33 @@ void BackFill_Func(struct RastPort *ArgRP, struct BackFillArgs *MyArgs)
 		register struct RastPort *RPort = W->RPort;
 
 		LockLayer(0, RPort->Layer);
-		DoHookClipRects(&hook, RPort, &rect);
+		DoHookClipRects(&hook, RPort, rect_ptr);
 		UnlockLayer( RPort->Layer);
 	}
+}
+
+void update_fullscreen_rect( int aspect )
+{
+	int SHeight = W -> WScreen -> Height; 
+	int Width;
+
+	if (screen_is_picasso)
+	{
+		Width = aspect ? picasso_vidinfo.width * SHeight / picasso_vidinfo.height  
+				:  W -> WScreen -> Width;
+	}
+	else
+	{
+		Width = aspect ? gfxvidinfo.width * SHeight / gfxvidinfo.height 
+				: W -> WScreen -> Width;
+	}
+
+	if (Width > W -> WScreen -> Width) Width = W -> WScreen -> Width;	// clamp it max width
+
+	fullscreen_rect.MinY = 0;
+	fullscreen_rect.MinX = (W -> WScreen -> Width -  Width) / 2;	// calulate edge, two edges.
+	fullscreen_rect.MaxX = fullscreen_rect.MinX + Width - 1;
+	fullscreen_rect.MaxY = W -> Height - 1;
 }
 
 void set_target_hookData( void )
@@ -118,29 +146,15 @@ void set_target_hookData( void )
  		rect.MinY = W->BorderTop;
  		rect.MaxX = W->Width - W->BorderRight - 1;
  		rect.MaxY = W->Height - W->BorderBottom - 1;
+		rect_ptr = &rect;
 	}
 	else
 	{
-		int SHeight = W -> WScreen -> Height; 
-		int Width;
-
-		if (screen_is_picasso)
-		{
-			Width = picasso_vidinfo.width * SHeight / picasso_vidinfo.height ;
-		}
-		else
-		{
-			Width = gfxvidinfo.width * SHeight / gfxvidinfo.height ;
-		}
-
-		rect.MinY = 0;
-		rect.MinX = (W -> WScreen -> Width -  Width) / 2;		// calulate edge, two edges.
-		rect.MaxX = rect.MinX + Width - 1;
-		rect.MaxY = W -> Height - 1;
+		rect_ptr = &fullscreen_rect;
 	}
 
- 	float destWidth = rect.MaxX - rect.MinX + 1;
-		float destHeight = rect.MaxY - rect.MinY + 1;
+ 	float destWidth = rect_ptr -> MaxX - rect_ptr -> MinX + 1;
+	float destHeight = rect_ptr -> MaxY - rect_ptr -> MinY + 1;
 
 	if (screen_is_picasso)
 	{
@@ -159,8 +173,8 @@ void set_target_hookData( void )
 		hookData.srcBitMap = comp_aga_RP.BitMap;
 	}
 
-	hookData.offsetX = rect.MinX ;
-	hookData.offsetY = rect.MinY;
+	hookData.offsetX = rect_ptr -> MinX ;
+	hookData.offsetY = rect_ptr -> MinY;
 	hookData.scaleX = COMP_FLOAT_TO_FIX(scaleX);
 	hookData.scaleY = COMP_FLOAT_TO_FIX(scaleY);
 	hookData.retCode = COMPERR_Success;

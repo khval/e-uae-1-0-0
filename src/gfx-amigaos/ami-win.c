@@ -1278,6 +1278,8 @@ int init_comp_one( struct Window *W, ULONG depth, struct RastPort *rp, int w, in
 	return 1;
 }
 
+extern void update_fullscreen_rect( int aspect );
+
 int init_comp( struct Window *W )
 {
 	if (W == NULL)
@@ -1288,12 +1290,17 @@ int init_comp( struct Window *W )
 	{
 		ULONG depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
 	
-		RectFillColor(W -> RPort, 
-			0, 
-			0, 
-			W -> Width , 
-			W -> Height,
-			0xFF000000);
+		if (W->BorderTop == 0)
+		{
+			RectFillColor(W -> RPort, 
+				0, 
+				0, 
+				W -> Width , 
+				W -> Height,
+				0xFF000000);
+
+			update_fullscreen_rect( currprefs.gfx_correct_aspect );
+		}
 
 		if (screen_is_picasso) 
 			init_comp_one( W,  depth, &comp_p96_RP, picasso_vidinfo.width, picasso_vidinfo.height );
@@ -2934,6 +2941,8 @@ int is_vsync (void)
 
 void toggle_fullscreen (void)
 {
+	is_fullscreen_state = is_fullscreen_state ? FALSE : TRUE;
+
 	graphics_leave ();
 	currprefs.amiga_screen_type = 2;
 	notice_screen_contents_lost ();
