@@ -2,7 +2,7 @@
 struct video_convert_names
 {
 	const char *name;
-	void *fn;
+	void (*fn) (void *src, void *dest, int size);
 };
 
 const char *get_name_converter_fn_ptr( void *fn_ptr);

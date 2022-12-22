@@ -5,8 +5,6 @@
 #include <proto/dos.h>
 #include "video_convert.h"
 
-extern BPTR video_debug_out;
-
 uint16 *lookup16bit = NULL;
 
 extern uint16 *vpal16;
