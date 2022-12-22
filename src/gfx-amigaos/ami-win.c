@@ -7,17 +7,23 @@
   * Copyright 2003-2007 Richard Drummond
   */
 
+#include <stdlib.h>
+
 #include "sysconfig.h"
 #include "sysdeps.h"
 #include "stdbool.h"
 
 /****************************************************************************/
 
+#include <proto/exec.h>
+#include <proto/dos.h>
+
+/*
 #include <exec/execbase.h>
 #include <exec/memory.h>
-
 #include <dos/dos.h>
 #include <dos/dosextens.h>
+*/
 
 #include <graphics/gfxbase.h>
 #include <graphics/displayinfo.h>
@@ -62,6 +68,7 @@
 #include "version.h"
 
 #include "window_icons.h"
+#include "video_convert.h"
 
 #if 0
 #define DEBUG_LOG(fmt,...) DebugPrintF(fmt, ##__VA_ARGS__)
@@ -78,6 +85,9 @@
 extern struct GraphicsIFace *IGraphics;
 
 #undef BitMap
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
 struct 
 {
@@ -117,6 +127,18 @@ static struct p96colors p96Colors[256];
 static int palette_update_start = 256;
 static int palette_update_end   = 0;
 
+void (*p96_conv_fn) (void *src, void *dest, int size) = NULL;
+
+uint32 *vpal32 = NULL;
+uint16 *vpal16 = NULL;
+void (*set_palette_fn)(uint8 *pal, uint32 num) = NULL;
+
+ void set_vpal_8bit_to_16bit_le_2pixels(uint8 *pal, uint32 num);
+ void set_vpal_8bit_to_16bit_be_2pixels(uint8 *pal, uint32 num);
+
+ void set_vpal_8bit_to_32bit_be_2pixels(uint8 *pal, uint32 num);
+ void set_vpal_8bit_to_32bit_le_2pixels(uint8 *pal, uint32 num);
+
 struct screen_rect
 {
 	int w;
@@ -124,6 +146,19 @@ struct screen_rect
 };
 
 ULONG RECTFMT_SRC = PIXF_A8R8G8B8;
+
+
+struct TagItem tags_any[] = {
+							{AVT_Type,MEMF_SHARED},
+							{AVT_Alignment,  16},
+							{TAG_DONE,0}
+						};
+
+struct TagItem tags_public[] = {
+							{AVT_Type,MEMF_SHARED},
+							{AVT_Alignment,  16},
+							{TAG_DONE,0}
+						};
 
 #endif
 
@@ -243,6 +278,14 @@ extern void appw_exit(void);
 extern void appw_events(void);
 
 BOOL has_p96_mode( uae_u32 width, uae_u32 height, int depth, int max_modes );
+
+void refresh_aga( void );
+void update_gfxvidinfo_width_height( void );
+void add_native_modes( int depth, int *count );
+void p96_conv_all( void );
+int init_comp_one( struct Window *W, ULONG output_depth, struct RastPort *rp, int w, int h );
+void init_comp( struct Window *W );
+static APTR setup_p96_buffer (struct vidbuf_description *gfxinfo);
 
 extern int ievent_alive;
 
@@ -1187,11 +1230,11 @@ static void open_window(void)
 }
 
 
-int init_comp_one( struct Window *W, ULONG depth, struct RastPort *rp, int w, int h )
+int init_comp_one( struct Window *W, ULONG output_depth, struct RastPort *rp, int w, int h )
 {
 	InitRastPort(rp);
 
-	rp -> BitMap = AllocBitMap( w,h, depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
+	rp -> BitMap = AllocBitMap( w,h, output_depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
 	
 	if (rp -> BitMap)
 	{
@@ -1200,16 +1243,71 @@ int init_comp_one( struct Window *W, ULONG depth, struct RastPort *rp, int w, in
 	else
 	{
 		printf("init_comp_one failed, no bitmap\n");
-		printf("debug: w %d, h %d, depth %d\n",w,h,depth);
+		printf("debug: w %d, h %d, depth %d\n",w,h,output_depth);
 		return 0;
 	}
+
+	 output_is_true_color = (output_depth>8) ? 1 : 0;
 
 	return 1;
 }
 
 extern void update_fullscreen_rect( int aspect );
 
-int init_comp( struct Window *W )
+struct vidbuf_description p96_buffer;
+
+void set_p96_func8()
+{
+	set_palette_fn = NULL;		// not supported yet.
+
+	switch ( picasso_vidinfo.depth )
+	{
+		case 8: p96_conv_fn = NULL; break;
+		case 15: p96_conv_fn = NULL; break;
+		case 16: p96_conv_fn = NULL; break;
+		case 32: p96_conv_fn = NULL; break;
+	}
+}
+
+void set_p96_func16()
+{
+	switch ( picasso_vidinfo.depth )
+	{
+		case 8: 	set_palette_fn = set_vpal_8bit_to_32bit_be_2pixels;
+				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; break;
+
+		case 15: init_lookup_15bit_to_16bit_le();
+				p96_conv_fn = convert_15bit_to_16bit_be; break;
+
+		case 16: p96_conv_fn = NULL; break;
+		case 32: p96_conv_fn = convert_32bit_to_16bit_be; break;
+	}
+}
+
+void set_p96_func32()
+{
+	switch ( picasso_vidinfo.depth )
+	{
+		case 8: 	set_palette_fn = set_vpal_8bit_to_32bit_le_2pixels;
+				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+				p96_conv_fn = convert_8bit_lookup_to_32bit_2pixels; 
+				break;
+
+		case 15:	printf("%s:%d NYI... wtf!!\n",__FUNCTION__,__LINE__);
+				break;
+
+/*
+		case 15: 	init_lookup_15bit_to_32bit_le();
+				p96_conv_fn = convert_15bit_to_32bit; break;
+*/
+
+		case 16: p96_conv_fn = convert_16bit_to_32bit ; break;
+		case 32: p96_conv_fn = NULL ; break;
+	}
+}
+
+void init_comp( struct Window *W )
 {
 	if (W == NULL)
 	{
@@ -1217,7 +1315,7 @@ int init_comp( struct Window *W )
 	}
 	else
 	{
-		ULONG depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
+		ULONG output_depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
 	
 		if (W->BorderTop == 0)
 		{
@@ -1232,9 +1330,20 @@ int init_comp( struct Window *W )
 		}
 
 		if (screen_is_picasso) 
-			init_comp_one( W,  depth, &comp_p96_RP, picasso_vidinfo.width, picasso_vidinfo.height );
+		{
+			init_comp_one( W, output_depth, &comp_p96_RP, picasso_vidinfo.width, picasso_vidinfo.height );
 
-		init_comp_one( W,  depth, &comp_aga_RP, gfxvidinfo.width, gfxvidinfo.height );
+			switch ( output_depth )
+			{
+				case 8: set_p96_func8(); break;
+				case 16: set_p96_func16(); break;
+				case 32: set_p96_func32(); break;
+			}
+
+			setup_p96_buffer ( &p96_buffer );
+		}
+
+		init_comp_one( W,  output_depth, &comp_aga_RP, gfxvidinfo.width, gfxvidinfo.height  );
 	}
 
 	if (screen_is_picasso)
@@ -1245,15 +1354,6 @@ int init_comp( struct Window *W )
 	{
 		printf("*** this is a AGA screen, (using gfxvidinfo.width, gfxvidinfo.height)\n");
 	}
-
-	/*
-	if (CyberGfxBase && GetBitMapAttr (RP->BitMap, (LONG)CYBRMATTR_ISCYBERGFX) && (GetBitMapAttr (RP->BitMap, (LONG)BMA_DEPTH) > 8)) 
-	{
-		output_is_true_color = 1;
-	}
-	*/
-
-	output_is_true_color = 1;
 }
 
 
@@ -1397,7 +1497,7 @@ static int setup_userscreen (void)
     if (DisplayID == (ULONG)INVALID_ID)
 	return 0;
 
-    if (Depth > 8) output_is_true_color = 1;
+    output_is_true_color = (Depth > 8)  ? 1 : 0;
 
     if ((DisplayID & HAM_KEY) && !output_is_true_color ) Depth = 6; /* only ham6 for the moment */
 
@@ -1519,29 +1619,8 @@ static void restore_prWindowPtr (void)
 	self->pr_WindowPtr = saved_prWindowPtr;
 }
 
-/****************************************************************************/
 
-/* Allocate and set-up off-screen buffer for rendering Amiga display to
- * when using CGX V41 or better
- *
- * gfxinfo - the buffer description (which gets filled in by this routine)
- * rp      - the Rastport this buffer will be blitted to
- */
-
-
-struct TagItem tags_any[] = {
-							{AVT_Type,MEMF_SHARED},
-							{AVT_Alignment,  16},
-							{TAG_DONE,0}
-						};
-
-struct TagItem tags_public[] = {
-							{AVT_Type,MEMF_SHARED},
-							{AVT_Alignment,  16},
-							{TAG_DONE,0}
-						};
-
-static APTR setup_cgx41_buffer (struct vidbuf_description *gfxinfo, const struct RastPort *rp)
+static APTR setup_classic_buffer (struct vidbuf_description *gfxinfo, const struct RastPort *rp)
 {
 	APTR buffer;
 	int bytes_per_pixel = 4;
@@ -1556,6 +1635,24 @@ static APTR setup_cgx41_buffer (struct vidbuf_description *gfxinfo, const struct
 		gfxinfo->rowbytes    = bytes_per_row;
 		gfxinfo->flush_line  = flush_line_cgx_v41;
 		gfxinfo->flush_block = flush_block_cgx_v41;
+	}
+
+	return buffer;
+}
+
+static APTR setup_p96_buffer (struct vidbuf_description *gfxinfo)
+{
+	APTR buffer;
+	int bytes_per_pixel = 4;
+	int bytes_per_row = picasso_vidinfo.width * 4;
+
+	buffer = AllocVecTagList ( bytes_per_row  * picasso_vidinfo.height , tags_any);
+
+	if (buffer)
+	{
+		gfxinfo->bufmem = buffer;
+		gfxinfo->pixbytes = bytes_per_pixel;
+		gfxinfo->rowbytes = bytes_per_row;
 	}
 
 	return buffer;
@@ -1653,15 +1750,7 @@ static int graphics_subinit (void)
 	gfxvidinfo.linemem  = 0;
 
 
-	/*
-	 * If using P96/CGX for output try to allocate on off-screen bitmap
-	 * as the display buffer
-	 *
-	 * We do this now, so if it fails we can easily fall back on using
-	 * graphics.library and palette-based rendering.
-	 */
-
-	CybBuffer = setup_cgx41_buffer (&gfxvidinfo, &comp_aga_RP);
+	CybBuffer = setup_classic_buffer (&gfxvidinfo, &comp_aga_RP);
 	if (!CybBuffer)
 	{
 
@@ -1889,6 +1978,18 @@ static void graphics_subshutdown (void)
 	{
 		FreeBitMap(comp_aga_RP.BitMap);
 		comp_aga_RP.BitMap = NULL;
+	}
+
+	if (vpal16)
+	{
+		FreeVec(vpal16);
+		vpal16 = NULL;
+	}
+
+	if (vpal32) 
+	{
+		FreeVec(vpal32);
+		vpal32 = NULL;
 	}
 }
 
