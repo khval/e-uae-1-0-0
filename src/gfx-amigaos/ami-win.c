@@ -1585,7 +1585,6 @@ static int graphics_subinit_picasso(void)
 
 	picasso_vidinfo.rowbytes	= 0;
 	picasso_vidinfo.extra_mem = 1;
-	picasso_vidinfo.depth	= bitdepth;
 	picasso_has_invalid_lines	= 0;
 	picasso_invalid_start	= picasso_vidinfo.height + 1;
 	picasso_invalid_stop	= -1;
