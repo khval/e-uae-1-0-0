@@ -91,7 +91,7 @@ struct
 int screen_is_picasso = 0;
 static int screen_was_picasso;
 
-//static char *picasso_invalid_lines;
+static char *picasso_invalid_lines = NULL;
 
 static int picasso_has_invalid_lines;
 static int picasso_invalid_start, picasso_invalid_stop;
@@ -1561,10 +1561,23 @@ static APTR setup_cgx41_buffer (struct vidbuf_description *gfxinfo, const struct
 	return buffer;
 }
 
+void free_picasso_invalid_lines()
+{
+	if (picasso_invalid_lines)
+	{
+		FreeVec(picasso_invalid_lines);
+		picasso_invalid_lines = NULL;
+	}
+}
 
-#ifdef USE_CGX_OVERLAY
-int fullscreen = 0;
-#endif
+void alloc_picasso_invalid_lines()
+{
+	picasso_invalid_lines = AllocVecTags(  picasso_vidinfo.height, tags_any);
+	if (picasso_invalid_lines)
+	{
+		memset (picasso_invalid_lines, 0, picasso_vidinfo.height );
+	}
+}
 
 static int graphics_subinit_picasso(void)
 {
@@ -1577,7 +1590,8 @@ static int graphics_subinit_picasso(void)
 	picasso_invalid_start	= picasso_vidinfo.height + 1;
 	picasso_invalid_stop	= -1;
 
-//	memset (picasso_invalid_lines, 0, sizeof picasso_invalid_lines);
+	free_picasso_invalid_lines();
+	alloc_picasso_invalid_lines();
 
 	return 1;
 }
@@ -1869,6 +1883,8 @@ static void graphics_subshutdown (void)
 		FreeBitMap(comp_p96_RP.BitMap);
 		comp_p96_RP.BitMap = NULL;
 	}
+
+	free_picasso_invalid_lines();
 
 	if (comp_aga_RP.BitMap)
 	{
@@ -2338,8 +2354,8 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 void DX_Invalidate (int first, int last)
 {
 //    DEBUG_LOG ("Function: DX_Invalidate %d - %d\n", first, last);
-/*
-	if (is_hwsurface) return;
+
+	if (!picasso_invalid_lines) return;
 	if (first > last) return;
 
 	picasso_has_invalid_lines = 1;
@@ -2351,7 +2367,7 @@ void DX_Invalidate (int first, int last)
 		picasso_invalid_lines[first] = 1;
 		first++;
 	}
-*/
+
 }
 
 int DX_BitsPerCannon (void)
