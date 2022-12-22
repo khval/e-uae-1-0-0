@@ -2830,8 +2830,20 @@ int is_fullscreen (void)
     return is_fullscreen_state ? 1: 0;
 }
 
+void p96_conv_all()
+{
+	int y;
+
+	for (y=0;y<100;y++)
+	{
+//		p96_conv_fn( src_buffer_ptr, dest_buffer_ptr, src_buffer_width );
+	}
+}
+
 int is_vsync (void)
 {
+	if (p96_conv_fn) p96_conv_all();
+
 	if (screen_is_picasso)
 	{
 		if ((comp_p96_RP.BitMap) && (W)) BackFill_Func(NULL, NULL);
