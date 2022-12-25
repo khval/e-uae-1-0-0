@@ -216,7 +216,8 @@ unsigned long            frame_num; /* for arexx */
 
 struct RastPort  comp_aga_RP;
 struct RastPort  comp_p96_RP;
-struct RastPort  *draw_p96_RP;
+struct RastPort  conv_p96_RP ;
+struct RastPort  *draw_p96_RP = &comp_p96_RP;	// draw direct to the output buffer.
 
 static UBYTE			*Line = NULL;
 static struct Screen		*S = NULL;;
@@ -1226,6 +1227,25 @@ static void open_window(void)
 	}
 }
 
+bool alloc_p96_draw_bitmap( int w, int h, int depth )
+{
+	InitRastPort(&conv_p96_RP);
+
+	conv_p96_RP.BitMap = AllocBitMapTags( w, h, depth, 
+			BMATags_PixelFormat, DRAW_FMT_SRC,
+			BMATags_Displayable, FALSE,
+			BMATags_Alignment, 4,
+			TAG_END);
+
+	if (conv_p96_RP.BitMap)
+	{
+		RectFillColor(&conv_p96_RP, 0, 0, w,h, 0xFFFF0000);
+		return true;
+	}
+
+	return false;
+}
+
 
 int init_comp_one( struct Window *W, ULONG output_depth, struct RastPort *rp, int w, int h )
 {
@@ -1312,11 +1332,27 @@ void set_p96_func32()
 
 		case 16:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
 				COMP_FMT_SRC = PIXF_A8R8G8B8;	
-				p96_conv_fn = convert_16bit_to_32bit ; break;
+				p96_conv_fn = convert_16bit_to_32bit ; 
+				break;
 
 		case 32:	COMP_FMT_SRC = PIXF_A8R8G8B8;	
-				p96_conv_fn = NULL ; break;
+				p96_conv_fn = NULL ; 
+				break;
 	}
+}
+
+void init_aga_comp( ULONG output_depth )
+{
+	switch ( output_depth )
+	{
+		case 8:	COMP_FMT_SRC = PIXF_CLUT; break;
+		case 16:	COMP_FMT_SRC = PIXF_A8R8G8B8; break;
+		case 24:
+		case 32:	COMP_FMT_SRC = PIXF_A8R8G8B8; break;
+	}
+
+	init_comp_one( W,  output_depth, &comp_aga_RP, gfxvidinfo.width, gfxvidinfo.height  );
+	update_fullscreen_rect( currprefs.gfx_correct_aspect );
 }
 
 void init_comp( struct Window *W )
@@ -1329,21 +1365,9 @@ void init_comp( struct Window *W )
 	{
 		ULONG output_depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
 	
-		draw_p96_RP = NULL;
+		init_aga_comp(output_depth);
 
-		if (W->BorderTop == 0)
-		{
-			draw_p96_RP = W -> RPort;
-
-			RectFillColor(W -> RPort, 
-				0, 
-				0, 
-				W -> Width , 
-				W -> Height,
-				0xFF000000);
-
-			update_fullscreen_rect( currprefs.gfx_correct_aspect );
-		}
+		draw_p96_RP = W -> RPort;
 
 		if (screen_is_picasso) 
 		{
@@ -1362,14 +1386,35 @@ void init_comp( struct Window *W )
 
 			if (output_depth != 8)
 			{
+				printf("**** this is a true color output *** \n");
 				init_comp_one( W, output_depth, &comp_p96_RP, picasso_vidinfo.width, picasso_vidinfo.height );
 				draw_p96_RP = &comp_p96_RP;
 			}
 
-			setup_p96_buffer ( &p96_buffer );
+			if (p96_conv_fn)
+			{
+				printf("**** Need to convert *** \n");
+				if (alloc_p96_draw_bitmap( picasso_vidinfo.width, picasso_vidinfo.height, picasso_vidinfo.depth ))
+				{
+					draw_p96_RP = &conv_p96_RP;
+				}
+				else
+				{
+					printf("*** Failed to alloc p96 draw buffer ***\n");
+					p96_conv_fn = NULL;
+				}
+			}
 		}
 
-		init_comp_one( W,  output_depth, &comp_aga_RP, gfxvidinfo.width, gfxvidinfo.height  );
+		if (W->BorderTop == 0)
+		{
+			RectFillColor(W -> RPort, 
+				0, 
+				0, 
+				W -> Width , 
+				W -> Height,
+				0xFF000000);
+		}
 	}
 
 	if (screen_is_picasso)
@@ -1669,27 +1714,6 @@ static APTR setup_classic_buffer (struct vidbuf_description *gfxinfo, const stru
 	return buffer;
 }
 
-static APTR setup_p96_buffer (struct vidbuf_description *gfxinfo)
-{
-	APTR buffer;
-
-	gfxinfo->pixbytes= 4;
-
-	int bytes_per_row = picasso_vidinfo.pixbytes;
-
-	// 4 bytes alignment.
-	bytes_per_row = bytes_per_row & 3 ? (bytes_per_row & ~3) + 4 : bytes_per_row;
-
-	buffer = AllocVecTagList ( bytes_per_row  * picasso_vidinfo.height , tags_any);
-	if (buffer)
-	{
-		gfxinfo->bufmem = buffer;
-		gfxinfo->rowbytes = bytes_per_row;
-	}
-
-	return buffer;
-}
-
 void free_picasso_invalid_lines()
 {
 	if (picasso_invalid_lines)
@@ -1726,7 +1750,6 @@ static int graphics_subinit_picasso(void)
 
 static int graphics_subinit (void)
 {
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
 
 	if (comp_aga_RP.BitMap)
 		printf("WTF!! comp_aga_RP.BitMap is not freed\n");
@@ -1996,6 +2019,12 @@ static void graphics_subshutdown (void)
 	{
 		FreeVec (CybBuffer);
 		CybBuffer = NULL;
+	}
+
+	if (conv_p96_RP.BitMap)
+	{
+		FreeBitMap(conv_p96_RP.BitMap);
+		conv_p96_RP.BitMap = NULL;
 	}
 
 	if (comp_p96_RP.BitMap)
@@ -2975,6 +3004,8 @@ int is_fullscreen (void)
 
 void p96_conv_all()
 {
+#if 0
+
 	APTR lock_src,lock_dest;
 	ULONG src_BytesPerRow,dest_BytesPerRow;
 	char *src_buffer_ptr, *dest_buffer_ptr;
@@ -3014,6 +3045,8 @@ void p96_conv_all()
 
 	if (lock_src) IGraphics -> UnlockBitMap( lock_src );
 	if (lock_dest) IGraphics -> UnlockBitMap( lock_dest );
+
+#endif
 }
 
 int is_vsync (void)
