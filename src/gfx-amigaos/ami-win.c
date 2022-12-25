@@ -1265,8 +1265,6 @@ struct vidbuf_description p96_buffer;
 
 void set_p96_func8()
 {
-	set_palette_fn = NULL;		// not supported yet.
-
 	switch ( picasso_vidinfo.depth )
 	{
 		case 8: p96_conv_fn = NULL; break;
@@ -1280,16 +1278,21 @@ void set_p96_func16()
 {
 	switch ( picasso_vidinfo.depth )
 	{
-		case 8: 	vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+		case 8:	RECTFMT_SRC = PIXF_A8R8G8B8;	
+				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 //				init_lookup_8bit_to_16bit_be_2pixels();
 				set_palette_fn = set_vpal_8bit_to_16bit_be_2pixels;
 				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; break;
 
-		case 15: init_lookup_15bit_to_16bit_le();
+		case 15:	RECTFMT_SRC = PIXF_R5G6B5PC;	
+				init_lookup_15bit_to_16bit_le();
 				p96_conv_fn = convert_15bit_to_16bit_be; break;
 
-		case 16: p96_conv_fn = NULL; break;
-		case 32: p96_conv_fn = convert_32bit_to_16bit_be; break;
+		case 16:	RECTFMT_SRC = PIXF_R5G6B5PC;	
+				p96_conv_fn = NULL; break;
+
+		case 32:	RECTFMT_SRC = PIXF_A8R8G8B8;	
+				p96_conv_fn = convert_32bit_to_16bit_be; break;
 	}
 }
 
@@ -1297,22 +1300,22 @@ void set_p96_func32()
 {
 	switch ( picasso_vidinfo.depth )
 	{
-		case 8: 	vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+		case 8:	RECTFMT_SRC = PIXF_A8R8G8B8;
+				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 //				init_lookup_8bit_to_32bit_be_2pixels();
 				set_palette_fn = set_vpal_8bit_to_32bit_be_2pixels;
 				p96_conv_fn = convert_8bit_lookup_to_32bit_2pixels; 
 				break;
 
-		case 15:	printf("%s:%d NYI... wtf!!\n",__FUNCTION__,__LINE__);
+		case 15:	RECTFMT_SRC = PIXF_R5G6B5PC;	
+				printf("%s:%d NYI... wtf!!\n",__FUNCTION__,__LINE__);
 				break;
 
-/*
-		case 15: 	init_lookup_15bit_to_32bit_le();
-				p96_conv_fn = convert_15bit_to_32bit; break;
-*/
+		case 16:	RECTFMT_SRC = PIXF_R5G6B5PC;
+				p96_conv_fn = convert_16bit_to_32bit ; break;
 
-		case 16: p96_conv_fn = convert_16bit_to_32bit ; break;
-		case 32: p96_conv_fn = NULL ; break;
+		case 32:	RECTFMT_SRC = PIXF_A8R8G8B8;	
+				p96_conv_fn = NULL ; break;
 	}
 }
 
