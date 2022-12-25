@@ -226,6 +226,7 @@ unsigned long            frame_num; /* for arexx */
 
 struct RastPort  comp_aga_RP;
 struct RastPort  comp_p96_RP;
+struct RastPort  *draw_p96_RP;
 
 static UBYTE			*Line = NULL;
 static struct Screen		*S = NULL;;
@@ -847,7 +848,7 @@ static int init_colors (void)
 
 		if (screen_is_picasso)
 		{
-			success = init_colors_cgx (&comp_p96_RP);
+			success = init_colors_cgx (draw_p96_RP);
 		}
 		else
 		{
@@ -1325,8 +1326,12 @@ void init_comp( struct Window *W )
 	{
 		ULONG output_depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
 	
+		draw_p96_RP = NULL;
+
 		if (W->BorderTop == 0)
 		{
+			draw_p96_RP = W -> RPort;
+
 			RectFillColor(W -> RPort, 
 				0, 
 				0, 
@@ -1339,13 +1344,19 @@ void init_comp( struct Window *W )
 
 		if (screen_is_picasso) 
 		{
-			init_comp_one( W, output_depth, &comp_p96_RP, picasso_vidinfo.width, picasso_vidinfo.height );
+			printf("output_depth: %d\n", output_depth);
 
 			switch ( output_depth )
 			{
 				case 8: set_p96_func8(); break;
 				case 16: set_p96_func16(); break;
 				case 32: set_p96_func32(); break;
+			}
+
+			if (output_depth != 8)
+			{
+				init_comp_one( W, output_depth, &comp_p96_RP, picasso_vidinfo.width, picasso_vidinfo.height );
+				draw_p96_RP = &comp_p96_RP;
 			}
 
 			setup_p96_buffer ( &p96_buffer );
@@ -2421,8 +2432,8 @@ int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT
 		ULONG error = BltBitMapTags(
 			BLITA_SrcType, BLITT_BITMAP,
 			BLITA_DestType, BLITT_BITMAP,
-			BLITA_Source, comp_p96_RP.BitMap,
-			BLITA_Dest, comp_p96_RP.BitMap,
+			BLITA_Source, draw_p96_RP->BitMap,
+			BLITA_Dest, draw_p96_RP->BitMap,
 			BLITA_SrcX, srcx,
 			BLITA_SrcY, srcy,
 			BLITA_Width,  width,
@@ -2447,9 +2458,9 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 
 	DEBUG_LOG ("DX_Fill (x:%d y:%d w:%d h:%d color=%08x)\n", dstx, dsty, width, height, color);
 
-	if (comp_p96_RP.BitMap)
+	if (draw_p96_RP -> BitMap)
 	{
-		RectFillColor(&comp_p96_RP, 
+		RectFillColor(draw_p96_RP, 
 			dstx, 
 			dsty, 
 			dstx + width - 1, 
@@ -2958,7 +2969,7 @@ void p96_conv_all()
 	dest_buffer_ptr = gfx_lock_picasso ();
 	for (y=0;y<picasso_vidinfo.height;y++)
 	{
-		if (picasso_invalid_lines[y]) 
+//		if (picasso_invalid_lines[y]) 
 		{
 			p96_conv_fn( src_buffer_ptr, dest_buffer_ptr, picasso_vidinfo.width );
 			picasso_invalid_lines[y] = 0;
@@ -2974,13 +2985,19 @@ int is_vsync (void)
 {
 	if (p96_conv_fn) p96_conv_all();
 
-	if (screen_is_picasso)
+	if (comp_p96_RP.BitMap)
 	{
-		if ((comp_p96_RP.BitMap) && (W)) BackFill_Func(NULL, NULL);
-	}
-	else
-	{
-		if ((comp_aga_RP.BitMap) && (W)) BackFill_Func(NULL, NULL);
+		if (W)
+		{
+			if (screen_is_picasso)
+			{
+				BackFill_Func(NULL, NULL);
+			}
+			else
+			{
+				BackFill_Func(NULL, NULL);
+			}
+		}
 	}
 
 	return 0;
