@@ -3018,20 +3018,16 @@ void p96_conv_all()
 
 int is_vsync (void)
 {
-	if (p96_conv_fn) p96_conv_all();
-
-	if (comp_p96_RP.BitMap)
+	if (W)
 	{
-		if (W)
+		if ((screen_is_picasso) && (comp_p96_RP.BitMap))
 		{
-			if (screen_is_picasso)
-			{
-				BackFill_Func(NULL, NULL);
-			}
-			else
-			{
-				BackFill_Func(NULL, NULL);
-			}
+			if (p96_conv_fn) p96_conv_all();
+			BackFill_Func(NULL, NULL);
+		}
+		else
+		{
+			BackFill_Func(NULL, NULL);
 		}
 	}
 
