@@ -1349,10 +1349,14 @@ void init_comp( struct Window *W )
 		{
 			printf("output_depth: %d\n", output_depth);
 
+			set_palette_fn = NULL;	// default.. no special palette function.
+			p96_conv_fn = NULL;	// default.. nothing to convert
+
 			switch ( output_depth )
 			{
 				case 8: set_p96_func8(); break;
 				case 16: set_p96_func16(); break;
+				case 24:
 				case 32: set_p96_func32(); break;
 			}
 
