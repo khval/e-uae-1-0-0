@@ -115,17 +115,6 @@ static int current_width, current_height;
 static int red_bits, green_bits, blue_bits;
 static int red_shift, green_shift, blue_shift;
 
-/*
-struct p96colors
-{
-	UBYTE a;
-	UBYTE r;
-	UBYTE g;
-	UBYTE b;
-};
-static struct p96colors p96Colors[256];
-*/
-
 uint32 load32_p96_table[1 + (256 * 3)];		// 256 colors + 1 count
 
 // this needs, to be changed when color is changed !!!!!
@@ -137,7 +126,7 @@ void (*p96_conv_fn) (void *src, void *dest, int size) = NULL;
 
 uint32 *vpal32 = NULL;
 uint16 *vpal16 = NULL;
-void (*set_palette_fn)(uint8 *pal, uint32 num) = NULL;
+void (*set_palette_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
 
  void set_vpal_8bit_to_16bit_le_2pixels(uint8 *pal, uint32 num);
  void set_vpal_8bit_to_16bit_be_2pixels(uint8 *pal, uint32 num);
