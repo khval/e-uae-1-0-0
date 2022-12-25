@@ -1669,7 +1669,7 @@ void free_picasso_invalid_lines()
 
 void alloc_picasso_invalid_lines()
 {
-	picasso_invalid_lines = AllocVecTags(  picasso_vidinfo.height, tags_any);
+	picasso_invalid_lines = AllocVecTagList(  picasso_vidinfo.height, tags_any);
 	if (picasso_invalid_lines)
 	{
 		memset (picasso_invalid_lines, 0, picasso_vidinfo.height );
