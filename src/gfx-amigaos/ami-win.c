@@ -2485,39 +2485,42 @@ void DX_SetPalette (int start, int count)
 {
     DEBUG_LOG ("Function: DX_SetPalette\n");
 
-    if (! screen_is_picasso || picasso96_state.RGBFormat != RGBFB_CHUNKY)
-	return;
+	// exit if not valid !!!
+	if (! screen_is_picasso || picasso96_state.RGBFormat != RGBFB_CHUNKY) return;
 
-    if (picasso_vidinfo.pixbytes != 1) {
-	/* This is the case when we're emulating a 256 color display. */
-	while (count-- > 0) {
-	    int r = picasso96_state.CLUT[start].Red;
-	    int g = picasso96_state.CLUT[start].Green;
-	    int b = picasso96_state.CLUT[start].Blue;
-	    picasso_vidinfo.clut[start++] =
-				(doMask256 (r, red_bits, red_shift)
-				| doMask256 (g, green_bits, green_shift)
-				| doMask256 (b, blue_bits, blue_shift));
+	if (count > 256) count = 256;
+
+	if (set_palette_fn)	// we need to convert !!
+	{
+		int n;
+		for (n = start ; n<(start+count); n++ )
+			set_palette_fn( picasso96_state.CLUT, n );			// fix me !!! wrong size of array maybe!!
 	}
-    } else {
-	int i;
-	for (i = start; i < start+count && i < 256;  i++) {
-	    p96Colors[i].r = picasso96_state.CLUT[i].Red;
-	    p96Colors[i].g = picasso96_state.CLUT[i].Green;
-	    p96Colors[i].b = picasso96_state.CLUT[i].Blue;
+	else	// CLUT output -- should be fullscreen mode!
+	{
+		load32_p96_table[ 0 ] = count << 16;
+
+		int i;
+		for (i = 0; i < count;  i++)
+		{
+			load32_p96_table[ i + 1 ] =
+				((picasso96_state.CLUT[i].Red * 0x0101) << 24) |
+				((picasso96_state.CLUT[i].Green * 0x0101) << 8) |
+ 				(picasso96_state.CLUT[i].Blue * 0x0101);
+		}
+
+		LoadRGB32( &(S -> ViewPort) , load32_p96_table );
 	}
-//	SDL_SetColors (screen, &p96Colors[start], start, count);
-    }
 }
 
 void DX_SetPalette_vsync(void)
 {
-    if (palette_update_end > palette_update_start) {
-	DX_SetPalette (palette_update_start,
-				palette_update_end - palette_update_start);
-    palette_update_end   = 0;
-    palette_update_start = 0;
-  }
+	if (palette_update_end > palette_update_start)
+	{
+		DX_SetPalette (palette_update_start, palette_update_end - palette_update_start);
+		palette_update_end  = 0;
+		palette_update_start = 0;
+	}
 }
 
 
