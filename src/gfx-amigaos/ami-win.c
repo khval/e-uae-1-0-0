@@ -2614,9 +2614,9 @@ uae_u8 *gfx_lock_picasso (void)
 
 	if (p96_lock) gfx_unlock_picasso ();
 
-	if (comp_p96_RP.BitMap)
+	if (draw_p96_RP -> BitMap)
 	{
-		p96_lock = IGraphics -> LockBitMapTags(comp_p96_RP.BitMap,
+		p96_lock = IGraphics -> LockBitMapTags(draw_p96_RP -> BitMap,
 			LBM_BaseAddress, (APTR *) &address,
 			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
 			TAG_END	);
@@ -2624,7 +2624,10 @@ uae_u8 *gfx_lock_picasso (void)
 		if (!p96_lock)
 		{
 			DEBUG_LOG ("Function: gfx_lock_picasso, failed to get lock!\n");
-			DEBUG_LOG ("Bitmap BytesPerRow: %d, Rows: %d, Depth: %d\n", comp_RP.BitMap -> BytesPerRow, comp_RP.BitMap -> Rows, comp_RP.BitMap -> Depth);
+			DEBUG_LOG ("Bitmap BytesPerRow: %d, Rows: %d, Depth: %d\n", 
+					draw_p96_RP -> BitMap -> BytesPerRow, 
+					draw_p96_RP -> BitMap -> Rows, 
+					draw_p96_RP -> BitMap -> Depth);
 		}
 	}
 
