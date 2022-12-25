@@ -126,7 +126,7 @@ struct p96colors
 static struct p96colors p96Colors[256];
 */
 
-uint32 load32_p96_table[257];		// 256 colors + 1 count
+uint32 load32_p96_table[1 + (256 * 3)];		// 256 colors + 1 count
 
 // this needs, to be changed when color is changed !!!!!
 
@@ -2504,17 +2504,19 @@ void DX_SetPalette (int start, int count)
 		for (n = start ; n<(start+count); n++ )
 			set_palette_fn( picasso96_state.CLUT, n );			// fix me !!! wrong size of array maybe!!
 	}
-	else	// CLUT output -- should be fullscreen mode!
+	else
 	{
 		load32_p96_table[ 0 ] = count << 16;
 
 		int i;
+		int offset;
+
 		for (i = 0; i < count;  i++)
 		{
-			load32_p96_table[ i + 1 ] =
-				((picasso96_state.CLUT[i].Red * 0x0101) << 24) |
-				((picasso96_state.CLUT[i].Green * 0x0101) << 8) |
- 				(picasso96_state.CLUT[i].Blue * 0x0101);
+			offset = (i*3) + 1;
+			load32_p96_table[ offset + 0  ] = picasso96_state.CLUT[i].Red ;
+			load32_p96_table[ offset + 1  ] = picasso96_state.CLUT[i].Green;
+			load32_p96_table[ offset + 2  ] = picasso96_state.CLUT[i].Blue;			 
 		}
 
 		LoadRGB32( &(S -> ViewPort) , load32_p96_table );
