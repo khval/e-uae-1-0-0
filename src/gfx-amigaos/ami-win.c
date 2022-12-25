@@ -1623,15 +1623,18 @@ static void restore_prWindowPtr (void)
 static APTR setup_classic_buffer (struct vidbuf_description *gfxinfo, const struct RastPort *rp)
 {
 	APTR buffer;
-	int bytes_per_pixel = 4;
-	int bytes_per_row = gfxinfo->width * 4;
+
+	gfxinfo->pixbytes= 4;
+
+	int bytes_per_row = gfxinfo->width * gfxinfo->pixbytes;
+
+	// 4 bytes alignment.
+	bytes_per_row = bytes_per_row & 3 ? (bytes_per_row & ~3) + 4 : bytes_per_row;
 
 	buffer = AllocVecTagList ( bytes_per_row  * gfxinfo->height , tags_any);
-
 	if (buffer)
 	{
 		gfxinfo->bufmem      = buffer;
-		gfxinfo->pixbytes    = bytes_per_pixel;
 		gfxinfo->rowbytes    = bytes_per_row;
 		gfxinfo->flush_line  = flush_line_cgx_v41;
 		gfxinfo->flush_block = flush_block_cgx_v41;
@@ -1643,15 +1646,18 @@ static APTR setup_classic_buffer (struct vidbuf_description *gfxinfo, const stru
 static APTR setup_p96_buffer (struct vidbuf_description *gfxinfo)
 {
 	APTR buffer;
-	int bytes_per_pixel = 4;
-	int bytes_per_row = picasso_vidinfo.width * 4;
+
+	gfxinfo->pixbytes= 4;
+
+	int bytes_per_row = picasso_vidinfo.pixbytes;
+
+	// 4 bytes alignment.
+	bytes_per_row = bytes_per_row & 3 ? (bytes_per_row & ~3) + 4 : bytes_per_row;
 
 	buffer = AllocVecTagList ( bytes_per_row  * picasso_vidinfo.height , tags_any);
-
 	if (buffer)
 	{
 		gfxinfo->bufmem = buffer;
-		gfxinfo->pixbytes = bytes_per_pixel;
 		gfxinfo->rowbytes = bytes_per_row;
 	}
 
