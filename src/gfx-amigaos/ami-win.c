@@ -2532,9 +2532,9 @@ void DX_SetPalette (int start, int count)
 		for (i = 0; i < count;  i++)
 		{
 			offset = (i*3) + 1;
-			load32_p96_table[ offset + 0  ] = picasso96_state.CLUT[i].Red ;
-			load32_p96_table[ offset + 1  ] = picasso96_state.CLUT[i].Green;
-			load32_p96_table[ offset + 2  ] = picasso96_state.CLUT[i].Blue;			 
+			load32_p96_table[ offset + 0  ] = 0x01010101 * picasso96_state.CLUT[i].Red;
+			load32_p96_table[ offset + 1  ] = 0x01010101 * picasso96_state.CLUT[i].Green;
+			load32_p96_table[ offset + 2  ] = 0x01010101 * picasso96_state.CLUT[i].Blue;			 
 		}
 
 		LoadRGB32( &(S -> ViewPort) , load32_p96_table );
