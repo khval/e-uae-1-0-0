@@ -1273,8 +1273,9 @@ void set_p96_func16()
 {
 	switch ( picasso_vidinfo.depth )
 	{
-		case 8: 	set_palette_fn = set_vpal_8bit_to_32bit_be_2pixels;
-				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+		case 8: 	vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+//				init_lookup_8bit_to_16bit_be_2pixels();
+				set_palette_fn = set_vpal_8bit_to_16bit_be_2pixels;
 				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; break;
 
 		case 15: init_lookup_15bit_to_16bit_le();
@@ -1289,8 +1290,9 @@ void set_p96_func32()
 {
 	switch ( picasso_vidinfo.depth )
 	{
-		case 8: 	set_palette_fn = set_vpal_8bit_to_32bit_le_2pixels;
-				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+		case 8: 	vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+//				init_lookup_8bit_to_32bit_be_2pixels();
+				set_palette_fn = set_vpal_8bit_to_32bit_be_2pixels;
 				p96_conv_fn = convert_8bit_lookup_to_32bit_2pixels; 
 				break;
 
