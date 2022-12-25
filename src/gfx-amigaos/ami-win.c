@@ -115,6 +115,7 @@ static int current_width, current_height;
 static int red_bits, green_bits, blue_bits;
 static int red_shift, green_shift, blue_shift;
 
+/*
 struct p96colors
 {
 	UBYTE a;
@@ -122,8 +123,13 @@ struct p96colors
 	UBYTE g;
 	UBYTE b;
 };
-
 static struct p96colors p96Colors[256];
+*/
+
+uint32 load32_p96_table[257];		// 256 colors + 1 count
+
+// this needs, to be changed when color is changed !!!!!
+
 static int palette_update_start = 256;
 static int palette_update_end   = 0;
 
