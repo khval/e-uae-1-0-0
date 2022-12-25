@@ -2938,12 +2938,23 @@ int is_fullscreen (void)
 
 void p96_conv_all()
 {
+	char *src_buffer_ptr, *dest_buffer_ptr;
 	int y;
 
-	for (y=0;y<100;y++)
+	src_buffer_ptr = p96_buffer.bufmem;
+	dest_buffer_ptr = gfx_lock_picasso ();
+	for (y=0;y<picasso_vidinfo.height;y++)
 	{
-//		p96_conv_fn( src_buffer_ptr, dest_buffer_ptr, src_buffer_width );
+		if (picasso_invalid_lines[y]) 
+		{
+			p96_conv_fn( src_buffer_ptr, dest_buffer_ptr, picasso_vidinfo.width );
+			picasso_invalid_lines[y] = 0;
+		}
+
+		src_buffer_ptr += p96_buffer.rowbytes;
+		dest_buffer_ptr += picasso_vidinfo.rowbytes;
 	}
+	gfx_unlock_picasso ();
 }
 
 int is_vsync (void)
