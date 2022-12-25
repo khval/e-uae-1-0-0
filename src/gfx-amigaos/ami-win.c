@@ -151,7 +151,8 @@ struct screen_rect
 	int h;
 };
 
-ULONG RECTFMT_SRC = PIXF_A8R8G8B8;
+ULONG DRAW_FMT_SRC = PIXF_A8R8G8B8;
+ULONG COMP_FMT_SRC = PIXF_A8R8G8B8;
 
 
 struct TagItem tags_any[] = {
@@ -498,7 +499,7 @@ static void flush_line_cgx_v41 (struct vidbuf_description *gfxinfo, int line_no)
 		WritePixelArray (CybBuffer,
 		     0 , line_no,
 		     gfxinfo->rowbytes,
-			RECTFMT_SRC,
+			COMP_FMT_SRC,
 		     &comp_aga_RP,
 		     XOffset,
 		     YOffset + line_no,
@@ -514,7 +515,7 @@ static void flush_block_cgx_v41 (struct vidbuf_description *gfxinfo, int first_l
 		WritePixelArray (CybBuffer,
 			0 , first_line,
 			gfxinfo->rowbytes,
-			RECTFMT_SRC,
+			COMP_FMT_SRC,
 			&comp_aga_RP,
 			XOffset,
 			YOffset + first_line,
@@ -1265,6 +1266,9 @@ struct vidbuf_description p96_buffer;
 
 void set_p96_func8()
 {
+	DRAW_FMT_SRC = PIXF_CLUT;
+	COMP_FMT_SRC = PIXF_NONE;	
+
 	switch ( picasso_vidinfo.depth )
 	{
 		case 8: p96_conv_fn = NULL; break;
@@ -1278,20 +1282,24 @@ void set_p96_func16()
 {
 	switch ( picasso_vidinfo.depth )
 	{
-		case 8:	RECTFMT_SRC = PIXF_A8R8G8B8;	
+		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
+				COMP_FMT_SRC = PIXF_A8R8G8B8;	
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 //				init_lookup_8bit_to_16bit_be_2pixels();
 				set_palette_fn = set_vpal_8bit_to_16bit_be_2pixels;
 				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; break;
 
-		case 15:	RECTFMT_SRC = PIXF_R5G6B5PC;	
+		case 15:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
+				COMP_FMT_SRC = PIXF_R5G6B5PC;
 				init_lookup_15bit_to_16bit_le();
 				p96_conv_fn = convert_15bit_to_16bit_be; break;
 
-		case 16:	RECTFMT_SRC = PIXF_R5G6B5PC;	
+		case 16:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
+				COMP_FMT_SRC = PIXF_R5G6B5PC;
 				p96_conv_fn = NULL; break;
 
-		case 32:	RECTFMT_SRC = PIXF_A8R8G8B8;	
+		case 32:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
+				COMP_FMT_SRC = PIXF_R5G6B5PC;
 				p96_conv_fn = convert_32bit_to_16bit_be; break;
 	}
 }
@@ -1300,21 +1308,24 @@ void set_p96_func32()
 {
 	switch ( picasso_vidinfo.depth )
 	{
-		case 8:	RECTFMT_SRC = PIXF_A8R8G8B8;
+		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
+				COMP_FMT_SRC = PIXF_A8R8G8B8;
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 //				init_lookup_8bit_to_32bit_be_2pixels();
 				set_palette_fn = set_vpal_8bit_to_32bit_be_2pixels;
 				p96_conv_fn = convert_8bit_lookup_to_32bit_2pixels; 
 				break;
 
-		case 15:	RECTFMT_SRC = PIXF_R5G6B5PC;	
+		case 15:	DRAW_FMT_SRC = PIXF_R5G5B5PC;
+				COMP_FMT_SRC = PIXF_A8R8G8B8;	
 				printf("%s:%d NYI... wtf!!\n",__FUNCTION__,__LINE__);
 				break;
 
-		case 16:	RECTFMT_SRC = PIXF_R5G6B5PC;
+		case 16:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
+				COMP_FMT_SRC = PIXF_A8R8G8B8;	
 				p96_conv_fn = convert_16bit_to_32bit ; break;
 
-		case 32:	RECTFMT_SRC = PIXF_A8R8G8B8;	
+		case 32:	COMP_FMT_SRC = PIXF_A8R8G8B8;	
 				p96_conv_fn = NULL ; break;
 	}
 }
@@ -2566,7 +2577,7 @@ void add_native_modes( int depth, int *count )
 			(GetDisplayInfoData( NULL, &dispi, sizeof(dispi) ,  DTAG_DISP, ID))
 		)
 		{
-			if (depth == (di.MaxDepth == 24 ?  32 : di.MaxDepth) )
+			if ( (depth == 15 ? 16: depth) == (di.MaxDepth == 24 ?  32 : di.MaxDepth) )
 			{
 				w =  di.Nominal.MaxX -di.Nominal.MinX +1;
 				h =  di.Nominal.MaxY -di.Nominal.MinY +1;
@@ -2601,6 +2612,7 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
     /* Check list of standard P96 screenmodes */
 
 	add_native_modes( 32, &count );
+	add_native_modes( 15, &count );
 	add_native_modes( 8, &count );
 
 	return count;
@@ -2952,6 +2964,8 @@ int check_prefs_changed_gfx (void)
 }
 
 /****************************************************************************/
+
+
 
 void toggle_mousegrab (void)
 {
