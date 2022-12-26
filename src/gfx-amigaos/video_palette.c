@@ -126,7 +126,6 @@ void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1)
 {
 
 	int index;
-//	int num2;
 
 	struct MyCLUTEntry *pal1;
 	struct MyCLUTEntry *pal2;
@@ -138,11 +137,16 @@ void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1)
 
 	for (index=0;index<256*256;index++)
 	{
-		pal1 = pal + ((index >> 8) & 255)*3;
-		pal2 = pal + (index & 255)*3;
+		vpal32[index*2] =   _BE_ARGB( (index >> 8)  );  // ARGB
+		vpal32[index*2+1] =  _BE_ARGB( (index & 0xFF) ) ;  // ARGB
 
-		vpal32[index*2] = 0xFF000000 + (pal1 -> Red << 16) +  (pal1 -> Green << 8) + pal1 -> Blue  ;  // ARGB
-		vpal32[index*2+1] = 0xFF000000 + (pal2 -> Red << 16) +  (pal2 -> Green << 8) + pal2 -> Blue  ;  // ARGB
+//		vpal32[index*2] =   0xFFFF00FF;
+//		vpal32[index*2+1] =  _BE_ARGB( index ) ;  // ARGB
 	}
+}
+
+void set_vpal_8bit_to_32bit_be(struct MyCLUTEntry *pal, uint32 num1)
+{
+	vpal32[num1] =  _BE_ARGB( num1 ) ;  // ARGB
 }
 
