@@ -1285,7 +1285,7 @@ int init_comp_one( struct Window *W, ULONG output_depth, struct RastPort *rp, in
 {
 	InitRastPort(rp);
 
-	rp -> BitMap = AllocBitMap( w,h, output_depth, BMF_DISPLAYABLE, W -> RPort -> BitMap);
+	rp -> BitMap = AllocBitMap( w,h, output_depth == 32 ? 24 :output_depth , BMF_DISPLAYABLE, W -> RPort -> BitMap);
 	
 	if (rp -> BitMap)
 	{
