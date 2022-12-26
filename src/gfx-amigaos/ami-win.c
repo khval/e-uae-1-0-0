@@ -381,7 +381,7 @@ STATIC_INLINE void flush_line_planar_nodither (struct vidbuf_description *gfxinf
     /* Find first pixel changed on this line */
     while (*newp++ == *oldp++) {
 	if (!--len)
-	    return; /* line not changed - so don't draw it */
+		return; /* line not changed - so don't draw it */
     }
     src   = --newp;
     dst   = --oldp;
@@ -429,7 +429,7 @@ STATIC_INLINE void flush_line_planar_dither (struct vidbuf_description *gfxinfo,
     /* Find first pixel changed on this line */
     while (*newp++ == *oldp++) {
 	if (!--len)
-	    return; /* line not changed - so don't draw it */
+		return; /* line not changed - so don't draw it */
     }
     src   = --newp;
     dst   = --oldp;
@@ -487,14 +487,14 @@ static void flush_line_cgx_v41 (struct vidbuf_description *gfxinfo, int line_no)
 	if (comp_aga_RP.BitMap)
 	{
 		WritePixelArray (CybBuffer,
-		     0 , line_no,
-		     gfxinfo->rowbytes,
+			 0 , line_no,
+			 gfxinfo->rowbytes,
 			COMP_FMT_SRC,
-		     &comp_aga_RP,
-		     XOffset,
-		     YOffset + line_no,
-		     gfxinfo->width,
-		     1);
+			 &comp_aga_RP,
+			 XOffset,
+			 YOffset + line_no,
+			 gfxinfo->width,
+			 1);
 	}
 }
 
@@ -524,9 +524,9 @@ static void flush_clear_screen_gfxlib (struct vidbuf_description *gfxinfo)
 		if (output_is_true_color)
 		{
 			RectFillColor (&comp_aga_RP, W->BorderLeft, W->BorderTop,
-			        W->Width - W->BorderLeft - W->BorderRight,
-			        W->Height - W->BorderTop - W->BorderBottom,
-			        0);
+				    W->Width - W->BorderLeft - W->BorderRight,
+				    W->Height - W->BorderTop - W->BorderBottom,
+				    0);
 		}
 		else
 		{
@@ -628,19 +628,19 @@ static int get_nearest_color (int r, int g, int b)
 	err = calc_err (r, g, b, cr, cg, cb);
 
 	if(err < besterr) {
-	    best = i;
-	    besterr = err;
-	    br = cr; bg = cg; bb = cb;
+		best = i;
+		besterr = err;
+		br = cr; bg = cg; bb = cb;
 	}
 
 	if (is_halfbrite) {
-	    cr /= 2; cg /= 2; cb /= 2;
-	    err = calc_err (r, g, b, cr, cg, cb);
-	    if (err < besterr) {
+		cr /= 2; cg /= 2; cb /= 2;
+		err = calc_err (r, g, b, cr, cg, cb);
+		if (err < besterr) {
 		best = i + 32;
 		besterr = err;
 		br = cr; bg = cg; bb = cb;
-	    }
+		}
 	}
     }
     return best;
@@ -648,204 +648,227 @@ static int get_nearest_color (int r, int g, int b)
 
 /****************************************************************************/
 
-static int init_colors_cgx (const struct RastPort *rp)
+static int init_true_colors_output (const struct RastPort *rp)
 {
-    int redbits,  greenbits,  bluebits;
-    int redshift, greenshift, blueshift;
-    int byte_swap = FALSE;
-    int pixfmt;
-    int found = TRUE;
+	int redbits,  greenbits,  bluebits;
+	int redshift, greenshift, blueshift;
+	int byte_swap = FALSE;
+	int pixfmt;
+	int found = TRUE;
 
-		pixfmt = GetBitMapAttr (rp->BitMap, (LONG)BMA_PIXELFORMAT);
+	if (!rp)
+	{
+		printf("%s:%d: unexpected rp=NULL, function failed\n");
+		return 0;
+	}
 
-    switch (pixfmt) {
+	if (!rp->BitMap)
+	{
+		printf("%s:%d: unexpected rp->BitMap=NULL, function failed\n");
+		return 0;
+	}
+
+	pixfmt = GetBitMapAttr (rp->BitMap, (LONG)BMA_PIXELFORMAT);
+
+	switch (pixfmt)
+	{
 #ifdef WORDS_BIGENDIAN
-	case PIXF_R5G5B5PC:
-	    byte_swap = TRUE;
-	case PIXF_R5G5B5:
-	    redbits  = 5;  greenbits  = 5; bluebits  = 5;
-	    redshift = 10; greenshift = 5; blueshift = 0;
-	    break;
-	case PIXF_R5G6B5PC:
-	    byte_swap = TRUE;
-	case PIXF_R5G6B5:
-	    redbits  = 5;  greenbits  = 6;  bluebits  = 5;
-	    redshift = 11; greenshift = 5;  blueshift = 0;
-	    break;
-	case PIXF_R8G8B8A8:
-	    redbits  = 8;  greenbits  = 8;  bluebits  = 8;
-	    redshift = 24; greenshift = 16; blueshift = 8;
-	    break;
-	case PIXF_B8G8R8A8:
-	    redbits  = 8;  greenbits  = 8;  bluebits  = 8;
-	    redshift = 8;  greenshift = 16; blueshift = 24;
-	    break;
-	case PIXF_A8R8G8B8:
-	    redbits  = 8;  greenbits  = 8;  bluebits  = 8;
-	    redshift = 16; greenshift = 8;  blueshift = 0;
-	    break;
+		case PIXF_R5G5B5PC:
+			byte_swap = TRUE;
+		case PIXF_R5G5B5:
+			redbits  = 5;  greenbits  = 5; bluebits  = 5;
+			redshift = 10; greenshift = 5; blueshift = 0;
+			break;
+		case PIXF_R5G6B5PC:
+			byte_swap = TRUE;
+		case PIXF_R5G6B5:
+			redbits  = 5;  greenbits  = 6;  bluebits  = 5;
+			redshift = 11; greenshift = 5;  blueshift = 0;
+			break;
+		case PIXF_R8G8B8A8:
+			redbits  = 8;  greenbits  = 8;  bluebits  = 8;
+			redshift = 24; greenshift = 16; blueshift = 8;
+			break;
+		case PIXF_B8G8R8A8:
+			redbits  = 8;  greenbits  = 8;  bluebits  = 8;
+			redshift = 8;  greenshift = 16; blueshift = 24;
+			break;
+		case PIXF_A8R8G8B8:
+			redbits  = 8;  greenbits  = 8;  bluebits  = 8;
+			redshift = 16; greenshift = 8;  blueshift = 0;
+			break;
 #else
-	case PIXF_R5G5B5:
-	    byte_swap = TRUE;
-	case PIXF_R5G5B5PC:
-	    redbits  = 5;  greenbits  = 5;  bluebits  = 5;
-	    redshift = 10; greenshift = 0;  blueshift = 0;
-	    break;
-	case PIXF_R5G6B5:
-	    byte_swap = TRUE;
-	case PIXF_R5G6B5PC:
-	    redbits  = 5;  greenbits  = 6;  bluebits  = 5;
-	    redshift = 11; greenshift = 5;  blueshift = 0;
-	    break;
-	case PIXF_B8G8R8A8:
-	    redbits  = 8;  greenbits  = 8;  bluebits  = 8;
-	    redshift = 16; greenshift = 8;  blueshift = 0;
-	    break;
-	case PIXF_A8R8G8B8:
-	    redbits  = 8;  greenbits  = 8;  bluebits  = 8;
-	    redshift = 8;  greenshift = 16; blueshift = 24;
-	    break;
+		case PIXF_R5G5B5:
+			byte_swap = TRUE;
+		case PIXF_R5G5B5PC:
+			redbits  = 5;  greenbits  = 5;  bluebits  = 5;
+			redshift = 10; greenshift = 0;  blueshift = 0;
+			break;
+		case PIXF_R5G6B5:
+			byte_swap = TRUE;
+		case PIXF_R5G6B5PC:
+			redbits  = 5;  greenbits  = 6;  bluebits  = 5;
+			redshift = 11; greenshift = 5;  blueshift = 0;
+			break;
+		case PIXF_B8G8R8A8:
+			redbits  = 8;  greenbits  = 8;  bluebits  = 8;
+			redshift = 16; greenshift = 8;  blueshift = 0;
+			break;
+		case PIXF_A8R8G8B8:
+			redbits  = 8;  greenbits  = 8;  bluebits  = 8;
+			redshift = 8;  greenshift = 16; blueshift = 24;
+			break;
 #endif
-	default:
-	    redbits  = 0;  greenbits  = 0;  bluebits  = 0;
-	    redshift = 0;  greenshift = 0;  blueshift = 0;
-	    found = FALSE;
-	    break;
-    }
+		default:
+			redbits  = 0;  greenbits  = 0;  bluebits  = 0;
+			redshift = 0;  greenshift = 0;  blueshift = 0;
+			found = FALSE;
+			break;
+	}
 
-    if (found) {
-	alloc_colors64k (redbits,  greenbits,  bluebits,
+	if (found)
+	{
+    		alloc_colors64k (redbits,  greenbits,  bluebits,
 			 redshift, greenshift, blueshift,
 			 0, 0, 0, byte_swap);
 
-	write_log ("AMIGFX: Using a %d-bit true-colour display.\n",
-		   redbits + greenbits + bluebits);
-    } else
-	write_log ("AMIGFX: Unsupported pixel format.\n");
+		write_log ("AMIGFX: Using a %d-bit true-colour display.\n", redbits + greenbits + bluebits);
+	}
+	else write_log ("AMIGFX: Unsupported pixel format.\n");
 
-    return found;
+	return found;
 }
 
 
 static int init_colors (void)
 {
-    int success = TRUE;
+	int success = TRUE;
 
-    if (need_dither) {
-	/* first try color allocation */
-	int bitdepth = usepub ? 8 : RPDepth (&comp_aga_RP);
-	int maxcol;
+	if (need_dither)
+	{
+		/* first try color allocation */
+		int bitdepth = usepub ? 8 : RPDepth (W -> RPort);
+		int maxcol;
 
-	if (!currprefs.amiga_use_grey && bitdepth >= 3)
-	    do {
-		get_color_failed = 0;
-		setup_dither (bitdepth, get_color);
+		if (!currprefs.amiga_use_grey && bitdepth >= 3)
+
+		do
+		{
+			get_color_failed = 0;
+			setup_dither (bitdepth, get_color);
+
+			if (get_color_failed) ReleaseColors ();
+		} while (get_color_failed && --bitdepth >= 3);
+
+		if( !currprefs.amiga_use_grey && bitdepth >= 3)
+		{
+			write_log ("AMIGFX: Color dithering with %d bits\n", bitdepth);
+			return 1;
+		}
+
+		/* if that fail then try grey allocation */
+		maxcol = 1 << (usepub ? 8 : RPDepth (&comp_aga_RP));
+
+		do
+		{
+			get_color_failed = 0;
+   			setup_greydither_maxcol (maxcol, get_color);
+			if (get_color_failed) ReleaseColors ();
+		} while (get_color_failed && --maxcol >= 2);
+
+		// extra pass with approximated colors //
 		if (get_color_failed)
-		    ReleaseColors ();
-	    } while (get_color_failed && --bitdepth >= 3);
+		do
+		{
+			maxcol=2;
+			use_approx_color = 1;
+			get_color_failed = 0;
+			setup_greydither_maxcol (maxcol, get_color);
+			if (get_color_failed) ReleaseColors ();
+		} while (get_color_failed && --maxcol >= 2);
 
-	if( !currprefs.amiga_use_grey && bitdepth >= 3) {
-	    write_log ("AMIGFX: Color dithering with %d bits\n", bitdepth);
-	    return 1;
+		if (maxcol >= 2)
+		{
+			write_log ("AMIGFX: Grey dithering with %d shades.\n", maxcol);
+				return 1;
+		}
+
+		return 0; /* everything failed :-( */
 	}
 
-	/* if that fail then try grey allocation */
-	maxcol = 1 << (usepub ? 8 : RPDepth (&comp_aga_RP));
-
-	do {
-	    get_color_failed = 0;
-	    setup_greydither_maxcol (maxcol, get_color);
-	    if (get_color_failed)
-		ReleaseColors ();
-	} while (get_color_failed && --maxcol >= 2);
-
-	/* extra pass with approximated colors */
-	if (get_color_failed)
-	    do {
-		maxcol=2;
-		use_approx_color = 1;
-		get_color_failed = 0;
-		setup_greydither_maxcol (maxcol, get_color);
-		if (get_color_failed)
-		    ReleaseColors ();
-	    } while (get_color_failed && --maxcol >= 2);
-
-	if (maxcol >= 2) {
-	    write_log ("AMIGFX: Grey dithering with %d shades.\n", maxcol);
-	    return 1;
-	}
-
-	return 0; /* everything failed :-( */
-    }
-
-    /* No dither */
+	// No dither //
     switch (RPDepth (&comp_aga_RP)) {
-	case 6:
-	    if (is_halfbrite) {
-		static int tab[]= {
-		    0x000, 0x00f, 0x0f0, 0x0ff, 0x08f, 0x0f8, 0xf00, 0xf0f,
-		    0x80f, 0xff0, 0xfff, 0x88f, 0x8f0, 0x8f8, 0x8ff, 0xf08,
-		    0xf80, 0xf88, 0xf8f, 0xff8, /* end of regular pattern */
-		    0xa00, 0x0a0, 0xaa0, 0x00a, 0xa0a, 0x0aa, 0xaaa,
-		    0xfaa, 0xf6a, 0xa80, 0x06a, 0x6af
-		};
+	{
+		case 6:
+			if (is_halfbrite)
+			{
+				static int tab[]= {
+				0x000, 0x00f, 0x0f0, 0x0ff, 0x08f, 0x0f8, 0xf00, 0xf0f,
+				0x80f, 0xff0, 0xfff, 0x88f, 0x8f0, 0x8f8, 0x8ff, 0xf08,
+				0xf80, 0xf88, 0xf8f, 0xff8, /* end of regular pattern */
+				0xa00, 0x0a0, 0xaa0, 0x00a, 0xa0a, 0x0aa, 0xaaa,
+				0xfaa, 0xf6a, 0xa80, 0x06a, 0x6af
+			};
+
 		int i;
 		for (i = 0; i < 32; ++i)
-		    get_color (tab[i] >> 8, (tab[i] >> 4) & 15, tab[i] & 15, xcolors);
+			get_color (tab[i] >> 8, (tab[i] >> 4) & 15, tab[i] & 15, xcolors);
 		for (i = 0; i < 4096; ++i) {
-		    uae_u32 val = get_nearest_color (i >> 8, (i >> 4) & 15, i & 15);
-		    xcolors[i] = val * 0x01010101;
+			uae_u32 val = get_nearest_color (i >> 8, (i >> 4) & 15, i & 15);
+			xcolors[i] = val * 0x01010101;
 		}
 		write_log ("AMIGFX: Using 32 colours and half-brite\n");
 		break;
-	    } else if (is_ham) {
+		} else if (is_ham) {
 		int i;
 		for (i = 0; i < 16; ++i)
-		    get_color (i, i, i, xcolors);
+			get_color (i, i, i, xcolors);
 		write_log ("AMIGFX: Using 12 bits pseudo-truecolor (HAM).\n");
 		alloc_colors64k (4, 4, 4, 10, 5, 0, 0, 0, 0, 0);
 		return init_ham ();
-	    }
-	    /* Fall through if !is_halfbrite && !is_ham */
-	case 1: case 2: case 3: case 4: case 5: case 7: case 8: {
-	    int maxcol = 1 << RPDepth (&comp_aga_RP);
-	    if (maxcol >= 8 && !currprefs.amiga_use_grey)
-		do {
-		    get_color_failed = 0;
-		    setup_maxcol (maxcol);
-		    alloc_colors256 (get_color);
-		    if (get_color_failed)
-			ReleaseColors ();
-		} while (get_color_failed && --maxcol >= 8);
-	    else {
-		int i;
-		for (i = 0; i < maxcol; ++i) {
-		    get_color ((i * 15)/(maxcol - 1), (i * 15)/(maxcol - 1),
-			       (i * 15)/(maxcol - 1), xcolors);
 		}
-	    }
-	    write_log ("AMIGFX: Using %d colours.\n", maxcol);
-	    for (maxcol = 0; maxcol < 4096; ++maxcol) {
-		int val = get_nearest_color (maxcol >> 8, (maxcol >> 4) & 15, maxcol & 15);
-		xcolors[maxcol] = val * 0x01010101;
-	    }
-	    break;
-	}
+		/* Fall through if !is_halfbrite && !is_ham */
+	case 1: case 2: case 3: case 4: case 5: case 7: case 8:
+		{
+	    int maxcol = 1 << RPDepth (&comp_aga_RP);
+
+			if (maxcol >= 8 && !currprefs.amiga_use_grey)
+			{
+				do
+				{
+					get_color_failed = 0;
+					setup_maxcol (maxcol);
+					alloc_colors256 (get_color);
+
+					if (get_color_failed)	ReleaseColors ();
+
+				} while (get_color_failed && --maxcol >= 8);
+			}
+			else
+			{
+				int i;
+				for (i = 0; i < maxcol; ++i)
+				{
+					get_color ((i * 15)/(maxcol - 1), (i * 15)/(maxcol - 1), (i * 15)/(maxcol - 1), xcolors);
+				}
+			}
+
+			write_log ("AMIGFX: Using %d colours.\n", maxcol);
+			for (maxcol = 0; maxcol < 4096; ++maxcol)
+			{
+				int val = get_nearest_color (maxcol >> 8, (maxcol >> 4) & 15, maxcol & 15);
+				xcolors[maxcol] = val * 0x01010101;
+			}
+			break;
+		}
 
 	case 15:
 	case 16:
 	case 24:
 	case 32:
 
-		if (screen_is_picasso)
-		{
-			success = init_colors_cgx (draw_p96_RP);
-		}
-		else
-		{
-			success = init_colors_cgx (&comp_aga_RP);
-		}
-	    break;
+		success = init_true_colors_output ( (W -> RPort) );
+		break;
 
     }
     return success;
@@ -869,9 +892,9 @@ static void init_pointer (void)
     bitmap.Planes[1] = (PLANEPTR) &row[1];
 
     blank_pointer = NewObject (NULL, POINTERCLASS,
-			       POINTERA_BitMap,	(ULONG)&bitmap,
-			       POINTERA_WordWidth,	1,
-			       TAG_DONE);
+				   POINTERA_BitMap,	(ULONG)&bitmap,
+				   POINTERA_WordWidth,	1,
+				   TAG_DONE);
 
     if (!blank_pointer)
 	write_log ("Warning: Unable to allocate blank mouse pointer.\n");
@@ -959,10 +982,10 @@ static POINTER_STATE get_pointer_state (const struct Window *w, int mousex, int 
 
 	/* Is this layer our window's layer? */
 	if (layer == w->WLayer) {
-	    /*
-	     * Yes. Therefore, pointer is inside the window.
-	     */
-	    new_state = INSIDE_WINDOW;
+		/*
+		 * Yes. Therefore, pointer is inside the window.
+		 */
+		new_state = INSIDE_WINDOW;
 	}
     }
     return new_state;
@@ -1081,23 +1104,23 @@ static int setup_customscreen (void)
 	const UBYTE preferred_depth[] = {15, 16, 32, 8}; /* Try depths in this order of preference */
 
 	for (i = 0; i < sizeof preferred_depth && mode == (ULONG) INVALID_ID; i++) {
-	    depth = preferred_depth[i];
-	    mode = find_rtg_mode (&width, &height, depth);
+		depth = preferred_depth[i];
+		mode = find_rtg_mode (&width, &height, depth);
 	}
     }
 
     if (mode != (ULONG) INVALID_ID) {
 	if (depth > 8)
-	    output_is_true_color = 1;
+		output_is_true_color = 1;
     } else {
 
 	/* No (suitable) RTG screen available. Try a native mode */
 	depth = os39 ? 8 : (currprefs.gfx_lores ? 5 : 4);
 	mode = PAL_MONITOR_ID; // FIXME: should check whether to use PAL or NTSC.
 	if (currprefs.gfx_lores)
-	    mode |= (gfxvidinfo.height > 256) ? LORESLACE_KEY : LORES_KEY;
+		mode |= (gfxvidinfo.height > 256) ? LORESLACE_KEY : LORES_KEY;
 	else
-	    mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
+		mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
     }
 
 
@@ -1105,10 +1128,8 @@ static int setup_customscreen (void)
 	if (width > (ULONG) gfxvidinfo.width)	XOffset = (width - gfxvidinfo.width) / 2;
 	if (height > (ULONG) gfxvidinfo.height)	YOffset = (height - gfxvidinfo.height) / 2;
 
-
 	do
 	{
-
 		screen = OpenScreenTags (NULL,
 				SA_Width,     width,
 				SA_Height,    height,
@@ -1296,7 +1317,8 @@ void set_p96_func16()
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 //				init_lookup_8bit_to_16bit_be_2pixels();
 				set_palette_fn = set_vpal_8bit_to_16bit_be_2pixels;
-				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; break;
+				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; 
+				break;
 
 		case 15:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
 				COMP_FMT_SRC = PIXF_R5G6B5PC;
@@ -1366,7 +1388,6 @@ void init_comp( struct Window *W )
 		ULONG output_depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
 	
 		init_aga_comp(output_depth);
-
 		draw_p96_RP = W -> RPort;
 
 		if (screen_is_picasso) 
@@ -1554,14 +1575,14 @@ static int setup_userscreen (void)
 			ASLSM_PropertyFlags,       0,
 			ASLSM_PropertyMask,        DIPF_IS_DUALPF | DIPF_IS_PF2PRI,
 			TAG_DONE)) {
-	    ScreenWidth  = ScreenRequest->sm_DisplayWidth;
-	    ScreenHeight = ScreenRequest->sm_DisplayHeight;
-	    Depth        = ScreenRequest->sm_DisplayDepth;
-	    DisplayID    = ScreenRequest->sm_DisplayID;
-	    OverscanType = ScreenRequest->sm_OverscanType;
-	    AutoScroll   = ScreenRequest->sm_AutoScroll;
+		ScreenWidth  = ScreenRequest->sm_DisplayWidth;
+		ScreenHeight = ScreenRequest->sm_DisplayHeight;
+		Depth        = ScreenRequest->sm_DisplayDepth;
+		DisplayID    = ScreenRequest->sm_DisplayID;
+		OverscanType = ScreenRequest->sm_OverscanType;
+		AutoScroll   = ScreenRequest->sm_AutoScroll;
 	} else
-	    DisplayID = INVALID_ID;
+		DisplayID = INVALID_ID;
     }
     FreeAslRequest (ScreenRequest);
 
@@ -1613,13 +1634,13 @@ static int setup_userscreen (void)
 			WA_Activate,		TRUE,
 			WA_ReportMouse,	TRUE,
 			WA_IDCMP,		IDCMP_MOUSEBUTTONS
-					     | IDCMP_RAWKEY
-					     | IDCMP_DISKINSERTED
-					     | IDCMP_DISKREMOVED
-					     | IDCMP_ACTIVEWINDOW
-					     | IDCMP_INACTIVEWINDOW
-					     | IDCMP_MOUSEMOVE
-					     | IDCMP_DELTAMOVE,
+						 | IDCMP_RAWKEY
+						 | IDCMP_DISKINSERTED
+						 | IDCMP_DISKREMOVED
+						 | IDCMP_ACTIVEWINDOW
+						 | IDCMP_INACTIVEWINDOW
+						 | IDCMP_MOUSEMOVE
+						 | IDCMP_DELTAMOVE,
 			(os39 ? WA_BackFill : TAG_IGNORE),   (ULONG) LAYERS_NOBACKFILL,
 			TAG_DONE);
 
@@ -1809,9 +1830,9 @@ static int graphics_subinit (void)
 	if (!CybBuffer)
 	{
 
-	    /*
-	     * Failed to allocate bitmap - we need to fall back on gfx.lib rendering
-	     */
+		/*
+		 * Failed to allocate bitmap - we need to fall back on gfx.lib rendering
+		 */
 		gfxvidinfo.bufmem = NULL;
 		output_is_true_color = 0;
 		if (bitdepth > 8)
@@ -1821,38 +1842,43 @@ static int graphics_subinit (void)
 	   	}
 	}
 
-    if (is_ham) {
-	/* ham 6 */
-	use_delta_buffer       = 0; /* needless as the line must be fully recomputed */
-	need_dither            = 0;
-	gfxvidinfo.pixbytes    = 2;
-	gfxvidinfo.flush_line  = flush_line_ham;
-	gfxvidinfo.flush_block = flush_block_ham;
-    } else if (bitdepth <= 8) {
-	/* chunk2planar is slow so we define use_delta_buffer for all modes */
-	use_delta_buffer       = 1;
-	need_dither            = currprefs.amiga_use_dither || (bitdepth <= 1);
-	gfxvidinfo.pixbytes    = need_dither ? 2 : 1;
-	gfxvidinfo.flush_line  = need_dither ? flush_line_planar_dither  : flush_line_planar_nodither;
-	gfxvidinfo.flush_block = need_dither ? flush_block_planar_dither : flush_block_planar_nodither;
-    }
-
-    gfxvidinfo.flush_clear_screen = flush_clear_screen_gfxlib;
-    gfxvidinfo.flush_screen       = dummy_flush_screen;
-    gfxvidinfo.lockscr            = dummy_lock;
-    gfxvidinfo.unlockscr          = dummy_unlock;
-
-    if (!output_is_true_color)
+	if (is_ham)
 	{
-		/*
-		* We're not using GGX/P96 for output, so allocate a dumb
-		 * display buffer
-		*/
+		// ham 6 
+		use_delta_buffer       = 0; /* needless as the line must be fully recomputed */
+		need_dither            = 0;
+		gfxvidinfo.pixbytes    = 2;
+		gfxvidinfo.flush_line  = flush_line_ham;
+		gfxvidinfo.flush_block = flush_block_ham;
+	}
+	else if (bitdepth <= 8)
+	{
+		// chunk2planar is slow so we define use_delta_buffer for all modes //
+		use_delta_buffer       = 1;
+		need_dither            = currprefs.amiga_use_dither || (bitdepth <= 1);
+		gfxvidinfo.pixbytes    = need_dither ? 2 : 1;
+		gfxvidinfo.flush_line  = need_dither ? flush_line_planar_dither  : flush_line_planar_nodither;
+		gfxvidinfo.flush_block = need_dither ? flush_block_planar_dither : flush_block_planar_nodither;
+	}
+
+	gfxvidinfo.flush_clear_screen = flush_clear_screen_gfxlib;
+	gfxvidinfo.flush_screen = dummy_flush_screen;
+	gfxvidinfo.lockscr = dummy_lock;
+	gfxvidinfo.unlockscr = dummy_unlock;
+
+	if (!output_is_true_color)
+	{
+		//
+		// We're not using GGX/P96 for output, so allocate a dumb
+		// display buffer
+		//
+
 		gfxvidinfo.rowbytes = gfxvidinfo.pixbytes * gfxvidinfo.width;
 		gfxvidinfo.bufmem   = (uae_u8 *) calloc (gfxvidinfo.rowbytes, gfxvidinfo.height + 1);
-		/*									      ^^^ */
-		/*				      This is because DitherLine may read one extra row */
-    }
+
+		//										  ^^^ //
+		//					  This is because DitherLine may read one extra row //
+	}
 
 	if (!gfxvidinfo.bufmem)
 	{
@@ -2303,38 +2329,38 @@ void handle_events(void)
 				uae_quit ();
 				break;
 
-	    case IDCMP_RAWKEY: {
+		case IDCMP_RAWKEY: {
 		int keycode = code & 127;
 		int state   = code & 128 ? 0 : 1;
 		int ievent;
 
 		if ((qualifier & IEQUALIFIER_REPEAT) == 0) {
-		    /* We just want key up/down events - not repeats */
-		    if ((ievent = match_hotkey_sequence (keycode, state)))
+			/* We just want key up/down events - not repeats */
+			if ((ievent = match_hotkey_sequence (keycode, state)))
 			handle_hotkey_event (ievent, state);
-		    else
+			else
 			inputdevice_do_keyboard (keycode, state);
 		}
 		break;
-	     }
+		 }
 
-	    case IDCMP_MOUSEMOVE:
+		case IDCMP_MOUSEMOVE:
 		setmousestate (0, 0, dmx, 0);
 		setmousestate (0, 1, dmy, 0);
 
 		if (usepub) {
-		    POINTER_STATE new_state = get_pointer_state (W, mx, my);
-		    if (new_state != pointer_state) {
+			POINTER_STATE new_state = get_pointer_state (W, mx, my);
+			if (new_state != pointer_state) {
 			pointer_state = new_state;
 			if (pointer_state == INSIDE_WINDOW)
-			    hide_pointer (W);
+				hide_pointer (W);
 			else
-			    show_pointer (W);
-		    }
+				show_pointer (W);
+			}
 		}
 		break;
 
-	    case IDCMP_MOUSEBUTTONS:
+		case IDCMP_MOUSEBUTTONS:
 		if (code == SELECTDOWN) setmousebuttonstate (0, 0, 1);
 		if (code == SELECTUP)   setmousebuttonstate (0, 0, 0);
 		if (code == MIDDLEDOWN) setmousebuttonstate (0, 2, 1);
@@ -2343,16 +2369,16 @@ void handle_events(void)
 		if (code == MENUUP)     setmousebuttonstate (0, 1, 0);
 		break;
 
-	    /* Those 2 could be of some use later. */
-	    case IDCMP_DISKINSERTED:
+		/* Those 2 could be of some use later. */
+		case IDCMP_DISKINSERTED:
 		/*printf("diskinserted(%d)\n",code);*/
 		break;
 
-	    case IDCMP_DISKREMOVED:
+		case IDCMP_DISKREMOVED:
 		/*printf("diskremoved(%d)\n",code);*/
 		break;
 
-	    case IDCMP_ACTIVEWINDOW:
+		case IDCMP_ACTIVEWINDOW:
 		/* When window regains focus (presumably after losing focus at some
 		 * point) UAE needs to know any keys that have changed state in between.
 		 * A simple fix is just to tell UAE that all keys have been released.
@@ -2364,24 +2390,24 @@ void handle_events(void)
 
 		break;
 
-	    case IDCMP_INACTIVEWINDOW:
+		case IDCMP_INACTIVEWINDOW:
 		inputdevice_unacquire ();
 		break;
 
-	    case IDCMP_INTUITICKS:
+		case IDCMP_INTUITICKS:
 #ifdef __amigaos4__
 		grabTicks--;
 		if (grabTicks < 0) {
-		    grabTicks = GRAB_TIMEOUT;
-		    #ifdef __amigaos4__
+			grabTicks = GRAB_TIMEOUT;
+			#ifdef __amigaos4__
 			if (mouseGrabbed)
-			    grab_pointer (W);
-		    #endif
+				grab_pointer (W);
+			#endif
 		}
 #endif
 		break;
 
-	    default:
+		default:
 		write_log ("Unknown event class: %x\n", class);
 		break;
         }
@@ -2466,17 +2492,17 @@ int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT
 	if (opcode == BLIT_SRC ) 
 	{
 		ULONG error = BltBitMapTags(
-			BLITA_SrcType, BLITT_BITMAP,
-			BLITA_DestType, BLITT_BITMAP,
-			BLITA_Source, draw_p96_RP->BitMap,
-			BLITA_Dest, draw_p96_RP->BitMap,
-			BLITA_SrcX, srcx,
-			BLITA_SrcY, srcy,
-			BLITA_Width,  width,
-			BLITA_Height, height,
-			BLITA_DestX, dstx,
-			BLITA_DestY, dsty,
-			TAG_END);
+				BLITA_SrcType, BLITT_BITMAP,
+				BLITA_DestType, BLITT_BITMAP,
+				BLITA_Source, draw_p96_RP->BitMap,
+				BLITA_Dest, draw_p96_RP->BitMap,
+				BLITA_SrcX, srcx,
+				BLITA_SrcY, srcy,
+				BLITA_Width,  width,
+				BLITA_Height, height,
+				BLITA_DestX, dstx,
+				BLITA_DestY, dsty,
+				TAG_END);
 
 		if (error == 0)
 		{
@@ -2490,24 +2516,16 @@ int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT
 
 int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE rgbtype)
 {
-	int result = 0;
-
 	DEBUG_LOG ("DX_Fill (x:%d y:%d w:%d h:%d color=%08x)\n", dstx, dsty, width, height, color);
 
 	if (draw_p96_RP -> BitMap)
 	{
-		RectFillColor(draw_p96_RP, 
-			dstx, 
-			dsty, 
-			dstx + width - 1, 
-			dsty + height - 1,
-			color);
-
+		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,color);
 		DX_Invalidate (dsty, dsty + height - 1);
-		result = 1;
+		return 1;
 	}
 
-	return result;
+	return 0;
 }
 
 #define is_hwsurface true
@@ -2860,7 +2878,7 @@ static void ReleaseColors(void)
 {
     if (os39 && usepub && CM)
 	while (maxpen > 0)
-	    ReleasePen (CM, pen[--maxpen]);
+		ReleasePen (CM, pen[--maxpen]);
     else
 	maxpen = 0;
 }
@@ -2906,11 +2924,11 @@ static int init_ham (void)
 	int c,d;
 	c = d = 50;
 	for (i = 0; i < 16; ++i) {
-	    t = dist4 (i*0x111, RGB);
-	    if (t<d) {
+		t = dist4 (i*0x111, RGB);
+		if (t<d) {
 		d = t;
 		c = i;
-	    }
+		}
 	}
 	i = (RGB & 0x00F) | ((RGB & 0x0F0) << 1) | ((RGB & 0xF00) << 2);
 	d_dst[i] = (d << 2) | 3; /* the "|3" is a trick to speedup comparison */
@@ -2935,50 +2953,64 @@ static int init_ham (void)
 #undef USE_BITFIELDS
 static void ham_conv (UWORD *src, UBYTE *buf, UWORD len)
 {
-    /* A good compiler (ie. gcc :) will use bfext/bfins instructions */
-#ifdef __SASC
-    union { struct { unsigned int _:17, r:5, g:5, b:5; } _;
-	    int all;} rgb, RGB;
-#else
-    union { struct { ULONG _:17,r:5,g:5,b:5;} _; ULONG all;} rgb, RGB;
-#endif
-    rgb.all = 0;
-    while(len--) {
-        UBYTE c,t;
-        RGB.all = *src++;
-        c = d_cmd[RGB.all];
-        /* cowabonga! */
-        t = h_buf[16912 + RGB.all - rgb.all];
+	union { struct { ULONG _:17,r:5,g:5,b:5;} _; ULONG all;} rgb, RGB;
+
+	rgb.all = 0;
+
+	while(len--)
+	{
+		UBYTE c,t;
+		RGB.all = *src++;
+		c = d_cmd[RGB.all];
+
+		// cowabonga! //
+		t = h_buf[16912 + RGB.all - rgb.all];
+
 #ifndef USE_BITFIELDS
-        if(t<=d_dst[RGB.all]) {
-	    static int ht[]={32+10,48+5,16+0}; ULONG m;
-	    t &= 3; m = 0x1F<<(ht[t]&15);
-            m = ~m; rgb.all &= m;
-            m = ~m; m &= RGB.all;rgb.all |= m;
-	    m >>= ht[t]&15;
-	    c = (ht[t]&~15) | m;
-        } else {
-	    rgb.all = c;
-	    rgb.all <<= 5; rgb.all |= c;
-	    rgb.all <<= 5; rgb.all |= c;
-        }
+
+		if(t<=d_dst[RGB.all])
+		{
+			static int ht[]={32+10,48+5,16+0}; ULONG m;
+			t &= 3; m = 0x1F<<(ht[t]&15);
+			m = ~m; rgb.all &= m;
+			m = ~m; m &= RGB.all;rgb.all |= m;
+			m >>= ht[t]&15;
+			c = (ht[t]&~15) | m;
+		}
+		else
+		{
+			rgb.all = c;
+			rgb.all <<= 5; rgb.all |= c;
+			rgb.all <<= 5; rgb.all |= c;
+		}
 #else
-        if(t<=d_dst[RGB.all]) {
-            t&=3;
-            if(!t)        {c = 32; c |= (rgb._.r = RGB._.r);}
-            else {--t; if(!t) {c = 48; c |= (rgb._.g = RGB._.g);}
-            else              {c = 16; c |= (rgb._.b = RGB._.b);} }
-        } else rgb._.r = rgb._.g = rgb._.b = c;
+		if(t<=d_dst[RGB.all])
+		{
+			t&=3;
+			if(!t)
+			{
+				c = 32; c |= (rgb._.r = RGB._.r);
+			}
+			else 
+			{
+				--t; if(!t) {c = 48; c |= (rgb._.g = RGB._.g);
+			}
+			else
+			{
+				c = 16; c |= (rgb._.b = RGB._.b);}
+			}
+		}
+		else rgb._.r = rgb._.g = rgb._.b = c;
 #endif
-        *buf++ = c;
-    }
+		*buf++ = c;
+	}
 }
 
 /****************************************************************************/
 
 int check_prefs_changed_gfx (void)
 {
-   return 0;
+	return 0;
 }
 
 /****************************************************************************/
