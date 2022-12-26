@@ -188,7 +188,7 @@ static int use_delta_buffer;   /* this will redraw only needed places */
 static int output_is_true_color;            /* this is for cybergfx truecolor mode */
 static int use_approx_color;
 
-extern void write_log(const char *fmt, ... );
+extern void write_log(const char *fmt, ... ) ;
 
 extern xcolnr xcolors[4096];
 
@@ -1443,7 +1443,18 @@ void init_comp( struct Window *W )
 			}
 		}
 
-		picasso_vidinfo.rgbformat = DRAW_FMT_SRC;
+
+		switch (DRAW_FMT_SRC)
+		{
+			case PIXF_CLUT: picasso_vidinfo.rgbformat = RGBFB_CHUNKY;
+						break;
+
+			default:
+//						picasso96_state.RGBFormat = RGBFB_A8R8G8B8;
+//						picasso_vidinfo.rgbformat = 9;
+						break;
+		}
+
 		picasso_vidinfo.pixbytes = GetBitMapAttr( draw_p96_RP -> BitMap, BMA_BYTESPERPIXEL );
 
 		if (W->BorderTop == 0)
@@ -2679,6 +2690,7 @@ APTR p96_lock = NULL;
 uae_u8 *gfx_lock_picasso (void)
 {
 	APTR address = NULL;
+	ULONG format ;
 
 	if (p96_lock) gfx_unlock_picasso ();
 
@@ -2686,16 +2698,22 @@ uae_u8 *gfx_lock_picasso (void)
 	{
 		p96_lock = IGraphics -> LockBitMapTags(draw_p96_RP -> BitMap,
 			LBM_BaseAddress, (APTR *) &address,
+			LBM_PixelFormat, (APTR *) &format,
 			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
 			TAG_END	);
 
-		if (!p96_lock)
+		if (p96_lock)
 		{
-			DEBUG_LOG ("Function: gfx_lock_picasso, failed to get lock!\n");
-			DEBUG_LOG ("Bitmap BytesPerRow: %d, Rows: %d, Depth: %d\n", 
-					draw_p96_RP -> BitMap -> BytesPerRow, 
-					draw_p96_RP -> BitMap -> Rows, 
-					draw_p96_RP -> BitMap -> Depth);
+			switch (format)
+			{
+				case PIXF_CLUT:
+					picasso_vidinfo.rgbformat = RGBFB_CLUT;
+					break;	
+
+				case PIXF_A8R8G8B8:
+					picasso_vidinfo.rgbformat = 9;		// RGBFB_A8R8G8B8;
+					break;
+			}
 		}
 	}
 
@@ -3108,7 +3126,7 @@ void p96_conv_all()
 
 	if ((lock_src)&&(lock_dest)&&(src_buffer_ptr))
 	{
-		for (y=0;y<picasso_vidinfo.height;y++)
+		for (y=0;y<picasso_vidinfo.height-1;y++)
 		{
 //			if (picasso_invalid_lines[y]) 
 			{
