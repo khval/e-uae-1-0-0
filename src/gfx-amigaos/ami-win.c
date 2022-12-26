@@ -3047,17 +3047,44 @@ int is_fullscreen (void)
 }
 
 void p96_conv_all()
-{
-#if 0
+{	
+	bool failed = false;
+	
+
+#if 1
 
 	APTR lock_src,lock_dest;
 	ULONG src_BytesPerRow,dest_BytesPerRow;
 	char *src_buffer_ptr, *dest_buffer_ptr;
 	int y;
 
+	if (conv_p96_RP.BitMap != draw_p96_RP -> BitMap)
+	{
+		printf("conv bitmap is expected to be draw bitmap\n");
+		return;
+	}
+
 	if (comp_p96_RP.BitMap == draw_p96_RP -> BitMap)
 	{
 		printf("royal fuck up... draw bitmap can not be the same as comp bitmap\nwhen converting formats\n");
+		return;
+	}
+
+	if (comp_p96_RP.BitMap == NULL)
+	{
+		printf("comp_p96_RP.BitMap has no bitmap");
+		return;
+	}
+
+	if (draw_p96_RP -> BitMap == NULL)
+	{
+		printf("cdraw_p96_RP -> BitMap has no bitmap");
+		return;
+	}
+
+	if (picasso_invalid_lines == NULL )
+	{
+		printf("unexpcted NULL on picasso_invalid_lines\n");
 		return;
 	}
 
@@ -3066,30 +3093,36 @@ void p96_conv_all()
 			LBM_BytesPerRow, &src_BytesPerRow,
 			TAG_END	);
 
-
 	lock_dest = IGraphics -> LockBitMapTags(comp_p96_RP.BitMap,
 			LBM_BaseAddress, (APTR *) &dest_buffer_ptr,
 			LBM_BytesPerRow, &dest_BytesPerRow,
 			TAG_END	);
 
-	if ((lock_src)&&(lock_dest))
+	if ((lock_src)&&(lock_dest)&&(src_buffer_ptr))
 	{
 		for (y=0;y<picasso_vidinfo.height;y++)
 		{
 //			if (picasso_invalid_lines[y]) 
 			{
 				p96_conv_fn( src_buffer_ptr, dest_buffer_ptr, picasso_vidinfo.width );
-				picasso_invalid_lines[y] = 0;
+//				picasso_invalid_lines[y] = 0;
 			}
 
 			src_buffer_ptr += src_BytesPerRow;
 			dest_buffer_ptr += dest_BytesPerRow;
 		}
 	}
+	else failed = true;
 
 	if (lock_src) IGraphics -> UnlockBitMap( lock_src );
 	if (lock_dest) IGraphics -> UnlockBitMap( lock_dest );
 
+	if (failed)
+	{
+		printf("%s:%d --- convection failed bcouse !!! \n",__FUNCTION__,__LINE__);
+		Printf("src: %08x\n",src_buffer_ptr);
+		Printf("dest: %08x\n",dest_buffer_ptr);
+	}
 #endif
 }
 
