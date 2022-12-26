@@ -128,11 +128,23 @@ uint32 *vpal32 = NULL;
 uint16 *vpal16 = NULL;
 void (*set_palette_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
 
- void set_vpal_8bit_to_16bit_le_2pixels(uint8 *pal, uint32 num);
- void set_vpal_8bit_to_16bit_be_2pixels(uint8 *pal, uint32 num);
+void init_aga_comp( ULONG output_depth );
 
- void set_vpal_8bit_to_32bit_be_2pixels(uint8 *pal, uint32 num);
- void set_vpal_8bit_to_32bit_le_2pixels(uint8 *pal, uint32 num);
+void alloc_picasso_invalid_lines( void );
+void free_picasso_invalid_lines( void );
+
+ void set_p96_func8( void );
+ void set_p96_func16( void );
+ void set_p96_func32( void );
+
+ bool alloc_p96_draw_bitmap( int w, int h, int depth );
+
+ void set_vpal_8bit_to_16bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num);
+ void set_vpal_8bit_to_16bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num);
+
+ void set_vpal_8bit_to_32bit_be(struct MyCLUTEntry *pal, uint32 num1);
+ void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num);
+ void set_vpal_8bit_to_32bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num);
 
 struct screen_rect
 {
