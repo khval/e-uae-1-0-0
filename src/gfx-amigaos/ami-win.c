@@ -809,7 +809,7 @@ static int init_colors (void)
 	}
 
 	// No dither //
-    switch (RPDepth (&comp_aga_RP)) {
+	switch (RPDepth (W -> RPort))
 	{
 		case 6:
 			if (is_halfbrite)
@@ -842,7 +842,7 @@ static int init_colors (void)
 		/* Fall through if !is_halfbrite && !is_ham */
 	case 1: case 2: case 3: case 4: case 5: case 7: case 8:
 		{
-	    int maxcol = 1 << RPDepth (&comp_aga_RP);
+			int maxcol = 1 << RPDepth (&comp_aga_RP);
 
 			if (maxcol >= 8 && !currprefs.amiga_use_grey)
 			{
