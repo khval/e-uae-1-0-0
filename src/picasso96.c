@@ -514,8 +514,13 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 	}
     } else {
 	int psiz = GetBytesPerPixel (picasso_vidinfo.rgbformat);
+
 	if (picasso96_state.RGBFormat != RGBFB_CHUNKY)
-	    abort ();
+	{
+		gfx_unlock_picasso ();
+		return;
+//		abort ();
+	}
 
 	while (height-- > 0) {
 	    int i;
@@ -636,8 +641,17 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 	}
     } else {
 	int psiz = GetBytesPerPixel (picasso_vidinfo.rgbformat);
+
 	if (picasso96_state.RGBFormat != RGBFB_CHUNKY)
-	    abort ();
+	{
+  		gfx_unlock_picasso ();
+
+
+		printf("Error: picasso96_state.RGBFormat: %08x\npicasso_vidinfo.rgbformat: %08x\n\n",picasso96_state.RGBFormat,picasso_vidinfo.rgbformat);
+
+		return;
+	 	//   abort ();
+	}
 
 	while (height-- > 0) {
 	    int i;
