@@ -841,8 +841,12 @@ static int init_colors (void)
 		}
 		/* Fall through if !is_halfbrite && !is_ham */
 	case 1: case 2: case 3: case 4: case 5: case 7: case 8:
+
+		if (!screen_is_picasso)
 		{
-			int maxcol = 1 << RPDepth (&comp_aga_RP);
+			int maxcol;
+			maxcol = 1 << RPDepth (W -> RPort);
+			maxcol = maxcol > 4096 ? 4096 : maxcol;
 
 			if (maxcol >= 8 && !currprefs.amiga_use_grey)
 			{
