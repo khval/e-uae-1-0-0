@@ -1354,7 +1354,7 @@ void set_p96_func32()
 		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
 				COMP_FMT_SRC = PIXF_A8R8G8B8;
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
-//				init_lookup_8bit_to_32bit_be_2pixels();
+
 				set_palette_fn = set_vpal_8bit_to_32bit_be_2pixels;
 				p96_conv_fn = convert_8bit_lookup_to_32bit_2pixels; 
 				break;
@@ -1436,6 +1436,9 @@ void init_comp( struct Window *W )
 					printf("*** Failed to alloc p96 draw buffer ***\n");
 					p96_conv_fn = NULL;
 				}
+
+				free_picasso_invalid_lines();
+				alloc_picasso_invalid_lines();
 			}
 		}
 
@@ -1774,9 +1777,6 @@ static int graphics_subinit_picasso(void)
 	picasso_has_invalid_lines	= 0;
 	picasso_invalid_start	= picasso_vidinfo.height + 1;
 	picasso_invalid_stop	= -1;
-
-	free_picasso_invalid_lines();
-	alloc_picasso_invalid_lines();
 
 	return 1;
 }
