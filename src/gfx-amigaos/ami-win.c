@@ -1266,8 +1266,9 @@ bool alloc_p96_draw_bitmap( int w, int h, int depth )
 
 	conv_p96_RP.BitMap = AllocBitMapTags( w, h, depth, 
 			BMATags_PixelFormat, DRAW_FMT_SRC,
-			BMATags_Displayable, FALSE,
+			BMATags_Displayable, TRUE,
 			BMATags_Alignment, 4,
+//			BMATags_Friend, W -> RPort -> BitMap,
 			TAG_END);
 
 	if (conv_p96_RP.BitMap)
@@ -1442,6 +1443,9 @@ void init_comp( struct Window *W )
 			}
 		}
 
+		picasso_vidinfo.rgbformat = DRAW_FMT_SRC;
+		picasso_vidinfo.pixbytes = GetBitMapAttr( draw_p96_RP -> BitMap, BMA_BYTESPERPIXEL );
+
 		if (W->BorderTop == 0)
 		{
 			RectFillColor(W -> RPort, 
@@ -1461,6 +1465,10 @@ void init_comp( struct Window *W )
 	{
 		printf("*** this is a AGA screen, (using gfxvidinfo.width, gfxvidinfo.height)\n");
 	}
+
+	if (draw_p96_RP == W -> RPort) printf( "*** draw_p96_RP is Window RastPort\n" );
+	if (draw_p96_RP == &conv_p96_RP) printf( "*** draw_p96_RP is &conv_p96_RP\n" );
+	if (draw_p96_RP == &comp_p96_RP) printf( "*** draw_p96_RP is &comp_p96_RP\n" );
 }
 
 
