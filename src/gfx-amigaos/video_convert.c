@@ -37,20 +37,6 @@ const char *get_name_converter_fn_ptr( void *fn_ptr)
 	return NULL;
 }
 
-
-void convert_8bit_to_32bit_db( char *from, uint32 *to,int  pixels )
-{
-	register int n;
-	register int v;
-
-	for (n=0; n<pixels;n++)
-	{
-		v = vpal32[from[n]];
-		*to++=v;
-		*to++=v;
-	}
-}
-
 void convert_8bit_to_16bit( char *from, uint16 *to,int  pixels )
 {
 	int n;

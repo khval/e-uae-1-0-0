@@ -16,7 +16,6 @@
 extern uint16 *vpal16;
 extern uint32 *vpal32;
 
-
 void init_lookup_15bit_to_16bit_le( void );
 void init_lookup_15bit_to_16bit_be( void );
 void set_vpal_8bit_to_16bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num1);
@@ -24,10 +23,8 @@ void set_vpal_8bit_to_16bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1);
 void set_vpal_8bit_to_32bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num1);
 void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1);
 
-
 #define _LE_ARGB(n) 0xFF + (pal[n].Red << 8) +  (pal[n].Green << 16) + (pal[n].Blue << 24) 
-#define _BE_ARGB(n) 0xFF000000 + (pal[n].Red << 16) +  (pal[n].green << 8) + pal[n].Blue   
-
+#define _BE_ARGB(n) 0xFF000000 + (pal[n].Red << 16) +  (pal[n].Green << 8) + pal[n].Blue   
 
 inline uint16 __pal_to_16bit(struct MyCLUTEntry *pal, int num)
 {
