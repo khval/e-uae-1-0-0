@@ -122,11 +122,16 @@ uint32 load32_p96_table[1 + (256 * 3)];		// 256 colors + 1 count
 static int palette_update_start = 256;
 static int palette_update_end   = 0;
 
+void reset_p96_fn_pointers( void );
+
 void (*p96_conv_fn) (void *src, void *dest, int size) = NULL;
 
 uint32 *vpal32 = NULL;
 uint16 *vpal16 = NULL;
 void (*set_palette_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
+void (*set_palette_on_vbl_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
+
+void palette_notify(struct MyCLUTEntry *pal, uint32 num);
 
 void init_aga_comp( ULONG output_depth );
 
@@ -353,6 +358,13 @@ static struct uae_hotkeyseq ami_hotkeys[] =
 };
 
 /****************************************************************************/
+
+bool palette_updated = false;
+
+void palette_notify(struct MyCLUTEntry *pal, uint32 num)
+{
+	palette_updated = true;
+}
 
 extern UBYTE cidx[4][8*4096];
 
@@ -1266,7 +1278,10 @@ static void open_window(void)
 
 bool alloc_p96_draw_bitmap( int w, int h, int depth )
 {
+	uint32 is_rtg;
 	InitRastPort(&conv_p96_RP);
+
+	printf("draw bitmap is %d,%d,%d, 0x%08x\n",w,h,depth, DRAW_FMT_SRC);
 
 	conv_p96_RP.BitMap = AllocBitMapTags( w, h, depth, 
 			BMATags_PixelFormat, DRAW_FMT_SRC,
@@ -1359,8 +1374,8 @@ void set_p96_func32()
 		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
 				COMP_FMT_SRC = PIXF_A8R8G8B8;
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
-
-				set_palette_fn = set_vpal_8bit_to_32bit_be_2pixels;
+				set_palette_on_vbl_fn = set_vpal_8bit_to_32bit_be_2pixels;
+				set_palette_fn = palette_notify;
 				p96_conv_fn = convert_8bit_lookup_to_32bit_2pixels; 
 				break;
 
@@ -1394,8 +1409,17 @@ void init_aga_comp( ULONG output_depth )
 	update_fullscreen_rect( currprefs.gfx_correct_aspect );
 }
 
+void reset_p96_fn_pointers( void )
+{
+	set_palette_on_vbl_fn = NULL;
+	set_palette_fn = NULL;	// default.. no special palette function.
+	p96_conv_fn = NULL;	// default.. nothing to convert
+}
+
 void init_comp( struct Window *W )
 {
+	reset_p96_fn_pointers() ;
+
 	if (W == NULL)
 	{
 		printf("UNEXPECTED: window is not open!!!\n");
@@ -1410,9 +1434,6 @@ void init_comp( struct Window *W )
 		if (screen_is_picasso) 
 		{
 			printf("output_depth: %d\n", output_depth);
-
-			set_palette_fn = NULL;	// default.. no special palette function.
-			p96_conv_fn = NULL;	// default.. nothing to convert
 
 			switch ( output_depth )
 			{
@@ -1445,19 +1466,18 @@ void init_comp( struct Window *W )
 				free_picasso_invalid_lines();
 				alloc_picasso_invalid_lines();
 			}
+
+			palette_updated = true;
 		}
 
-
+/*
 		switch (DRAW_FMT_SRC)
 		{
-			case PIXF_CLUT: picasso_vidinfo.rgbformat = RGBFB_CHUNKY;
-						break;
-
-			default:
-//						picasso96_state.RGBFormat = RGBFB_A8R8G8B8;
-//						picasso_vidinfo.rgbformat = 9;
-						break;
+			case PIXF_CLUT: picasso_vidinfo.rgbformat = RGBFB_CHUNKY;break;
 		}
+*/
+
+		printf("picasso_vidinfo.rgbformat: %08x\n", picasso_vidinfo.rgbformat);
 
 		picasso_vidinfo.pixbytes = GetBitMapAttr( draw_p96_RP -> BitMap, BMA_BYTESPERPIXEL );
 
@@ -1484,6 +1504,10 @@ void init_comp( struct Window *W )
 	if (draw_p96_RP == W -> RPort) printf( "*** draw_p96_RP is Window RastPort\n" );
 	if (draw_p96_RP == &conv_p96_RP) printf( "*** draw_p96_RP is &conv_p96_RP\n" );
 	if (draw_p96_RP == &comp_p96_RP) printf( "*** draw_p96_RP is &comp_p96_RP\n" );
+
+	printf("VPAL32: 0x%08x\n", vpal32);
+	printf("VPAL16: 0x%08x\n", vpal16);
+
 }
 
 
@@ -1975,6 +1999,8 @@ int graphics_init (void)
 	use_delta_buffer = 0;
 	need_dither = 0;
 	output_is_true_color = 0;
+	
+	reset_p96_fn_pointers();
 
 	update_gfxvidinfo_width_height();
 
@@ -3162,6 +3188,12 @@ int is_vsync (void)
 	{
 		if ((screen_is_picasso) && (comp_p96_RP.BitMap))
 		{
+			if (palette_updated)
+			{
+				if (set_palette_on_vbl_fn) set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
+				palette_updated = false;
+			}
+
 			if (p96_conv_fn) p96_conv_all();
 			BackFill_Func(NULL, NULL);
 		}
