@@ -197,7 +197,7 @@ extern void write_log(const char *fmt, ... ) ;
 
 extern xcolnr xcolors[4096];
 
-static uae_u8 *oldpixbuf;
+static uae_u8 *oldpixbuf = NULL;
 
 /* Values for amiga_screen_type */
 enum {
@@ -359,11 +359,13 @@ static struct uae_hotkeyseq ami_hotkeys[] =
 
 /****************************************************************************/
 
-bool palette_updated = false;
+bool p96_gfx_updated = false;
+bool p96_palette_updated = false;
+bool p96_update_format = false;
 
 void palette_notify(struct MyCLUTEntry *pal, uint32 num)
 {
-	palette_updated = true;
+	p96_palette_updated = true;
 }
 
 extern UBYTE cidx[4][8*4096];
@@ -1347,7 +1349,6 @@ void set_p96_func16()
 		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
 				COMP_FMT_SRC = PIXF_A8R8G8B8;	
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
-//				init_lookup_8bit_to_16bit_be_2pixels();
 				set_palette_fn = set_vpal_8bit_to_16bit_be_2pixels;
 				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; 
 				break;
@@ -1467,19 +1468,10 @@ void init_comp( struct Window *W )
 				alloc_picasso_invalid_lines();
 			}
 
-			palette_updated = true;
+			p96_palette_updated = true;
 		}
-
-/*
-		switch (DRAW_FMT_SRC)
-		{
-			case PIXF_CLUT: picasso_vidinfo.rgbformat = RGBFB_CHUNKY;break;
-		}
-*/
 
 		printf("picasso_vidinfo.rgbformat: %08x\n", picasso_vidinfo.rgbformat);
-
-		picasso_vidinfo.pixbytes = GetBitMapAttr( draw_p96_RP -> BitMap, BMA_BYTESPERPIXEL );
 
 		if (W->BorderTop == 0)
 		{
@@ -1494,7 +1486,12 @@ void init_comp( struct Window *W )
 
 	if (screen_is_picasso)
 	{
-		printf("*** this is a picasso96 screen, (using picasso_vidinfo.width, picasso_vidinfo.height!)\n");
+		printf("*** this is a picasso96 screen, (using picasso_vidinfo.width: %d, picasso_vidinfo.height: %d)\n",  
+					picasso_vidinfo.width,  
+					picasso_vidinfo.height);
+
+//		if (draw_p96_RP) if (draw_p96_RP -> BitMap) picasso_vidinfo.pixbytes = GetBitMapAttr( draw_p96_RP -> BitMap, BMA_BYTESPERPIXEL );
+		p96_update_format = true;
 	}
 	else
 	{
@@ -1504,10 +1501,6 @@ void init_comp( struct Window *W )
 	if (draw_p96_RP == W -> RPort) printf( "*** draw_p96_RP is Window RastPort\n" );
 	if (draw_p96_RP == &conv_p96_RP) printf( "*** draw_p96_RP is &conv_p96_RP\n" );
 	if (draw_p96_RP == &comp_p96_RP) printf( "*** draw_p96_RP is &comp_p96_RP\n" );
-
-	printf("VPAL32: 0x%08x\n", vpal32);
-	printf("VPAL16: 0x%08x\n", vpal16);
-
 }
 
 
@@ -1754,6 +1747,8 @@ int graphics_setup (void)
 
 /****************************************************************************/
 
+uae_u8 *classic_buffer = NULL;
+
 static struct Window *saved_prWindowPtr;
 
 static void set_prWindowPtr (struct Window *w)
@@ -1933,7 +1928,16 @@ static int graphics_subinit (void)
 		//
 
 		gfxvidinfo.rowbytes = gfxvidinfo.pixbytes * gfxvidinfo.width;
-		gfxvidinfo.bufmem   = (uae_u8 *) calloc (gfxvidinfo.rowbytes, gfxvidinfo.height + 1);
+
+		if (classic_buffer)	// no classic buffer;
+		{
+			free(classic_buffer);
+			classic_buffer = NULL;
+		}
+		
+		classic_buffer = (uae_u8 *) calloc (gfxvidinfo.rowbytes, gfxvidinfo.height + 1);
+		
+		gfxvidinfo.bufmem = classic_buffer;
 
 		//										  ^^^ //
 		//					  This is because DitherLine may read one extra row //
@@ -1948,6 +1952,12 @@ static int graphics_subinit (void)
 	if (use_delta_buffer)
 	{
 		printf("*******  gfxvidinfo.rowbytes: %d\n",gfxvidinfo.rowbytes);
+
+		if (oldpixbuf)
+		{
+			free(oldpixbuf);
+			oldpixbuf = NULL;
+		}
 
 		oldpixbuf = (uae_u8 *) calloc (gfxvidinfo.rowbytes, gfxvidinfo.height);
 		if (!oldpixbuf)
@@ -1999,7 +2009,8 @@ int graphics_init (void)
 	use_delta_buffer = 0;
 	need_dither = 0;
 	output_is_true_color = 0;
-	
+	screen_is_picasso = 0;
+
 	reset_p96_fn_pointers();
 
 	update_gfxvidinfo_width_height();
@@ -2144,6 +2155,18 @@ static void graphics_subshutdown (void)
 void graphics_leave (void)
 {
 	printf("%s:%d\n",__FUNCTION__,__LINE__);
+
+	if (oldpixbuf)
+	{
+		free(oldpixbuf);
+		oldpixbuf = NULL;
+	}
+
+	if (classic_buffer)
+	{
+		free(classic_buffer);
+		classic_buffer = NULL;
+	}
 
 	closepseudodevices ();
 
@@ -2546,8 +2569,6 @@ BOOL has_p96_mode( uae_u32 width, uae_u32 height, int depth, int max_modes )
 
 int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT_OPCODE opcode)
 {
-	int result = 0;
-
 	DEBUG_LOG ("DX_Blit (sx:%d sy:%d dx:%d dy:%d w:%d h:%d op:%d)\n", srcx, srcy, dstx, dsty, width, height, opcode);
 
 	if (opcode == BLIT_SRC ) 
@@ -2567,12 +2588,13 @@ int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT
 
 		if (error == 0)
 		{
+			p96_gfx_updated = true;
 			DX_Invalidate (dsty, dsty + height - 1);
-			result = 1;
+			return 1;
 		}
 	}
 
-	return result;
+	return 0;
 }
 
 int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE rgbtype)
@@ -2582,6 +2604,7 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 	if (draw_p96_RP -> BitMap)
 	{
 		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,color);
+		p96_gfx_updated = true;
 		DX_Invalidate (dsty, dsty + height - 1);
 		return 1;
 	}
@@ -2758,6 +2781,7 @@ void gfx_unlock_picasso (void)
 	{
 		IGraphics -> UnlockBitMap( p96_lock );
 		p96_lock = NULL;
+		p96_gfx_updated = true;
 	}
 }
 
@@ -2782,7 +2806,17 @@ void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 	picasso_vidinfo.width = w;
 	picasso_vidinfo.height = h;
 	picasso_vidinfo.depth = depth;
-	picasso_vidinfo.pixbytes = bit_unit >> 3;
+
+	switch (depth)
+	{
+		case 8:	picasso_vidinfo.pixbytes = 1;
+				break;
+		case 15:
+		case 16:	picasso_vidinfo.pixbytes = 2;
+				break;
+		case 32:	picasso_vidinfo.pixbytes = 4;
+				break;
+	}
 
 	if (screen_is_picasso) set_window_for_picasso();
 }
@@ -3083,8 +3117,6 @@ int check_prefs_changed_gfx (void)
 
 /****************************************************************************/
 
-
-
 void toggle_mousegrab (void)
 {
 #ifdef __amigaos4__
@@ -3106,7 +3138,6 @@ void p96_conv_all()
 {	
 	bool failed = false;
 	
-
 #if 1
 
 	APTR lock_src,lock_dest;
@@ -3160,6 +3191,7 @@ void p96_conv_all()
 		{
 //			if (picasso_invalid_lines[y]) 
 			{
+
 				p96_conv_fn( src_buffer_ptr, dest_buffer_ptr, picasso_vidinfo.width );
 //				picasso_invalid_lines[y] = 0;
 			}
@@ -3179,6 +3211,7 @@ void p96_conv_all()
 		Printf("src: %08x\n",src_buffer_ptr);
 		Printf("dest: %08x\n",dest_buffer_ptr);
 	}
+
 #endif
 }
 
@@ -3188,13 +3221,31 @@ int is_vsync (void)
 	{
 		if ((screen_is_picasso) && (comp_p96_RP.BitMap))
 		{
-			if (palette_updated)
+//			printf("picasso_vidinfo.rowbytes %d pixbytes: %d\n",picasso_vidinfo.rowbytes,picasso_vidinfo.pixbytes);
+
+			if (p96_update_format)
 			{
-				if (set_palette_on_vbl_fn) set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
-				palette_updated = false;
+				gfx_lock_picasso ();
+				gfx_unlock_picasso ();
+				p96_update_format = false;
 			}
 
-			if (p96_conv_fn) p96_conv_all();
+			if (p96_palette_updated)
+			{
+				if (set_palette_on_vbl_fn) 
+				{
+					set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
+					p96_gfx_updated = true;
+				}
+				p96_palette_updated = false;
+			}
+
+			if (p96_gfx_updated)
+			{
+				if (p96_conv_fn) p96_conv_all();
+				p96_gfx_updated = false;
+			}
+
 			BackFill_Func(NULL, NULL);
 		}
 		else
