@@ -1297,7 +1297,7 @@ bool alloc_p96_draw_bitmap( int w, int h, int depth )
 {
 	printf("draw bitmap is %d,%d,%d, 0x%08x\n",w,h,depth, DRAW_FMT_SRC);
 
-	conv_p96_RP.BitMap = AllocBitMapTags( w, h, depth, 
+	conv_p96_RP.BitMap = AllocBitMapTags( w, h+1, depth, 
 			BMATags_PixelFormat, DRAW_FMT_SRC,
 			BMATags_Displayable, FALSE,
 			BMATags_Alignment, 4,
