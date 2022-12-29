@@ -5,6 +5,7 @@
   *
   * Copyright 1996,1997,1998 Samuel Devulder.
   * Copyright 2003-2007 Richard Drummond
+  * Copyright Nov-Des-2022 Kjetil Hvalstrand
   */
 
 #include <stdlib.h>
@@ -98,11 +99,24 @@ struct
 
 #ifdef PICASSO96
 
+int dx_pal_count;
+int dx_rect_count;
+int dx_blit_count;
+int dx_lock_count;
+int dx_pal_sync_count;
+
+void reset_count()
+{
+	dx_pal_count = 0;
+	dx_rect_count = 0;
+	dx_blit_count = 0;
+	dx_lock_count = 0;
+	dx_pal_sync_count = 0;
+}
+
 int screen_is_picasso = 0;
 static int screen_was_picasso;
-
 static char *picasso_invalid_lines = NULL;
-
 static int picasso_has_invalid_lines;
 static int picasso_invalid_start, picasso_invalid_stop;
 static int picasso_maxw = 0, picasso_maxh = 0;
@@ -2594,6 +2608,8 @@ int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT
 		}
 	}
 
+	dx_blit_count++;
+
 	return 0;
 }
 
@@ -2608,6 +2624,8 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 		DX_Invalidate (dsty, dsty + height - 1);
 		return 1;
 	}
+
+	dx_rect_count++;
 
 	return 0;
 }
@@ -2680,6 +2698,8 @@ void DX_SetPalette_vsync(void)
 		palette_update_end  = 0;
 		palette_update_start = 0;
 	}
+
+	dx_pal_sync_count++;
 }
 
 
@@ -2783,6 +2803,8 @@ void gfx_unlock_picasso (void)
 		p96_lock = NULL;
 		p96_gfx_updated = true;
 	}
+
+	dx_lock_count++;
 }
 
 static void set_window_for_picasso (void)
@@ -3187,7 +3209,7 @@ void p96_conv_all()
 
 	if ((lock_src)&&(lock_dest)&&(src_buffer_ptr))
 	{
-		for (y=0;y<picasso_vidinfo.height-1;y++)
+		for (y=0;y<picasso_vidinfo.height;y++)
 		{
 //			if (picasso_invalid_lines[y]) 
 			{
@@ -3215,8 +3237,21 @@ void p96_conv_all()
 #endif
 }
 
+#define debug_vsync_time 1
+
+#if debug_vsync_time
+int every = 0;
+#endif
+
 int is_vsync (void)
 {
+
+#if debug_vsync_time
+	struct timeval t1, t2;
+	double deltaTime;
+	gettimeofday(&t1,NULL);
+#endif
+
 	if (W)
 	{
 		if ((screen_is_picasso) && (comp_p96_RP.BitMap))
@@ -3253,6 +3288,38 @@ int is_vsync (void)
 			BackFill_Func(NULL, NULL);
 		}
 	}
+
+
+#if debug_vsync_time
+	gettimeofday(&t2, NULL);
+	deltaTime = (t2.tv_sec - t1.tv_sec) * 1000.0f;
+	deltaTime += (t2.tv_usec - t1.tv_usec);
+
+	if (deltaTime>50)
+	{
+		if (every++ % 30 == 0)		// report high deleys every now and then.
+		{
+			printf("DeltaTime: %f ms time, memory free: %lu\n"
+				"dx_rect_count: %d "
+				"dx_blit_count: %d "
+				"dx_lock_count: %d "
+				"dx_pal_sync_count: %d"
+				"dx_pal_count: %d\n",
+
+				deltaTime,  
+				AvailMem(MEMF_TOTAL),
+
+				dx_rect_count,
+				dx_blit_count,
+				dx_lock_count,
+				dx_pal_sync_count,
+				dx_pal_count);
+		}
+
+		reset_count();
+	}
+
+#endif
 
 	return 0;
 }
