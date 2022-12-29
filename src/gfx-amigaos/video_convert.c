@@ -75,12 +75,15 @@ void convert_8bit_lookup_to_16bit_2pixels(  uint16 *from, uint32 *to,int  pixels
 void convert_8bit_lookup_to_32bit_2pixels(  uint16 *from, double *to,int  pixels )
 {
 	double *vpal64 = (double *) vpal32;	// need to use doubles to get true 64bit registers.
+	uint16 *end;
 	int packs = pixels / 2;
 	int n;
 
-	for (n=0; n<packs;n++)
+	end = from + packs;
+	while (from<end)
 	{
-		to[n] = vpal64[ from[n] ];
+		*to++ = vpal64[ *from++ ];
+		*to++ = vpal64[ *from++ ];
 	}
 }
 
