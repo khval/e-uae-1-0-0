@@ -2836,10 +2836,6 @@ void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 {
 	DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %d h: %d depth: %d rgbfmt: %d\n", w, h, depth, rgbfmt);
 
-	picasso_vidinfo.width = w;
-	picasso_vidinfo.height = h;
-	picasso_vidinfo.depth = depth;
-
 	switch (depth)
 	{
 		case 8:	picasso_vidinfo.pixbytes = 1;
@@ -2850,6 +2846,11 @@ void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 		case 32:	picasso_vidinfo.pixbytes = 4;
 				break;
 	}
+
+	picasso_vidinfo.width = w;
+	picasso_vidinfo.height = h;
+	picasso_vidinfo.depth = depth;
+	picasso_vidinfo.rowbytes = w * picasso_vidinfo.pixbytes;	// maybe not correct, but its not insane.
 
 	if (screen_is_picasso) set_window_for_picasso();
 }
