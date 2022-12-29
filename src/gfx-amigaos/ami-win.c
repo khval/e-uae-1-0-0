@@ -146,6 +146,7 @@ void (*set_palette_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
 void (*set_palette_on_vbl_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
 
 void palette_notify(struct MyCLUTEntry *pal, uint32 num);
+void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num);
 
 void init_aga_comp( ULONG output_depth );
 
@@ -1349,9 +1350,14 @@ void set_p96_func8()
 
 	switch ( picasso_vidinfo.depth )
 	{
-		case 8: p96_conv_fn = NULL; break;
+		case 8:	p96_conv_fn = NULL;
+				set_palette_on_vbl_fn = palette_8bit_update;	// when changing from 32bit to 8bit screen we need to reset palette.
+				break;
+
 		case 15: p96_conv_fn = NULL; break;
+
 		case 16: p96_conv_fn = NULL; break;
+
 		case 32: p96_conv_fn = NULL; break;
 	}
 }
@@ -2656,6 +2662,28 @@ int DX_BitsPerCannon (void)
 	return 8;
 }
 
+void SetPalette_8bit_screen (int start, int count)
+{
+	load32_p96_table[ 0 ] = count << 16;
+
+	int i;
+	int offset = (start*3+1);
+
+	for (i = 0; i < count;  i++)
+	{
+		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Red;
+		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Green;
+		load32_p96_table[ offset ++  ] = 0x01010101 * picasso96_state.CLUT[i].Blue;			 
+	}
+
+	LoadRGB32( &(S -> ViewPort) , load32_p96_table );
+}
+
+void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num)
+{
+	SetPalette_8bit_screen(0, 256);
+}
+
 void DX_SetPalette (int start, int count)
 {
     DEBUG_LOG ("Function: DX_SetPalette\n");
@@ -2663,31 +2691,21 @@ void DX_SetPalette (int start, int count)
 	// exit if not valid !!!
 	if (! screen_is_picasso || picasso96_state.RGBFormat != RGBFB_CHUNKY) return;
 
-	if (count > 256) count = 256;
+	if (start > 255) start = 255;
+	if (start + count > 256) count = 256 - start;
 
 	if (set_palette_fn)	// we need to convert !!
 	{
 		int n;
-		for (n = start ; n<(start+count); n++ )
-			set_palette_fn( picasso96_state.CLUT, n );			// fix me !!! wrong size of array maybe!!
+		for (n = start ; n<(start+count); n++ ) set_palette_fn( picasso96_state.CLUT, n );
 	}
-	else
+	else if (S)
 	{
-		load32_p96_table[ 0 ] = count << 16;
-
-		int i;
-		int offset;
-
-		for (i = 0; i < count;  i++)
-		{
-			offset = (i*3) + 1;
-			load32_p96_table[ offset + 0  ] = 0x01010101 * picasso96_state.CLUT[i].Red;
-			load32_p96_table[ offset + 1  ] = 0x01010101 * picasso96_state.CLUT[i].Green;
-			load32_p96_table[ offset + 2  ] = 0x01010101 * picasso96_state.CLUT[i].Blue;			 
-		}
-
-		LoadRGB32( &(S -> ViewPort) , load32_p96_table );
+		printf("using LoadRGB32 to set colors\n");
+		SetPalette_8bit_screen(start, count);
 	}
+
+	dx_pal_count++;
 }
 
 void DX_SetPalette_vsync(void)
