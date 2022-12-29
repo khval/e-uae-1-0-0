@@ -1295,9 +1295,6 @@ static void open_window(void)
 
 bool alloc_p96_draw_bitmap( int w, int h, int depth )
 {
-	uint32 is_rtg;
-	InitRastPort(&conv_p96_RP);
-
 	printf("draw bitmap is %d,%d,%d, 0x%08x\n",w,h,depth, DRAW_FMT_SRC);
 
 	conv_p96_RP.BitMap = AllocBitMapTags( w, h, depth, 
@@ -1319,7 +1316,7 @@ bool alloc_p96_draw_bitmap( int w, int h, int depth )
 
 int init_comp_one( struct Window *W, ULONG output_depth, struct RastPort *rp, int w, int h )
 {
-	InitRastPort(rp);
+	printf("comp output_depth: %d\n",output_depth);
 
 	rp -> BitMap = AllocBitMap( w,h, output_depth == 32 ? 24 :output_depth , BMF_DISPLAYABLE, W -> RPort -> BitMap);
 	
@@ -2031,15 +2028,12 @@ int graphics_init (void)
 	output_is_true_color = 0;
 	screen_is_picasso = 0;
 
+	InitRastPort(&comp_aga_RP);
+	InitRastPort(&comp_p96_RP);
+	InitRastPort(&conv_p96_RP);
+
 	reset_p96_fn_pointers();
-
 	update_gfxvidinfo_width_height();
-
-/*
-    currprefs.gfx_correct_aspect;
-    currprefs.gfx_afullscreen;
-    currprefs.gfx_pfullscreen;
-*/
 
 	switch (currprefs.amiga_screen_type)
 	{
