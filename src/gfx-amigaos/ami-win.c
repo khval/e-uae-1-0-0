@@ -1299,9 +1299,8 @@ bool alloc_p96_draw_bitmap( int w, int h, int depth )
 
 	conv_p96_RP.BitMap = AllocBitMapTags( w, h, depth, 
 			BMATags_PixelFormat, DRAW_FMT_SRC,
-			BMATags_Displayable, TRUE,
+			BMATags_Displayable, FALSE,
 			BMATags_Alignment, 4,
-//			BMATags_Friend, W -> RPort -> BitMap,
 			TAG_END);
 
 	if (conv_p96_RP.BitMap)
