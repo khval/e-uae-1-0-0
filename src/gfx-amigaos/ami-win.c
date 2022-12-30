@@ -1399,10 +1399,6 @@ void set_p96_output_R5G6B5PC()
 				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; 
 				break;
 
-		case 15:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
-				init_lookup_15bit_to_16bit_le();
-				p96_conv_fn = convert_16bit_lookup_to_16bit; break;
-
 		case 16:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
 				init_lookup_16bit_swap();
 				p96_conv_fn = convert_16bit_lookup_to_16bit; break;
@@ -1426,16 +1422,13 @@ void set_p96_output_A8R8G8B8()
 				p96_conv_fn = convert_8bit_lookup_to_32bit_2pixels; 
 				break;
 
-		case 15:	DRAW_FMT_SRC = PIXF_R5G5B5PC;
-				printf("%s:%d NYI... wtf!!\n",__FUNCTION__,__LINE__);
+		case 16:	DRAW_FMT_SRC = PIXF_R5G5B5;
+//				init_lookup_15bit_to_16bit_le();
+//				p96_conv_fn = convert_16bit_lookup_to_16bit; 
+				p96_conv_fn = convert_15bit_to_32bit ; 
 				break;
 
-		case 16:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
-				p96_conv_fn = convert_16bit_to_32bit ; 
-				break;
-
-		case 32:	COMP_FMT_SRC = PIXF_A8R8G8B8;	
-				p96_conv_fn = NULL ; 
+		case 32:	p96_conv_fn = NULL ; 
 				break;
 	}
 }
@@ -2792,18 +2785,17 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
 	*ppixel_format =0;
 
 	*ppixel_format |= 1 << RGBFB_R5G5B5;
-	*ppixel_format |= 1 << RGBFB_R5G5B5PC;
-	*ppixel_format |= 1 << RGBFB_R5G6B5;
-	*ppixel_format |= 1 << RGBFB_R5G6B5PC;
+//	*ppixel_format |= 1 << RGBFB_R5G5B5PC;
+//	*ppixel_format |= 1 << RGBFB_R5G6B5;
+//	*ppixel_format |= 1 << RGBFB_R5G6B5PC;
 	*ppixel_format |= 1 << RGBFB_A8R8G8B8;
 	*ppixel_format |= RGBFF_CHUNKY;
 
-	ppixel_format = ~0;
 
     /* Check list of standard P96 screenmodes */
 
 	add_native_modes( 32, &count );
-	add_native_modes( 15, &count );
+	add_native_modes( 16, &count );
 	add_native_modes( 8, &count );
 
 	return count;
@@ -2832,7 +2824,14 @@ uae_u8 *gfx_lock_picasso (void)
 			{
 				case PIXF_CLUT:
 					picasso_vidinfo.rgbformat = RGBFB_CLUT;
-					break;	
+					break;
+
+				case PIXF_R5G5B5:
+//				case PIXF_R556B5PC:
+				case PIXF_R5G6B5:
+				case PIXF_R5G6B5PC:
+					picasso_vidinfo.rgbformat = format;
+					break;
 
 				case PIXF_A8R8G8B8:
 					picasso_vidinfo.rgbformat = 6;		// RGBFB_A8R8G8B8;
