@@ -3062,17 +3062,21 @@ void InitPicasso96 (void)
 	qsort (DisplayModes, mode_count, sizeof (struct PicassoResolution),
 	       resolution_compare);
 
+#if 0
 	/* Work-around for possible P96 bug. A8R8G8B8 modes have
 	 * palette emulation issues. Tell the world we have a
 	 * a BGRA mode instead (and we'll byte-swap all pixels output).
 	 */
-	if (picasso_vidinfo.rgbformat == RGBFB_A8R8G8B8) {
+
+	if (picasso_vidinfo.rgbformat == RGBFB_A8R8G8B8)
+	{
 	    picasso_vidinfo.rgbformat = RGBFB_B8G8R8A8;
 	    picasso96_pixel_format &= RGBFF_CHUNKY;
 	    picasso96_pixel_format |= 1 << picasso_vidinfo.rgbformat;
 	    need_argb32_hack = 1;
 	   write_log ("Enabling argb32 byte-swapping for P96.\n");
 	}
+#endif
 
 	for (i = 0; i < mode_count; i++) {
 	    sprintf (DisplayModes[i].name, "%dx%d, %d-bit, %d Hz",

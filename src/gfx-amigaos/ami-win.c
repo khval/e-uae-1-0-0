@@ -2757,16 +2757,23 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
 
     DEBUG_LOG ("Function: DX_FillResolutions\n");
 
-	if (bit_unit == 16)
-		picasso_vidinfo.rgbformat = RGBFB_R5G6B5;
-	else
-		picasso_vidinfo.rgbformat = RGBFB_A8R8G8B8;
+//	if (bit_unit == 16)
+//		picasso_vidinfo.rgbformat = RGBFB_R5G6B5;
+//	else
+//		picasso_vidinfo.rgbformat = RGBFB_A8R8G8B8;
+//	*ppixel_format = 1 << picasso_vidinfo.rgbformat;
 
-	*ppixel_format = 1 << picasso_vidinfo.rgbformat;
-	if (bit_unit == 16 || bit_unit == 32)
-	{
-		*ppixel_format |= RGBFF_CHUNKY;
-	}
+
+	*ppixel_format =0;
+
+	*ppixel_format |= 1 << RGBFB_R5G5B5;
+	*ppixel_format |= 1 << RGBFB_R5G5B5PC;
+	*ppixel_format |= 1 << RGBFB_R5G6B5;
+	*ppixel_format |= 1 << RGBFB_R5G6B5PC;
+	*ppixel_format |= 1 << RGBFB_A8R8G8B8;
+	*ppixel_format |= RGBFF_CHUNKY;
+
+	ppixel_format = ~0;
 
     /* Check list of standard P96 screenmodes */
 
@@ -2803,7 +2810,7 @@ uae_u8 *gfx_lock_picasso (void)
 					break;	
 
 				case PIXF_A8R8G8B8:
-					picasso_vidinfo.rgbformat = 9;		// RGBFB_A8R8G8B8;
+					picasso_vidinfo.rgbformat = 6;		// RGBFB_A8R8G8B8;
 					break;
 			}
 		}
