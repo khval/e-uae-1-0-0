@@ -125,6 +125,21 @@ void convert_15bit_to_16bit_be(  uint16 *from, uint16 *to,int  pixels )
 	}
 }
 
+void init_lookup_16bit_swap(  )
+{
+	register unsigned int rgb;
+	register unsigned int rg;
+	register unsigned int b;
+
+	if (lookup16bit == NULL) lookup16bit = (uint16 *) malloc(65535 * sizeof(uint16));
+	if (lookup16bit == NULL) return;
+
+	for (rgb=0; rgb<65535;rgb++)
+	{
+		lookup16bit[rgb] = ((rgb & 0xFF00) >> 8)  | ((rgb & 0xFF) << 8);
+	}
+}
+
 void init_lookup_15bit_to_16bit_le(  )
 {
 	int n;
