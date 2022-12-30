@@ -2664,12 +2664,13 @@ int DX_BitsPerCannon (void)
 
 void SetPalette_8bit_screen (int start, int count)
 {
-	load32_p96_table[ 0 ] = count << 16;
-
 	int i;
-	int offset = (start*3+1);
 
-	for (i = 0; i < count;  i++)
+	load32_p96_table[ 0 ] = count << 16 | start;
+
+	int offset = 1;
+
+	for (i = start; i < start+count;  i++)
 	{
 		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Red;
 		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Green;
