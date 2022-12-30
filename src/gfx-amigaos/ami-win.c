@@ -140,6 +140,8 @@ void reset_p96_fn_pointers( void );
 
 void (*p96_conv_fn) (void *src, void *dest, int size) = NULL;
 
+ULONG p96_output_bpr = 0;
+
 uint32 *vpal32 = NULL;
 uint16 *vpal16 = NULL;
 void (*set_palette_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
@@ -1341,6 +1343,8 @@ struct vidbuf_description p96_buffer;
 
 void set_p96_func8()
 {
+	p96_output_bpr = picasso_vidinfo.width * 1;
+
 	DRAW_FMT_SRC = PIXF_CLUT;
 	COMP_FMT_SRC = PIXF_NONE;	
 
@@ -1360,6 +1364,8 @@ void set_p96_func8()
 
 void set_p96_func16()
 {
+	p96_output_bpr = picasso_vidinfo.width * 2;
+
 	switch ( picasso_vidinfo.depth )
 	{
 		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
@@ -1386,6 +1392,8 @@ void set_p96_func16()
 
 void set_p96_func32()
 {
+	p96_output_bpr = picasso_vidinfo.width * 4;
+
 	switch ( picasso_vidinfo.depth )
 	{
 		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
@@ -3180,76 +3188,56 @@ void p96_conv_all()
 	int y;
 
 	if (conv_p96_RP.BitMap != draw_p96_RP -> BitMap)
-	{
-		printf("conv bitmap is expected to be draw bitmap\n");
-		return;
-	}
+		{ printf("conv bitmap is expected to be draw bitmap\n");return; }
 
 	if (comp_p96_RP.BitMap == draw_p96_RP -> BitMap)
-	{
-		printf("royal fuck up... draw bitmap can not be the same as comp bitmap\nwhen converting formats\n");
-		return;
-	}
+		{ printf("royal fuck up... draw bitmap can not be the same as comp bitmap\nwhen converting formats\n");return; }
 
 	if (comp_p96_RP.BitMap == NULL)
-	{
-		printf("comp_p96_RP.BitMap has no bitmap");
-		return;
-	}
+		{ printf("comp_p96_RP.BitMap has no bitmap");return; }
 
 	if (draw_p96_RP -> BitMap == NULL)
-	{
-		printf("cdraw_p96_RP -> BitMap has no bitmap");
-		return;
-	}
+		{ printf("draw_p96_RP -> BitMap has no bitmap");return; }
 
 	if (picasso_invalid_lines == NULL )
+		{ printf("unexpcted NULL on picasso_invalid_lines\n"); return; }
+
+	char *dest_tmp_buffer_ptr = alloca( (picasso_vidinfo.width & 7 ? picasso_vidinfo.width & ~7 + 8 : picasso_vidinfo.width ) * 4 );		// becouse output is needs more space.
+
+	if (dest_tmp_buffer_ptr == NULL)
+		{ printf("no dest_tmp_buffer\n"); return ; }
+
+	for (y=0;y<picasso_vidinfo.height;y++)
 	{
-		printf("unexpcted NULL on picasso_invalid_lines\n");
-		return;
-	}
-
-	lock_src = IGraphics -> LockBitMapTags(draw_p96_RP -> BitMap,
-			LBM_BaseAddress, (APTR *) &src_buffer_ptr,
-			LBM_BytesPerRow, &src_BytesPerRow,
-			TAG_END	);
-
-	lock_dest = IGraphics -> LockBitMapTags(comp_p96_RP.BitMap,
-			LBM_BaseAddress, (APTR *) &dest_buffer_ptr,
-			LBM_BytesPerRow, &dest_BytesPerRow,
-			TAG_END	);
-
-	if ((lock_src)&&(lock_dest)&&(src_buffer_ptr))
-	{
-		for (y=0;y<picasso_vidinfo.height;y++)
+//		if (picasso_invalid_lines[y]) 
 		{
-//			if (picasso_invalid_lines[y]) 
+//			picasso_invalid_lines[y] = 0;
+
+			lock_src = IGraphics -> LockBitMapTags(draw_p96_RP -> BitMap,
+					LBM_BaseAddress, (APTR *) &src_buffer_ptr,
+					LBM_BytesPerRow, &src_BytesPerRow,
+					TAG_END	);
+
+			if (lock_src)
 			{
-
-				p96_conv_fn( src_buffer_ptr, dest_buffer_ptr, picasso_vidinfo.width );
-//				picasso_invalid_lines[y] = 0;
+				if (src_buffer_ptr) p96_conv_fn( src_buffer_ptr + y*src_BytesPerRow, dest_tmp_buffer_ptr, picasso_vidinfo.width );
+				IGraphics -> UnlockBitMap(lock_src);
 			}
-
-			src_buffer_ptr += src_BytesPerRow;
-			dest_buffer_ptr += dest_BytesPerRow;
+	
+			WritePixelArray (dest_tmp_buffer_ptr,
+				0, 0,
+				p96_output_bpr,
+				COMP_FMT_SRC,
+				&comp_p96_RP,
+				0, y,
+				picasso_vidinfo.width, 1 );
 		}
-	}
-	else failed = true;
-
-	if (lock_src) IGraphics -> UnlockBitMap( lock_src );
-	if (lock_dest) IGraphics -> UnlockBitMap( lock_dest );
-
-	if (failed)
-	{
-		printf("%s:%d --- convection failed bcouse !!! \n",__FUNCTION__,__LINE__);
-		Printf("src: %08x\n",src_buffer_ptr);
-		Printf("dest: %08x\n",dest_buffer_ptr);
 	}
 
 #endif
 }
 
-#define debug_vsync_time 1
+#define debug_vsync_time 0
 
 #if debug_vsync_time
 int every = 0;
@@ -3307,7 +3295,7 @@ int is_vsync (void)
 	deltaTime = (t2.tv_sec - t1.tv_sec) * 1000.0f;
 	deltaTime += (t2.tv_usec - t1.tv_usec);
 
-	if (deltaTime>50)
+	if (deltaTime>20)
 	{
 		if (every++ % 30 == 0)		// report high deleys every now and then.
 		{
