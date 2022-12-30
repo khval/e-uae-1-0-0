@@ -194,8 +194,8 @@ struct TagItem tags_public[] = {
 
 /****************************************************************************/
 
-#define UAEIFF "UAEIFF"        /* env: var to trigger iff dump */
-#define UAESM  "UAESM"         /* env: var for screen mode */
+#define UAEIFF "UAEIFF"		// env: var to trigger iff dump //
+#define UAESM "UAESM"		// env: var for screen mode //
 
 static void graphics_subshutdown (void);
 
@@ -205,9 +205,9 @@ static bool is_uniconifyed(void);
 static bool enable_Iconify(void);
 static void dispose_Iconify(void);
 
-static int need_dither;        /* well.. guess :-) */
-static int use_delta_buffer;   /* this will redraw only needed places */
-static int output_is_true_color;            /* this is for cybergfx truecolor mode */
+static int need_dither;			// well.. guess :-) //
+static int use_delta_buffer;		// this will redraw only needed places //
+static int output_is_true_color;            // this is for truecolor mode //
 static int use_approx_color;
 
 extern void write_log(const char *fmt, ... ) ;
@@ -224,10 +224,10 @@ enum {
     UAESCREENTYPE_LAST
 };
 
-/****************************************************************************/
-/*
- * prototypes & global vars
- */
+//****************************************************************************//
+//
+// prototypes & global vars
+//
 
 extern struct IntuitionBase    *IntuitionBase ;
 extern struct GfxBase          *GfxBase ;
@@ -387,10 +387,9 @@ void palette_notify(struct MyCLUTEntry *pal, uint32 num)
 
 extern UBYTE cidx[4][8*4096];
 
-
-/*
- * Dummy buffer locking methods
- */
+//
+// Dummy buffer locking methods
+//
 
 static int dummy_lock (struct vidbuf_description *gfxinfo)
 {
@@ -809,7 +808,7 @@ static int init_colors (void)
 			return 1;
 		}
 
-		/* if that fail then try grey allocation */
+		// if that fail then try grey allocation //
 		maxcol = 1 << (usepub ? 8 : RPDepth (&comp_aga_RP));
 
 		do
@@ -836,7 +835,7 @@ static int init_colors (void)
 				return 1;
 		}
 
-		return 0; /* everything failed :-( */
+		return 0; // everything failed :-( //
 	}
 
 	// No dither //
@@ -2873,8 +2872,8 @@ void gfx_set_picasso_state (int on)
 		return;
 	}
 
-    /* We can get called by drawing_init() when there's
-     * no window opened yet... */
+	// We can get called by drawing_init() when there's 
+	// no window opened yet...
 
 	if ( W == NULL)
 	{
