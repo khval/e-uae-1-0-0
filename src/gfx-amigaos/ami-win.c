@@ -380,6 +380,9 @@ bool p96_gfx_updated = false;
 bool p96_palette_updated = false;
 bool p96_update_format = false;
 
+int p96_xoffset = 0;
+int p96_yoffset = 0;
+
 void palette_notify(struct MyCLUTEntry *pal, uint32 num)
 {
 	p96_palette_updated = true;
@@ -1516,6 +1519,15 @@ void init_comp( struct Window *W )
 
 		if (W->BorderTop == 0)
 		{
+			p96_xoffset = W -> Width/2 - picasso_vidinfo.width/2;
+			p96_yoffset = W -> Height/2 - picasso_vidinfo.height/2;
+
+			if ((p96_xoffset + picasso_vidinfo.width) > (W -> Width)) p96_xoffset = (p96_xoffset + picasso_vidinfo.width) - (W -> Width);
+			if ((p96_yoffset + picasso_vidinfo.height) > (W -> Height)) p96_yoffset = (p96_xoffset + picasso_vidinfo.height) - (W -> Height);
+
+			if (p96_xoffset<0) p96_xoffset = 0;
+			if (p96_yoffset<0) p96_yoffset = 0;
+
 			RectFillColor(W -> RPort, 
 				0, 
 				0, 
@@ -2611,6 +2623,9 @@ int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT
 
 	if (opcode == BLIT_SRC ) 
 	{
+		dstx += p96_xoffset;
+		dsty += p96_yoffset;
+
 		ULONG error = BltBitMapTags(
 				BLITA_SrcType, BLITT_BITMAP,
 				BLITA_DestType, BLITT_BITMAP,
@@ -2643,6 +2658,9 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 
 	if (draw_p96_RP -> BitMap)
 	{
+		dstx += p96_xoffset;
+		dsty += p96_yoffset;
+
 		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,color);
 		p96_gfx_updated = true;
 		DX_Invalidate (dsty, dsty + height - 1);
@@ -2805,7 +2823,7 @@ APTR p96_lock = NULL;
 
 uae_u8 *gfx_lock_picasso (void)
 {
-	APTR address = NULL;
+	uae_u8 * address = NULL;
 	ULONG format ;
 
 	if (p96_lock) gfx_unlock_picasso ();
@@ -2820,6 +2838,8 @@ uae_u8 *gfx_lock_picasso (void)
 
 		if (p96_lock)
 		{
+			address += (p96_xoffset + p96_yoffset * picasso_vidinfo.rowbytes);
+
 			switch (format)
 			{
 				case PIXF_CLUT:
@@ -2840,7 +2860,7 @@ uae_u8 *gfx_lock_picasso (void)
 		}
 	}
 
-	return address;
+	return (APTR ) address;
 }
 
 void gfx_unlock_picasso (void)
@@ -2864,6 +2884,8 @@ static void set_window_for_picasso (void)
 	if (screen_was_picasso && current_width == picasso_vidinfo.width && current_height == picasso_vidinfo.height)
 		return;
 
+	p96_xoffset = 0;
+	p96_yoffset = 0;
 	screen_was_picasso = 1;
 	graphics_subshutdown();
 	current_width  = picasso_vidinfo.width;
