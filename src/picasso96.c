@@ -464,24 +464,35 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
     /* Try OS specific fillrect function here; and return if successful. Make
      * sure we adjust for the pen values if we're doing 8-bit
      * display-emulation on a 16-bit or higher screen. */
-    if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat) {
-#	ifndef WORDS_BIGENDIAN
-	    if (Bpp > 1)
-		if (!(Bpp == 4 && need_argb32_hack))
-		    pen = bswap_32 (pen);
-#	else
-	    if (Bpp == 4 && need_argb32_hack)
-		pen = bswap_32 (pen);
-#	endif
 
-	if (DX_Fill (x, y, width, height, pen, rgbtype))
-	    return;
-    } else {
-	if (DX_Fill (x, y, width, height, picasso_vidinfo.clut[src[0]], rgbtype))
-	    return;
-    }
+	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
+	{
+		switch (picasso_vidinfo.rgbformat)
+		{
+			case RGBFB_R5G5B5:
+				{
+					int r,g,b;
+					r = (((pen  >> 10) & 0x1F) *255) / 0x1F;
+					g = (((pen >> 5) & 0x1F) * 255) / 0x1F;
+					b = ((pen & 0x1F) * 255) / 0x1F;
+					pen = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
+				}
+				break;
 
-    P96TRACE (("P96: WARNING - do_fillrect() using fall-back routine!\n"));
+			case RGBFB_B8G8R8A8:
+				pen = bswap_32 (pen);
+				break;
+		}
+
+		if (DX_Fill (x, y, width, height, pen, rgbtype)) return;
+	}
+	else
+	{
+		if (DX_Fill (x, y, width, height, picasso_vidinfo.clut[src[0]], rgbtype))
+		return;
+	}
+
+	P96TRACE (("P96: WARNING - do_fillrect() using fall-back routine!\n"));
 
 	DX_Invalidate (y, y + height - 1);
 
