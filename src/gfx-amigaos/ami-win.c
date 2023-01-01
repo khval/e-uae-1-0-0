@@ -125,7 +125,7 @@ static int picasso_maxw = 0, picasso_maxh = 0;
 static int mode_count;
 extern struct picasso_vidbuf_description picasso_vidinfo;
 
-static int bitdepth, bit_unit = 32;
+static int bitdepth;
 static int current_width, current_height;
 
 static int red_bits, green_bits, blue_bits;
@@ -259,6 +259,7 @@ bool empty_msg_queue(struct MsgPort *port);
 unsigned long            frame_num; /* for arexx */
 
 struct RastPort  comp_aga_RP;
+struct RastPort *draw_aga_RP = &comp_aga_RP;
 struct RastPort  comp_p96_RP;
 struct RastPort  conv_p96_RP ;
 struct RastPort  *draw_p96_RP = &comp_p96_RP;	// draw direct to the output buffer.
@@ -454,7 +455,7 @@ STATIC_INLINE void flush_line_planar_nodither (struct vidbuf_description *gfxinf
     CopyMem (src, dst, len);
 
     /* Blit changed pixels to the display */
-    WritePixelLine8 (&comp_aga_RP, xs + XOffset, line_no + YOffset, len, dst, TempRPort);
+    WritePixelLine8 (draw_aga_RP, xs + XOffset, line_no + YOffset, len, dst, TempRPort);
 }
 
 static void flush_block_planar_nodither (struct vidbuf_description *gfxinfo, int first_line, int last_line)
@@ -505,7 +506,7 @@ STATIC_INLINE void flush_line_planar_dither (struct vidbuf_description *gfxinfo,
     DitherLine (Line, src, xs, line_no, (len + 3) & ~3, 8);
 
     /* Blit dithered pixels from Line buffer to the display */
-    WritePixelLine8 ( &comp_aga_RP, xs + XOffset, line_no + YOffset, len, Line, TempRPort);
+    WritePixelLine8 ( draw_aga_RP, xs + XOffset, line_no + YOffset, len, Line, TempRPort);
 }
 
 static void flush_block_planar_dither (struct vidbuf_description *gfxinfo, int first_line, int last_line)
@@ -525,7 +526,7 @@ STATIC_INLINE void flush_line_ham (struct vidbuf_description *gfxinfo, int line_
     uae_u8 *src = gfxinfo->bufmem + (line_no * gfxinfo->rowbytes);
 
     ham_conv ((void*) src, Line, len);
-    WritePixelLine8 (&comp_aga_RP, 0, line_no, len, Line, TempRPort);
+    WritePixelLine8 (draw_aga_RP, 0, line_no, len, Line, TempRPort);
 
     return;
 }
@@ -539,13 +540,13 @@ static void flush_block_ham (struct vidbuf_description *gfxinfo, int first_line,
 
 static void flush_line_cgx_v41 (struct vidbuf_description *gfxinfo, int line_no)
 {
-	if (comp_aga_RP.BitMap)
+	if (draw_aga_RP -> BitMap)
 	{
 		WritePixelArray (CybBuffer,
 			 0 , line_no,
 			 gfxinfo->rowbytes,
 			COMP_FMT_SRC,
-			 &comp_aga_RP,
+			 draw_aga_RP,
 			 XOffset,
 			 YOffset + line_no,
 			 gfxinfo->width,
@@ -555,13 +556,13 @@ static void flush_line_cgx_v41 (struct vidbuf_description *gfxinfo, int line_no)
 
 static void flush_block_cgx_v41 (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
-	if (comp_aga_RP.BitMap)
+	if (draw_aga_RP -> BitMap)
 	{
 		WritePixelArray (CybBuffer,
 			0 , first_line,
 			gfxinfo->rowbytes,
 			COMP_FMT_SRC,
-			&comp_aga_RP,
+			draw_aga_RP,
 			XOffset,
 			YOffset + first_line,
 			gfxinfo->width,
@@ -574,19 +575,19 @@ static void flush_block_cgx_v41 (struct vidbuf_description *gfxinfo, int first_l
 
 static void flush_clear_screen_gfxlib (struct vidbuf_description *gfxinfo)
 {
-	if (comp_aga_RP.BitMap)
+	if (draw_aga_RP -> BitMap)
 	{
 		if (output_is_true_color)
 		{
-			RectFillColor (&comp_aga_RP, W->BorderLeft, W->BorderTop,
+			RectFillColor (draw_aga_RP, W->BorderLeft, W->BorderTop,
 				    W->Width - W->BorderLeft - W->BorderRight,
 				    W->Height - W->BorderTop - W->BorderBottom,
 				    0);
 		}
 		else
 		{
-			SetAPen  (&comp_aga_RP, get_nearest_color (0,0,0));
-			RectFill (&comp_aga_RP, W->BorderLeft, W->BorderTop, W->Width - W->BorderRight, W->Height - W->BorderBottom);
+			SetAPen  (draw_aga_RP, get_nearest_color (0,0,0));
+			RectFill (draw_aga_RP, W->BorderLeft, W->BorderTop, W->Width - W->BorderRight, W->Height - W->BorderBottom);
 		}
 	}
 	if (use_delta_buffer)  memset (oldpixbuf, 0, gfxinfo->rowbytes * gfxinfo->height);
@@ -668,7 +669,7 @@ static int get_nearest_color (int r, int g, int b)
 
     best    = 0;
     besterr = calc_err (0, 0, 0, 15, 15, 15);
-    colors  = is_halfbrite ? 32 :(1 << RPDepth (&comp_aga_RP));
+    colors  = is_halfbrite ? 32 :(1 << RPDepth (draw_aga_RP));
 
     for (i = 0; i < colors; i++) {
 	long rgb;
@@ -822,7 +823,7 @@ static int init_colors (void)
 		}
 
 		// if that fail then try grey allocation //
-		maxcol = 1 << (usepub ? 8 : RPDepth (&comp_aga_RP));
+		maxcol = 1 << (usepub ? 8 : RPDepth (draw_aga_RP));
 
 		do
 		{
@@ -1480,8 +1481,18 @@ void init_comp( struct Window *W )
 		ULONG output_depth = GetBitMapAttr( W -> RPort -> BitMap, BMA_DEPTH );
 		ULONG output_format = GetBitMapAttr( W -> RPort -> BitMap, BMA_PIXELFORMAT );
 	
-		init_aga_comp(output_depth);
-		draw_p96_RP = W -> RPort;
+		if (output_depth == 8)
+		{
+			draw_aga_RP = W -> RPort;
+			draw_p96_RP = W -> RPort;
+			update_fullscreen_rect( currprefs.gfx_correct_aspect );
+		}
+		else
+		{
+			draw_aga_RP = &comp_aga_RP;
+			draw_p96_RP = &comp_p96_RP;
+			init_aga_comp(output_depth);
+		}
 
 		if (screen_is_picasso) 
 		{
@@ -1900,50 +1911,50 @@ static int graphics_subinit (void)
 	appw_init (W);
 	set_prWindowPtr (W);
 
-	Line = AllocVecTagList ((gfxvidinfo.width + 15) & ~15, tags_public );
-	if (!Line)
-	{
-		write_log ("Unable to allocate raster buffer.\n");
-		return 0;
-	}
-
-	if (comp_aga_RP.BitMap)
+	if (draw_aga_RP -> BitMap)
 	{
 		printf("BitMap was allocated with width %d\n",gfxvidinfo.width);
 
-		BitMap = AllocBitMap (gfxvidinfo.width, 1, 8, BMF_CLEAR | BMF_MINPLANES, comp_aga_RP.BitMap);
+		Line = AllocVecTagList ((gfxvidinfo.width + 15) & ~15, tags_public );
+		if (!Line)
+		{
+			write_log ("Unable to allocate raster buffer.\n");
+			return 0;
+		}
+
+		BitMap = AllocBitMap (gfxvidinfo.width, 1, 8, BMF_CLEAR | BMF_MINPLANES, draw_aga_RP -> BitMap);
 		if (!BitMap)
 		{
-			write_log ("Unable to allocate BitMap.\n");
+			printf ("Unable to allocate BitMap.\n");
 			return 0;
 		}
 
 		TempRPort = AllocVecTagList (sizeof (struct RastPort), tags_public );
 		if (!TempRPort)
 		{
-			write_log ("Unable to allocate RastPort.\n");
+			printf ("Unable to allocate RastPort.\n");
 			return 0;
 		}
 
-		CopyMem (&comp_aga_RP, TempRPort, sizeof (struct RastPort));
+		CopyMem (draw_aga_RP, TempRPort, sizeof (struct RastPort));
 		TempRPort->Layer  = NULL;
 		TempRPort->BitMap = BitMap;
 
 	}
 	else
 	{
-		write_log ("No aga bitmap.\n");
+		printf ("*** No aga bitmap. ***\n");
 		return 0;
 	}
 
 	if (usepub) set_title ();
 
-	bitdepth = RPDepth (&comp_aga_RP);
+	bitdepth = RPDepth (draw_aga_RP);
 	gfxvidinfo.emergmem = 0;
 	gfxvidinfo.linemem  = 0;
 
 
-	CybBuffer = setup_classic_buffer (&gfxvidinfo, &comp_aga_RP);
+	CybBuffer = setup_classic_buffer (&gfxvidinfo, draw_aga_RP);
 	if (!CybBuffer)
 	{
 
@@ -3047,7 +3058,7 @@ static LONG ObtainColor (ULONG r,ULONG g,ULONG b)
 		return i;
 	}
 
-	colors = is_halfbrite ? 32 : (1 << RPDepth (&comp_aga_RP));
+	colors = is_halfbrite ? 32 : (1 << RPDepth (draw_aga_RP));
 
 	// private screen => standard allocation //
 	if (!usepub)
