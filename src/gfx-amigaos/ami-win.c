@@ -105,6 +105,8 @@ int dx_blit_count;
 int dx_lock_count;
 int dx_pal_sync_count;
 
+void reset_count(void);
+
 void reset_count()
 {
 	dx_pal_count = 0;
@@ -140,6 +142,8 @@ void reset_p96_fn_pointers( void );
 
 void (*p96_conv_fn) (void *src, void *dest, int size) = NULL;
 
+#define conv_fn_cast void (*)(void *, void *, int)
+
 ULONG p96_output_bpr = 0;
 
 uint32 *vpal32 = NULL;
@@ -149,15 +153,19 @@ void (*set_palette_on_vbl_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
 
 void palette_notify(struct MyCLUTEntry *pal, uint32 num);
 void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num);
+void SetPalette_8bit_screen (int start, int count);
+
+void init_lookup_16bit_swap( void );
 
 void init_aga_comp( ULONG output_depth );
 
 void alloc_picasso_invalid_lines( void );
 void free_picasso_invalid_lines( void );
 
- void set_p96_func8( void );
- void set_p96_func16( void );
- void set_p96_func32( void );
+void set_p96_output_CLUT( void );
+void set_p96_output_R5G6B5( void );
+void set_p96_output_R5G6B5PC( void );
+void set_p96_output_A8R8G8B8( void );
 
  bool alloc_p96_draw_bitmap( int w, int h, int depth );
 
@@ -1374,18 +1382,18 @@ void set_p96_output_R5G6B5()
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 				set_palette_fn = palette_notify;
 				set_palette_on_vbl_fn = set_vpal_8bit_to_16bit_be_2pixels;
-				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; 
+				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_16bit_2pixels; 
 				break;
 
 		case 15:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
 				init_lookup_15bit_to_16bit_be();
-				p96_conv_fn = convert_16bit_lookup_to_16bit; break;
+				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; break;
 
 		case 16:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
 				p96_conv_fn = NULL; break;
 
 		case 32:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
-				p96_conv_fn = convert_32bit_to_16bit_be; break;
+				p96_conv_fn = (conv_fn_cast) convert_32bit_to_16bit_be; break;
 	}
 }
 
@@ -1399,15 +1407,15 @@ void set_p96_output_R5G6B5PC()
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 				set_palette_fn = palette_notify;
 				set_palette_on_vbl_fn = set_vpal_8bit_to_16bit_le_2pixels;
-				p96_conv_fn = convert_8bit_lookup_to_16bit_2pixels; 
+				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_16bit_2pixels; 
 				break;
 
 		case 16:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
 				init_lookup_16bit_swap();
-				p96_conv_fn = convert_16bit_lookup_to_16bit; break;
+				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; break;
 
 		case 32:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
-				p96_conv_fn = convert_32bit_to_16bit_le; break;
+				p96_conv_fn = (conv_fn_cast) convert_32bit_to_16bit_le; break;
 	}
 }
 
@@ -1422,13 +1430,13 @@ void set_p96_output_A8R8G8B8()
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 				set_palette_on_vbl_fn = set_vpal_8bit_to_32bit_be_2pixels;
 				set_palette_fn = palette_notify;
-				p96_conv_fn = convert_8bit_lookup_to_32bit_2pixels; 
+				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_32bit_2pixels; 
 				break;
 
 		case 16:	DRAW_FMT_SRC = PIXF_R5G5B5;
 //				init_lookup_15bit_to_16bit_le();
-//				p96_conv_fn = convert_16bit_lookup_to_16bit; 
-				p96_conv_fn = convert_15bit_to_32bit ; 
+//				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; 
+				p96_conv_fn = (conv_fn_cast) convert_15bit_to_32bit ; 
 				break;
 
 		case 32:	p96_conv_fn = NULL ; 
@@ -3255,7 +3263,7 @@ void p96_conv_all()
 	if (picasso_invalid_lines == NULL )
 		{ printf("unexpcted NULL on picasso_invalid_lines\n"); return; }
 
-	char *dest_tmp_buffer_ptr = alloca( (picasso_vidinfo.width & 7 ? picasso_vidinfo.width & ~7 + 8 : picasso_vidinfo.width ) * 4 );		// becouse output is needs more space.
+	char *dest_tmp_buffer_ptr = alloca( (picasso_vidinfo.width & 7 ? (picasso_vidinfo.width & ~7) + 8 : picasso_vidinfo.width ) * 4 );		// becouse output is needs more space.
 
 	if (dest_tmp_buffer_ptr == NULL)
 		{ printf("no dest_tmp_buffer\n"); return ; }
