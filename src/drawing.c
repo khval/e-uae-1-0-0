@@ -139,7 +139,13 @@ typedef void (*line_draw_func)(int, int);
 
 static char linestate[(MAXVPOS + 1) * 2 + 1];
 
+#define debug 0
+
+#if debug
+#define dprintf(fmt,...) printf(fmt,## __VA_ARGS__)
+#else
 #define dprintf(fmt,...)
+#endif
 
 uae_u8 line_data[(MAXVPOS + 1) * 2][MAX_PLANES * MAX_WORDS_PER_LINE * 2];
 
