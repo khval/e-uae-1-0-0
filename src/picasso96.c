@@ -522,25 +522,31 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 //		abort ();
 	}
 
-	while (height-- > 0) {
-	    int i;
-	    switch (psiz) {
-	    case 2:
-		for (i = 0; i < width; i++)
-		    *((uae_u16 *) dst + i) = picasso_vidinfo.clut[src[i]];
-		break;
-	    case 4:
-		for (i = 0; i < width; i++)
-		    *((uae_u32 *) dst + i) = picasso_vidinfo.clut[src[i]];
-		break;
-	    default:
-		abort ();
-	    }
-	    dst += picasso_vidinfo.rowbytes;
+		int i;
+		switch (psiz)
+		{
+			case 2:
+				while (height-- > 0) for (i = 0; i < width; i++)
+				{
+					*((uae_u16 *) dst + i) = picasso_vidinfo.clut[src[i]];
+	    				dst += picasso_vidinfo.rowbytes;
+				}
+				break;
+			case 4:
+				while (height-- > 0) for (i = 0; i < width; i++)
+				{
+					*((uae_u32 *) dst + i) = picasso_vidinfo.clut[src[i]];
+				    	dst += picasso_vidinfo.rowbytes;
+				}
+				break;
+			default:
+				gfx_unlock_picasso ();
+				return;
+		}
+	
 	}
-    }
   out:
-    gfx_unlock_picasso ();
+	gfx_unlock_picasso ();
 }
 
 /*
