@@ -483,44 +483,56 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 
     P96TRACE (("P96: WARNING - do_fillrect() using fall-back routine!\n"));
 
-    DX_Invalidate (y, y + height - 1);
-    if (!picasso_vidinfo.extra_mem)
-	return;
+	DX_Invalidate (y, y + height - 1);
 
-    width *= picasso96_state.BytesPerPixel;
-    dst = gfx_lock_picasso ();
-    if (!dst)
-	goto out;
+	if (!picasso_vidinfo.extra_mem) return;
 
-    dst += y * picasso_vidinfo.rowbytes + x * picasso_vidinfo.pixbytes;
-    if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat) {
-	if (Bpp == 1) {
-	    while (height-- > 0) {
-		memset (dst, pen, width);
-		dst += picasso_vidinfo.rowbytes;
-	    }
-	} else {
-	    if (Bpp == 4 && need_argb32_hack) {
-		while (height-- > 0) {
-		    memcpy_bswap32 (dst, src, width);
-		    dst += picasso_vidinfo.rowbytes;
-		}
-	    } else {
-		while (height-- > 0) {
-		    memcpy (dst, src, width);
-		    dst += picasso_vidinfo.rowbytes;
-		}
-	    }
-	}
-    } else {
-	int psiz = GetBytesPerPixel (picasso_vidinfo.rgbformat);
+	width *= picasso96_state.BytesPerPixel;
+	dst = gfx_lock_picasso ();
 
-	if (picasso96_state.RGBFormat != RGBFB_CHUNKY)
+	if (!dst) goto out;
+
+	dst += y * picasso_vidinfo.rowbytes + x * picasso_vidinfo.pixbytes;
+
+	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
 	{
-		gfx_unlock_picasso ();
-		return;
-//		abort ();
+		if (Bpp == 1)
+		{
+			while (height-- > 0)
+			{
+				memset (dst, pen, width);
+				dst += picasso_vidinfo.rowbytes;
+			}
+		}
+		else
+		{
+			if (Bpp == 4 && need_argb32_hack)
+			{
+				while (height-- > 0)
+				{
+					memcpy_bswap32 (dst, src, width);
+					dst += picasso_vidinfo.rowbytes;
+				}
+			}
+			else
+			{
+				while (height-- > 0)
+				{
+					memcpy (dst, src, width);
+					dst += picasso_vidinfo.rowbytes;
+				}
+			}
+		}
 	}
+	else
+	{
+		int psiz = GetBytesPerPixel (picasso_vidinfo.rgbformat);
+
+		if (picasso96_state.RGBFormat != RGBFB_CHUNKY)
+		{
+			gfx_unlock_picasso ();
+			return;
+		}
 
 		int i;
 		switch (psiz)
