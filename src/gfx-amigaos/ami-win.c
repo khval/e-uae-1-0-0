@@ -155,6 +155,8 @@ void palette_notify(struct MyCLUTEntry *pal, uint32 num);
 void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num);
 void SetPalette_8bit_screen (int start, int count);
 
+void init_lookup_15bit_to_16bit_le( void );
+void init_lookup_15bit_to_16bit_be( void );
 void init_lookup_16bit_swap( void );
 
 void init_aga_comp( ULONG output_depth );
@@ -3245,7 +3247,8 @@ void p96_conv_all()
 
 	APTR lock_src,lock_dest;
 	ULONG src_BytesPerRow,dest_BytesPerRow;
-	char *src_buffer_ptr, *dest_buffer_ptr;
+	uint8 *src_buffer_ptr;
+	char *dest_buffer_ptr;
 	int y;
 
 	if (conv_p96_RP.BitMap != draw_p96_RP -> BitMap)
@@ -3285,7 +3288,7 @@ void p96_conv_all()
 				IGraphics -> UnlockBitMap(lock_src);
 			}
 	
-			WritePixelArray (dest_tmp_buffer_ptr,
+			WritePixelArray( (void *) dest_tmp_buffer_ptr,
 				0, 0,
 				p96_output_bpr,
 				COMP_FMT_SRC,
