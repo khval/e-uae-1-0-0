@@ -549,18 +549,25 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 		switch (psiz)
 		{
 			case 2:
-				while (height-- > 0) for (i = 0; i < width; i++)
+				while (height-- > 0)
 				{
-					*((uae_u16 *) dst + i) = picasso_vidinfo.clut[src[i]];
-	    				dst += picasso_vidinfo.rowbytes;
+					for (i = 0; i < width; i++)				
+					{
+						*((uae_u16 *) dst + i) = picasso_vidinfo.clut[src[i]];
+					}
+		    			dst += picasso_vidinfo.rowbytes;					
 				}
 				break;
 			case 4:
-				while (height-- > 0) for (i = 0; i < width; i++)
+				while (height-- > 0)
 				{
-					*((uae_u32 *) dst + i) = picasso_vidinfo.clut[src[i]];
+					for (i = 0; i < width; i++)
+					{
+						*((uae_u32 *) dst + i) = picasso_vidinfo.clut[src[i]];
+					}
 				    	dst += picasso_vidinfo.rowbytes;
 				}
+	
 				break;
 			default:
 				gfx_unlock_picasso ();
