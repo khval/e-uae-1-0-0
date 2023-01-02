@@ -2863,7 +2863,7 @@ uae_u8 *gfx_lock_picasso (void)
 		if (p96_lock)
 		{
 			address += (p96_xoffset + p96_yoffset * picasso_vidinfo.rowbytes);
-
+/*
 			switch (format)
 			{
 				case PIXF_CLUT:
@@ -2871,7 +2871,6 @@ uae_u8 *gfx_lock_picasso (void)
 					break;
 
 				case PIXF_R5G5B5:
-//				case PIXF_R556B5PC:
 				case PIXF_R5G6B5:
 				case PIXF_R5G6B5PC:
 					picasso_vidinfo.rgbformat = format;
@@ -2881,6 +2880,7 @@ uae_u8 *gfx_lock_picasso (void)
 					picasso_vidinfo.rgbformat = 6;		// RGBFB_A8R8G8B8;
 					break;
 			}
+*/
 		}
 	}
 
@@ -2919,16 +2919,21 @@ static void set_window_for_picasso (void)
 
 void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 {
-	DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %d h: %d depth: %d rgbfmt: %d\n", w, h, depth, rgbfmt);
+//	DEBUG_LOG
+
+	printf ("Function: gfx_set_picasso_modeinfo w: %d h: %d depth: %d rgbfmt: %d\n", w, h, depth, rgbfmt);
 
 	switch (depth)
 	{
 		case 8:	picasso_vidinfo.pixbytes = 1;
+				picasso_vidinfo.rgbformat = RGBFB_CLUT;
 				break;
 		case 15:
 		case 16:	picasso_vidinfo.pixbytes = 2;
+				picasso_vidinfo.rgbformat = RGBFB_R5G5B5;
 				break;
 		case 32:	picasso_vidinfo.pixbytes = 4;
+				picasso_vidinfo.rgbformat = RGBFB_A8R8G8B8;
 				break;
 	}
 
@@ -2938,6 +2943,13 @@ void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 	picasso_vidinfo.rowbytes = w * picasso_vidinfo.pixbytes;	// maybe not correct, but its not insane.
 
 	if (screen_is_picasso) set_window_for_picasso();
+
+	picasso96_state.RGBFormat = picasso_vidinfo.rgbformat;
+
+	graphics_subshutdown ();
+	graphics_subinit ();
+
+	printf("DRAW_FMT_SRC: %d, COMP_FMT_SRC: %d\n", DRAW_FMT_SRC , COMP_FMT_SRC);
 }
 
 void gfx_set_picasso_state (int on)
@@ -2968,6 +2980,7 @@ void gfx_set_picasso_state (int on)
 		// Set height, width for Picasso gfx
 		current_width  = picasso_vidinfo.width;
 		current_height = picasso_vidinfo.height;
+
 		graphics_subinit ();
 	}
 	else
