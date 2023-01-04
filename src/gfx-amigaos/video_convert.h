@@ -9,6 +9,9 @@ const char *get_name_converter_fn_ptr( void *fn_ptr);
 
 void init_lookup_15bit_to_16bit_le( void );
 void init_lookup_15bit_to_16bit_be( void );
+void init_lookup_15bit_be_to_32bit_be( void );
+void init_lookup_16bit_be_to_32bit_le( void );
+void init_lookup_16bit_be_to_32bit_be( void  );
 
 void convert_15bit_to_16bit_le( uint16 *from, uint16 *to,int  pixels );
 void convert_32bit_to_16bit_le( uint32 *from, uint16 *to,int  pixels );

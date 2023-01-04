@@ -18,6 +18,10 @@ extern uint32 *vpal32;
 
 void init_lookup_15bit_to_16bit_le( void );
 void init_lookup_15bit_to_16bit_be( void );
+
+void init_lookup_16bit_to_32bit_le( void );
+void init_lookup_16bit_to_32bit_be( void );
+
 void set_vpal_8bit_to_16bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num1);
 void set_vpal_8bit_to_16bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1);
 void set_vpal_8bit_to_32bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num1);
@@ -130,15 +134,14 @@ void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1)
 	register unsigned int rgb;
 	// Convert palette to 32 bits virtual buffer.
 
+//	printf("set color %d, src %02x,%02x,%02x , dest: %08x \n", num1, pal[num1].Red, pal[num1].Green, pal[num1].Blue, _BE_ARGB( num1 ));
+
 	// pixel [0,256],[0..256]		// because color 0 is not always black... (we need to redo the first 256 colors also)
 
 	for (index=0;index<256*256;index++)
 	{
 		vpal32[index*2] =   _BE_ARGB( (index >> 8)  );  // ARGB
 		vpal32[index*2+1] =  _BE_ARGB( (index & 0xFF) ) ;  // ARGB
-
-//		vpal32[index*2] =   0xFFFF00FF;
-//		vpal32[index*2+1] =  _BE_ARGB( index ) ;  // ARGB
 	}
 }
 

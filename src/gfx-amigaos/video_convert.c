@@ -5,7 +5,9 @@
 #include <proto/dos.h>
 #include "video_convert.h"
 
-uint16 *lookup16bit = NULL;
+// uint16 *vpal16 = NULL;
+
+extern struct TagItem tags_public[] ;
 
 extern uint16 *vpal16;
 extern uint32 *vpal32;
@@ -20,7 +22,7 @@ struct video_convert_names vcn[] =	{
 	{"convert_32bit_to_16bit_be",(void *) convert_32bit_to_16bit_be},
 	{"convert_32bit_to_16bit_le",(void *) convert_32bit_to_16bit_le},
 	{"convert_8bit_lookup_to_32bit_2pixels",(void *) convert_8bit_lookup_to_32bit_2pixels},
-	{"convert_15bit_to_32bit",(void *) convert_15bit_to_32bit},
+//	{"convert_15bit_to_32bit",(void *) convert_15bit_to_32bit},
 	{"convert_16bit_to_32bit",(void *) convert_16bit_to_32bit},
 
 	{NULL,NULL}};
@@ -125,68 +127,52 @@ void convert_15bit_to_16bit_be(  uint16 *from, uint16 *to,int  pixels )
 	}
 }
 
-void init_lookup_16bit_swap(  )
-{
-	register unsigned int rgb;
-	register unsigned int rg;
-	register unsigned int b;
-
-	if (lookup16bit == NULL) lookup16bit = (uint16 *) malloc(65535 * sizeof(uint16));
-	if (lookup16bit == NULL) return;
-
-	for (rgb=0; rgb<65535;rgb++)
-	{
-		lookup16bit[rgb] = ((rgb & 0xFF00) >> 8)  | ((rgb & 0xFF) << 8);
-	}
-}
-
-void init_lookup_15bit_to_16bit_le(  )
-{
-	int n;
-	register unsigned int rgb;
-	register unsigned int rg;
-	register unsigned int b;
-
-	if (lookup16bit == NULL) lookup16bit = (uint16 *) malloc(65535 * sizeof(uint16));
-	if (lookup16bit == NULL) return;
-
-	for (n=0; n<65535;n++)
-	{
-		rg = (n & 0x007FE0) << 1;
-		b = (n & 0x00001F) ;
-		rgb =  (rg | b); 
-
-		lookup16bit[n] = ((rgb & 0xFF00) >> 8)  | ((rgb & 0xFF) << 8);
-	}
-}
-
-void init_lookup_15bit_to_16bit_be(  )
-{
-	int n;
-	register unsigned int rgb;
-	register unsigned int rg;
-	register unsigned int b;
-
-	if (lookup16bit == NULL) lookup16bit = (uint16 *) malloc(65535 * sizeof(uint16));
-	if (lookup16bit == NULL) return;
-
-	for (n=0; n<65535;n++)
-	{
-		rg = (n & 0x007FE0) << 1;
-		b = (n & 0x00001F) ;
-		lookup16bit[n] = (rg | b);
-	}
-}
-
 void convert_16bit_lookup_to_16bit(  uint16 *from, uint16 *to,int  pixels )
+{
+	register int n;
+
+	if (!vpal16)
+	{
+		DebugPrintF("vpal16 is NULL, can't convert!!\n");
+		return;
+	}
+
+	for (n=0; n<pixels;n++)
+	{
+		to[n] = vpal16[ from[n] ];
+	}
+}
+
+void convert_16bit_to_32bit(  uint16 *from, uint32 *to,int  pixels )
 {
 	register int n;
 
 	for (n=0; n<pixels;n++)
 	{
-		to[n] = lookup16bit[ from[n] ];
+		to[n] = vpal32[from[n]];
 	}
 }
+
+
+/*
+void convert_16bit_to_32bit( uint16 *from, uint32 *to,int  pixels )
+{
+	int n;
+	register unsigned int rgb;
+	register unsigned int r;
+	register unsigned int g;
+	register unsigned int b;
+
+	for (n=0; n<pixels;n++)
+	{
+		rgb = from[n];
+		r = (rgb & 0x00F800) << 8;
+		g = (rgb & 0x0007E0) << 5;
+		b = (rgb & 0x00001F) << 3;
+		to[n] = 0xFF000000 | r | g | b;
+	}
+}
+*/
 
 void convert_32bit_to_16bit_le( uint32 *from, uint16 *to,int  pixels )
 {
@@ -236,7 +222,7 @@ void convert_8bit_to_32bit(  char *from, uint32 *to,int  pixels )
 	}
 }
 
-void convert_15bit_to_32bit( uint16 *from, uint32 *to,int  pixels )
+void __convert_15bit_to_32bit( uint16 *from, uint32 *to,int  pixels )
 {
 	int n;
 	register unsigned int rgb;
@@ -254,22 +240,117 @@ void convert_15bit_to_32bit( uint16 *from, uint32 *to,int  pixels )
 	}
 }
 
-void convert_16bit_to_32bit( uint16 *from, uint32 *to,int  pixels )
+void init_lookup_16bit_swap(  )
+{
+	register unsigned int rgb;
+	register unsigned int rg;
+	register unsigned int b;
+
+	if (vpal16 == NULL) vpal16 = (uint16 *) AllocVecTagList(65535 * sizeof(uint16), tags_public);
+	if (vpal16 == NULL) return;
+
+	for (rgb=0; rgb<65535;rgb++)
+	{
+		vpal16[rgb] = ((rgb & 0xFF00) >> 8)  | ((rgb & 0xFF) << 8);
+	}
+}
+
+void init_lookup_15bit_to_16bit_le(  )
 {
 	int n;
 	register unsigned int rgb;
+	register unsigned int rg;
+	register unsigned int b;
+
+	if (vpal16) free(vpal16); 
+	vpal16 = (uint16 *) AllocVecTagList(65535 * sizeof(uint16), tags_public);
+	if (vpal16 == NULL) return;
+
+	for (n=0; n<65535;n++)
+	{
+		rg = (n & 0x007FE0) << 1;
+		b = (n & 0x00001F) ;
+		rgb =  (rg | b); 
+
+		vpal16[n] = ((rgb & 0xFF00) >> 8)  | ((rgb & 0xFF) << 8);
+	}
+}
+
+void init_lookup_15bit_to_16bit_be(  )
+{
+	int n;
+	register unsigned int rgb;
+	register unsigned int rg;
+	register unsigned int b;
+
+	if (vpal16) free(vpal16); 
+	vpal16 = (uint16 *) AllocVecTagList( 0x10000 * sizeof(uint16), tags_public);
+	if (vpal16 == NULL) return;
+
+	for (n=0; n<65535;n++)
+	{
+		rg = (n & 0x007FE0) << 1;
+		b = (n & 0x00001F) ;
+		vpal16[n] = (rg | b);
+	}
+}
+
+void init_lookup_15bit_be_to_32bit_be( void  )
+{
+	int n;
 	register unsigned int r;
 	register unsigned int g;
 	register unsigned int b;
 
-	for (n=0; n<pixels;n++)
+	if (vpal32) free(vpal32); 
+	vpal32 = AllocVecTagList(0x10000 * sizeof(uint32), tags_public);
+	if (vpal32 == NULL) return;
+
+	for (n=0; n<0x10000;n++)
 	{
-		rgb = from[n];
-		r = (rgb & 0x00F800) << 8;
-		g = (rgb & 0x0007E0) << 5;
-		b = (rgb & 0x00001F) << 3;
-		to[n] = 0xFF000000 | r | g | b;
+		r = ((n >> 10) & 0x1F)	 * 255 / 0x1F;
+		g = ((n >> 5) & 0x1F) * 255 / 0x1F;
+		b = (n & 0x1F) * 255 / 0x1F ;
+		vpal32[n] = 0xFF000000 | r << 16 | g << 8 | b;
 	}
 }
 
+void init_lookup_16bit_be_to_32bit_le( void )
+{
+	int n;
+	register unsigned int r;
+	register unsigned int g;
+	register unsigned int b;
+
+	if (vpal32) free(vpal32); 
+	vpal32 = AllocVecTagList( 0x10000 * sizeof(uint32), tags_public);
+	if (vpal32 == NULL) return;
+
+	for (n=0; n<0x10000;n++)
+	{
+		r = ((n >> (6+5)) & 0x1F)	 * 255 / 0x1F;
+		g = ((n >> 6) & 0x3F) * 255 / 0x3F;
+		b = (n & 0x1F) * 255 / 0x1F ;
+		vpal32[n] = b << 24 | g << 16 | r << 8 | 0xFF; 
+	}
+}
+
+void init_lookup_16bit_be_to_32bit_be(  )
+{
+	int n;
+	register unsigned int r;
+	register unsigned int g;
+	register unsigned int b;
+
+	if (vpal32 == NULL) vpal32 = AllocVecTagList( 0x10000 * sizeof(uint32), tags_public);
+	if (vpal32 == NULL) return;
+
+	for (n=0; n<0x10000;n++)
+	{
+		r = ((n >> (6+5)) & 0x1F)	 * 255 / 0x1F;
+		g = ((n >> 6) & 0x3F) * 255 / 0x3F;
+		b = (n & 0x1F) * 255 / 0x1F ;
+		vpal32[n] = 0xFF000000 | r << 16 | g << 8 | b; 
+	}
+}
 

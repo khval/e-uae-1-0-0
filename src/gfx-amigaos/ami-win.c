@@ -157,6 +157,9 @@ void SetPalette_8bit_screen (int start, int count);
 
 void init_lookup_15bit_to_16bit_le( void );
 void init_lookup_15bit_to_16bit_be( void );
+
+//void init_lookup_16bit_be_to_32bit_le( void );
+//void init_lookup_16bit_be_to_32bit_be( void  );
 void init_lookup_16bit_swap( void );
 
 void init_aga_comp( ULONG output_depth );
@@ -1379,24 +1382,32 @@ void set_p96_output_R5G6B5()
 {
 	p96_output_bpr = picasso_vidinfo.width * 2;
 
-	switch ( picasso_vidinfo.depth )
+	switch ( picasso_vidinfo.rgbformat )
 	{
-		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
+		case PIXF_CLUT:	DRAW_FMT_SRC = PIXF_CLUT;
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 				set_palette_fn = palette_notify;
 				set_palette_on_vbl_fn = set_vpal_8bit_to_16bit_be_2pixels;
 				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_16bit_2pixels; 
 				break;
 
-		case 15:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
+		case PIXF_R5G5B5:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
 				init_lookup_15bit_to_16bit_be();
-				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; break;
+				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit;
+				break;
 
-		case 16:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
-				p96_conv_fn = NULL; break;
+		case PIXF_R5G6B5:	DRAW_FMT_SRC = PIXF_R5G6B5;
+				p96_conv_fn = NULL; 
+				break;
 
-		case 32:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
-				p96_conv_fn = (conv_fn_cast) convert_32bit_to_16bit_be; break;
+		case PIXF_R5G6B5PC:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
+				init_lookup_16bit_swap();
+				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; 
+				break;
+
+		case PIXF_A8R8G8B8:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
+				p96_conv_fn = (conv_fn_cast) convert_32bit_to_16bit_be; 
+				break;
 	}
 }
 
@@ -1404,21 +1415,40 @@ void set_p96_output_R5G6B5PC()
 {
 	p96_output_bpr = picasso_vidinfo.width * 2;
 
-	switch ( picasso_vidinfo.depth )
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+
+	switch ( picasso_vidinfo.rgbformat )
 	{
-		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
+		case PIXF_CLUT:	DRAW_FMT_SRC = PIXF_CLUT;
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 				set_palette_fn = palette_notify;
 				set_palette_on_vbl_fn = set_vpal_8bit_to_16bit_le_2pixels;
 				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_16bit_2pixels; 
 				break;
 
-		case 16:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
-				init_lookup_16bit_swap();
-				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; break;
+		case PIXF_R5G5B5:	DRAW_FMT_SRC = PIXF_R5G5B5;
+				init_lookup_15bit_to_16bit_le();
+				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; 
 
-		case 32:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
-				p96_conv_fn = (conv_fn_cast) convert_32bit_to_16bit_le; break;
+				printf("*** this one is expected!! ***\n");
+		
+				break;
+
+		case PIXF_R5G6B5:	DRAW_FMT_SRC = PIXF_R5G6B5;
+				init_lookup_16bit_swap();
+				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit;
+
+				printf("*** this one is not expected!! ***\n");
+
+				break;
+
+		case PIXF_R5G6B5PC:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
+				p96_conv_fn = NULL;
+				break;
+
+		case PIXF_A8R8G8B8:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
+				p96_conv_fn = (conv_fn_cast) convert_32bit_to_16bit_le;
+				break;
 	}
 }
 
@@ -1427,22 +1457,40 @@ void set_p96_output_A8R8G8B8()
 {
 	p96_output_bpr = picasso_vidinfo.width * 4;
 
-	switch ( picasso_vidinfo.depth )
+	switch ( picasso_vidinfo.rgbformat )
 	{
-		case 8:	DRAW_FMT_SRC = PIXF_CLUT;
+		case PIXF_CLUT:	DRAW_FMT_SRC = PIXF_CLUT;
 				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
 				set_palette_on_vbl_fn = set_vpal_8bit_to_32bit_be_2pixels;
 				set_palette_fn = palette_notify;
 				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_32bit_2pixels; 
 				break;
 
-		case 16:	DRAW_FMT_SRC = PIXF_R5G5B5;
-//				init_lookup_15bit_to_16bit_le();
-//				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; 
-				p96_conv_fn = (conv_fn_cast) convert_15bit_to_32bit ; 
+		case PIXF_R5G5B5:	DRAW_FMT_SRC = PIXF_R5G5B5;
+						COMP_FMT_SRC = PIXF_A8R8G8B8;
+
+				init_lookup_15bit_be_to_32bit_be();
+				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit ; 
+
+				printf("*** this one is expected!! ***\n");
+
 				break;
 
-		case 32:	p96_conv_fn = NULL ; 
+		case PIXF_R5G6B5:	DRAW_FMT_SRC = PIXF_R5G6B5;
+				init_lookup_16bit_be_to_32bit_be();
+				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit; 
+
+				printf("*** this one is not expected!! ***\n");
+
+				break;
+
+/*		case PIXF_R5G6B5PC:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
+				init_lookup_16bit_le_to_32bit_be();
+				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit; 
+				break;*/
+
+		case PIXF_A8R8G8B8:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
+				p96_conv_fn = NULL ; 
 				break;
 	}
 }
@@ -1452,7 +1500,7 @@ void init_aga_comp( ULONG output_depth )
 	switch ( output_depth )
 	{
 		case 8:	COMP_FMT_SRC = PIXF_CLUT; break;
-		case 16:	COMP_FMT_SRC = PIXF_A8R8G8B8; break;
+		case 16:	COMP_FMT_SRC = PIXF_R5G6B5; break;
 		case 24:
 		case 32:	COMP_FMT_SRC = PIXF_A8R8G8B8; break;
 	}
@@ -1496,7 +1544,7 @@ void init_comp( struct Window *W )
 
 		if (screen_is_picasso) 
 		{
-			printf("output_depth: %d\n", output_depth);
+			printf("output_depth: %d output format: %d \n", output_depth, output_format);
 
 			COMP_FMT_SRC = output_format;
 
@@ -2684,7 +2732,6 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 	{
 		dstx += p96_xoffset;
 		dsty += p96_yoffset;
-
 		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,color);
 		p96_gfx_updated = true;
 		DX_Invalidate (dsty, dsty + height - 1);
@@ -2863,24 +2910,6 @@ uae_u8 *gfx_lock_picasso (void)
 		if (p96_lock)
 		{
 			address += (p96_xoffset + p96_yoffset * picasso_vidinfo.rowbytes);
-/*
-			switch (format)
-			{
-				case PIXF_CLUT:
-					picasso_vidinfo.rgbformat = RGBFB_CLUT;
-					break;
-
-				case PIXF_R5G5B5:
-				case PIXF_R5G6B5:
-				case PIXF_R5G6B5PC:
-					picasso_vidinfo.rgbformat = format;
-					break;
-
-				case PIXF_A8R8G8B8:
-					picasso_vidinfo.rgbformat = 6;		// RGBFB_A8R8G8B8;
-					break;
-			}
-*/
 		}
 	}
 
@@ -2948,8 +2977,6 @@ void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 
 	graphics_subshutdown ();
 	graphics_subinit ();
-
-	printf("DRAW_FMT_SRC: %d, COMP_FMT_SRC: %d\n", DRAW_FMT_SRC , COMP_FMT_SRC);
 }
 
 void gfx_set_picasso_state (int on)
@@ -3343,6 +3370,16 @@ int is_vsync (void)
 	gettimeofday(&t1,NULL);
 #endif
 
+/*
+	printf("DRAW_FMT_SRC: %d:%d, COMP_FMT_SRC: %d\n", 
+			DRAW_FMT_SRC ,
+			draw_p96_RP ?
+				draw_p96_RP -> BitMap ? 
+					GetBitMapAttr( draw_p96_RP -> BitMap, BMA_PIXELFORMAT ) 
+					: 0
+			: 0,
+ 			COMP_FMT_SRC);
+*/
 	if (W)
 	{
 		if ((screen_is_picasso) && (comp_p96_RP.BitMap))
