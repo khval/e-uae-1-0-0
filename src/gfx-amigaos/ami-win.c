@@ -3364,7 +3364,7 @@ void p96_conv_all()
 
 #if pickmode == 1
 // custom conversion.
-// 800x600 15bit to 32bit = 8800 ms.
+// 800x600 15bit to 32bit = 8.800 ms.
 
 			src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;
 			src_BytesPerRow = draw_p96_RP -> BitMap -> BytesPerRow;
@@ -3382,13 +3382,12 @@ void p96_conv_all()
 
 #if pickmode == 2
 // no custom conversion.
-// 800x600 15bit ti 32bit = 24500 ms. (slower)
+// 800x600 15bit ti 32bit = 17.200 ms. (slower)
 
 			src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;
 			src_BytesPerRow = draw_p96_RP -> BitMap -> BytesPerRow;
-			memcpy(dest_tmp_buffer_ptr, src_buffer_ptr + y*src_BytesPerRow, src_BytesPerRow);
 
-			WritePixelArray( (void *) dest_tmp_buffer_ptr,
+			WritePixelArray( (void *) (src_buffer_ptr + y*src_BytesPerRow),
 				0, 0,
 				src_BytesPerRow,
 				DRAW_FMT_SRC,
@@ -3469,10 +3468,10 @@ int is_vsync (void)
 
 #if debug_vsync_time
 	gettimeofday(&t2, NULL);
-	deltaTime = (t2.tv_sec - t1.tv_sec) * 1000.0f;
-	deltaTime += (t2.tv_usec - t1.tv_usec);
+	deltaTime = (t2.tv_sec - t1.tv_sec) * 1000.0f;		// s to ms
+	deltaTime += (t2.tv_usec - t1.tv_usec) / 1000.0f;	// us to ms
 
-	if (deltaTime>20)
+	if (deltaTime>5.0f)		// 5 ms long delays...
 	{
 		if (every++ % 30 == 0)		// report high deleys every now and then.
 		{
