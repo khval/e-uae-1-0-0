@@ -1472,25 +1472,53 @@ void set_p96_output_A8R8G8B8()
 
 				init_lookup_15bit_be_to_32bit_be();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit ; 
-
-				printf("*** this one is expected!! ***\n");
-
 				break;
 
 		case PIXF_R5G6B5:	DRAW_FMT_SRC = PIXF_R5G6B5;
 				init_lookup_16bit_be_to_32bit_be();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit; 
-
-				printf("*** this one is not expected!! ***\n");
-
 				break;
 
-/*		case PIXF_R5G6B5PC:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
-				init_lookup_16bit_le_to_32bit_be();
+		case PIXF_A8R8G8B8:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
+				p96_conv_fn = NULL ; 
+				break;
+
+		case PIXF_B8G8R8A8:	DRAW_FMT_SRC = PIXF_B8G8R8A8;
+				p96_conv_fn = (conv_fn_cast) convert_32bit_swap; 
+				break;
+	}
+}
+
+void set_p96_output_B8G8R8A8()
+{
+	p96_output_bpr = picasso_vidinfo.width * 4;
+
+	switch ( picasso_vidinfo.rgbformat )
+	{
+		case PIXF_CLUT:	DRAW_FMT_SRC = PIXF_CLUT;
+				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256, tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+				set_palette_on_vbl_fn = set_vpal_8bit_to_32bit_le_2pixels;
+				set_palette_fn = palette_notify;
+				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_32bit_2pixels; 
+				break;
+
+		case PIXF_R5G5B5:	DRAW_FMT_SRC = PIXF_R5G5B5;
+						COMP_FMT_SRC = PIXF_B8G8R8A8;
+
+				init_lookup_15bit_be_to_32bit_le();
+				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit ; 
+				break;
+
+		case PIXF_R5G6B5:	DRAW_FMT_SRC = PIXF_R5G6B5;
+				init_lookup_16bit_be_to_32bit_le();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit; 
-				break;*/
+				break;
 
 		case PIXF_A8R8G8B8:	DRAW_FMT_SRC = PIXF_A8R8G8B8;
+				p96_conv_fn = (conv_fn_cast) convert_32bit_swap; 
+				break;
+
+		case PIXF_B8G8R8A8:	DRAW_FMT_SRC = PIXF_B8G8R8A8;
 				p96_conv_fn = NULL ; 
 				break;
 	}
@@ -1554,7 +1582,7 @@ void init_comp( struct Window *W )
 				case PIXF_CLUT: set_p96_output_CLUT(); break;
 				case PIXF_R5G6B5PC: set_p96_output_R5G6B5PC(); break;
 				case PIXF_R5G6B5: set_p96_output_R5G6B5(); break;
-				case PIXF_B8G8R8A8:
+				case PIXF_B8G8R8A8:set_p96_output_B8G8R8A8(); break;
 				case PIXF_A8R8G8B8: set_p96_output_A8R8G8B8(); break;
 			}
 
@@ -3376,7 +3404,7 @@ void p96_conv_all()
 #endif
 }
 
-#define debug_vsync_time 1
+#define debug_vsync_time 0
 
 #if debug_vsync_time
 int every = 0;
