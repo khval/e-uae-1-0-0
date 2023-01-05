@@ -308,7 +308,7 @@ void init_lookup_15bit_be_to_32bit_be( void  )
 
 	for (n=0; n<0x10000;n++)
 	{
-		r = ((n >> 10) & 0x1F)	 * 255 / 0x1F;
+		r = ((n >> 10) & 0x1F) * 255 / 0x1F;		// etch channel is 5 bits, two channels shifted out.
 		g = ((n >> 5) & 0x1F) * 255 / 0x1F;
 		b = (n & 0x1F) * 255 / 0x1F ;
 		vpal32[n] = 0xFF000000 | r << 16 | g << 8 | b;
@@ -328,8 +328,8 @@ void init_lookup_16bit_be_to_32bit_le( void )
 
 	for (n=0; n<0x10000;n++)
 	{
-		r = ((n >> (6+5)) & 0x1F)	 * 255 / 0x1F;
-		g = ((n >> 6) & 0x3F) * 255 / 0x3F;
+		r = ((n >> 11) & 0x1F) * 255 / 0x1F;
+		g = ((n >> 5) & 0x3F) * 255 / 0x3F;
 		b = (n & 0x1F) * 255 / 0x1F ;
 		vpal32[n] = b << 24 | g << 16 | r << 8 | 0xFF; 
 	}
@@ -347,8 +347,8 @@ void init_lookup_16bit_be_to_32bit_be(  )
 
 	for (n=0; n<0x10000;n++)
 	{
-		r = ((n >> (6+5)) & 0x1F)	 * 255 / 0x1F;
-		g = ((n >> 6) & 0x3F) * 255 / 0x3F;
+		r = ((n >> 11) & 0x1F) * 255 / 0x1F;		// right shift green and blue
+		g = ((n >> 5) & 0x3F) * 255 / 0x3F;		// right shift blue.
 		b = (n & 0x1F) * 255 / 0x1F ;
 		vpal32[n] = 0xFF000000 | r << 16 | g << 8 | b; 
 	}
