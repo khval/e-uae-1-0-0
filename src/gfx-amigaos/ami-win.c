@@ -1318,6 +1318,7 @@ bool alloc_p96_draw_bitmap( int w, int h, int depth )
 	conv_p96_RP.BitMap = AllocBitMapTags( w, h+1, depth, 
 			BMATags_PixelFormat, DRAW_FMT_SRC,
 			BMATags_Displayable, FALSE,
+			BMATags_UserPrivate, TRUE,
 			BMATags_Alignment, 4,
 			TAG_END);
 
@@ -3331,16 +3332,15 @@ void p96_conv_all()
 		{
 //			picasso_invalid_lines[y] = 0;
 
-			lock_src = IGraphics -> LockBitMapTags(draw_p96_RP -> BitMap,
-					LBM_BaseAddress, (APTR *) &src_buffer_ptr,
-					LBM_BytesPerRow, &src_BytesPerRow,
-					TAG_END	);
+#define pickmode 1
 
-			if (lock_src)
-			{
-				if (src_buffer_ptr) p96_conv_fn( src_buffer_ptr + y*src_BytesPerRow, dest_tmp_buffer_ptr, picasso_vidinfo.width );
-				IGraphics -> UnlockBitMap(lock_src);
-			}
+#if pickmode == 1
+// custom conversion.
+// 800x600 15bit to 32bit = 8800 ms.
+
+			src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;
+			src_BytesPerRow = draw_p96_RP -> BitMap -> BytesPerRow;
+			if (src_buffer_ptr) p96_conv_fn( src_buffer_ptr + y*src_BytesPerRow, dest_tmp_buffer_ptr, picasso_vidinfo.width );
 	
 			WritePixelArray( (void *) dest_tmp_buffer_ptr,
 				0, 0,
@@ -3349,13 +3349,34 @@ void p96_conv_all()
 				&comp_p96_RP,
 				0, y,
 				picasso_vidinfo.width, 1 );
+
+#endif
+
+#if pickmode == 2
+// no custom conversion.
+// 800x600 15bit ti 32bit = 24500 ms. (slower)
+
+			src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;
+			src_BytesPerRow = draw_p96_RP -> BitMap -> BytesPerRow;
+			memcpy(dest_tmp_buffer_ptr, src_buffer_ptr + y*src_BytesPerRow, src_BytesPerRow);
+
+			WritePixelArray( (void *) dest_tmp_buffer_ptr,
+				0, 0,
+				src_BytesPerRow,
+				DRAW_FMT_SRC,
+				&comp_p96_RP,
+				0, y,
+				picasso_vidinfo.width, 1 );
+#endif
+
+
 		}
 	}
 
 #endif
 }
 
-#define debug_vsync_time 0
+#define debug_vsync_time 1
 
 #if debug_vsync_time
 int every = 0;
