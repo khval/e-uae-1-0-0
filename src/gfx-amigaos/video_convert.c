@@ -246,10 +246,10 @@ void init_lookup_16bit_swap(  )
 	register unsigned int rg;
 	register unsigned int b;
 
-	if (vpal16 == NULL) vpal16 = (uint16 *) AllocVecTagList(65535 * sizeof(uint16), tags_public);
+	if (vpal16 == NULL) vpal16 = (uint16 *) AllocVecTagList(0x10000 * sizeof(uint16), tags_public);
 	if (vpal16 == NULL) return;
 
-	for (rgb=0; rgb<65535;rgb++)
+	for (rgb=0; rgb<0x10000;rgb++)
 	{
 		vpal16[rgb] = ((rgb & 0xFF00) >> 8)  | ((rgb & 0xFF) << 8);
 	}
@@ -263,10 +263,10 @@ void init_lookup_15bit_to_16bit_le(  )
 	register unsigned int b;
 
 	if (vpal16) free(vpal16); 
-	vpal16 = (uint16 *) AllocVecTagList(65535 * sizeof(uint16), tags_public);
+	vpal16 = (uint16 *) AllocVecTagList(0x10000 * sizeof(uint16), tags_public);
 	if (vpal16 == NULL) return;
 
-	for (n=0; n<65535;n++)
+	for (n=0; n<0x10000;n++)
 	{
 		rg = (n & 0x007FE0) << 1;
 		b = (n & 0x00001F) ;
