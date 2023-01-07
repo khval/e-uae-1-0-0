@@ -90,6 +90,8 @@ extern struct GraphicsIFace *IGraphics;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
+ULONG CFG_16bit_mode,CFG_32bit_mode;
+
 struct 
 {
 	int x,y;
@@ -2905,28 +2907,22 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
 
     DEBUG_LOG ("Function: DX_FillResolutions\n");
 
-//	if (bit_unit == 16)
-//		picasso_vidinfo.rgbformat = RGBFB_R5G6B5;
-//	else
-//		picasso_vidinfo.rgbformat = RGBFB_A8R8G8B8;
-//	*ppixel_format = 1 << picasso_vidinfo.rgbformat;
+//	CFG_16bit_mode = RGBFB_R5G5B5;
+	CFG_16bit_mode = RGBFB_R5G6B5;
+//	CFG_16bit_mode = RGBFB_R5G6B5PC;
 
+	CFG_32bit_mode = RGBFB_A8R8G8B8;
+//	CFG_32bit_mode = RGBFB_B8G8R8A8;
 
-	*ppixel_format =0;
-
-	*ppixel_format |= 1 << RGBFB_R5G5B5;
-//	*ppixel_format |= 1 << RGBFB_R5G5B5PC;
-//	*ppixel_format |= 1 << RGBFB_R5G6B5;
-//	*ppixel_format |= 1 << RGBFB_R5G6B5PC;
-	*ppixel_format |= 1 << RGBFB_A8R8G8B8;
-	*ppixel_format |= RGBFF_CHUNKY;
-
+	*ppixel_format =RGBFF_CHUNKY;
+	*ppixel_format |= 1 << CFG_16bit_mode;
+	*ppixel_format |= 1 << CFG_32bit_mode;
 
     /* Check list of standard P96 screenmodes */
 
-	add_native_modes( 32, &count );
-	add_native_modes( 16, &count );
 	add_native_modes( 8, &count );
+	add_native_modes( 16, &count );
+	add_native_modes( 32, &count );
 
 	return count;
 }
@@ -3008,16 +3004,17 @@ void update_p96_format()
 		case 8:	picasso_vidinfo.pixbytes = 1;
 				picasso_vidinfo.rgbformat = RGBFB_CLUT;
 				break;
-		case 15:
+
 		case 16:	picasso_vidinfo.pixbytes = 2;
-				picasso_vidinfo.rgbformat = RGBFB_R5G5B5;
+				picasso_vidinfo.rgbformat = CFG_16bit_mode;
 				break;
+
 		case 32:	picasso_vidinfo.pixbytes = 4;
-				picasso_vidinfo.rgbformat = RGBFB_A8R8G8B8;
+				picasso_vidinfo.rgbformat = CFG_32bit_mode;
 				break;
 	}
 
-	picasso_vidinfo.rowbytes = picasso_vidinfo.width * picasso_vidinfo.pixbytes;	// maybe not correct, but its not insane.
+	picasso_vidinfo.rowbytes = picasso_vidinfo.width * picasso_vidinfo.pixbytes;
 }
 
 void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)		// called from picasso96.c
