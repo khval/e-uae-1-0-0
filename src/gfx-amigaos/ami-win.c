@@ -1467,15 +1467,24 @@ void set_p96_output_A8R8G8B8()
 				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_32bit_2pixels; 
 				break;
 
-		case PIXF_R5G5B5:	DRAW_FMT_SRC = PIXF_R5G5B5;
-						COMP_FMT_SRC = PIXF_A8R8G8B8;
-
+		case PIXF_R5G5B5:
+				DRAW_FMT_SRC = PIXF_R5G5B5;
+				COMP_FMT_SRC = PIXF_A8R8G8B8;
 				init_lookup_15bit_be_to_32bit_be();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit ; 
 				break;
 
-		case PIXF_R5G6B5:	DRAW_FMT_SRC = PIXF_R5G6B5;
+		case PIXF_R5G6B5:
+				DRAW_FMT_SRC = PIXF_R5G6B5;
+				COMP_FMT_SRC = PIXF_A8R8G8B8;
 				init_lookup_16bit_be_to_32bit_be();
+				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit; 
+				break;
+
+		case PIXF_R5G6B5PC:	
+				DRAW_FMT_SRC = PIXF_R5G6B5PC;
+				COMP_FMT_SRC = PIXF_A8R8G8B8;
+				init_lookup_16bit_le_to_32bit_be();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit; 
 				break;
 
@@ -1510,6 +1519,8 @@ void set_p96_output_B8G8R8A8()
 				break;
 
 		case PIXF_R5G6B5:	DRAW_FMT_SRC = PIXF_R5G6B5;
+						COMP_FMT_SRC = PIXF_B8G8R8A8;
+
 				init_lookup_16bit_be_to_32bit_le();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_to_32bit; 
 				break;

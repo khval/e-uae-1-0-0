@@ -352,6 +352,27 @@ void init_lookup_15bit_be_to_32bit_be( void  )
 	}
 }
 
+void init_lookup_16bit_le_to_32bit_le( void )
+{
+	int n, rev;
+	register unsigned int r;
+	register unsigned int g;
+	register unsigned int b;
+
+	if (vpal32) free(vpal32); 
+	vpal32 = AllocVecTagList( 0x10000 * sizeof(uint32), tags_public);
+	if (vpal32 == NULL) return;
+
+	for (n=0; n<0x10000;n++)
+	{
+		rev = (n << 8) | (n >> 8);
+		r = ((rev >> 11) & 0x1F) * 255 / 0x1F;
+		g = ((rev >> 5) & 0x3F) * 255 / 0x3F;
+		b = (rev & 0x1F) * 255 / 0x1F ;
+		vpal32[n] = b << 24 | g << 16 | r << 8 | 0xFF; 
+	}
+}
+
 void init_lookup_16bit_be_to_32bit_le( void )
 {
 	int n;
@@ -369,6 +390,26 @@ void init_lookup_16bit_be_to_32bit_le( void )
 		g = ((n >> 5) & 0x3F) * 255 / 0x3F;
 		b = (n & 0x1F) * 255 / 0x1F ;
 		vpal32[n] = b << 24 | g << 16 | r << 8 | 0xFF; 
+	}
+}
+
+void init_lookup_16bit_le_to_32bit_be(  )
+{
+	int n, rev;
+	register unsigned int r;
+	register unsigned int g;
+	register unsigned int b;
+
+	if (vpal32 == NULL) vpal32 = AllocVecTagList( 0x10000 * sizeof(uint32), tags_public);
+	if (vpal32 == NULL) return;
+
+	for (n=0; n<0x10000;n++)
+	{
+		rev = (n << 8) | (n >> 8);
+		r = ((rev >> 11) & 0x1F) * 255 / 0x1F;		// right shift green and blue
+		g = ((rev >> 5) & 0x3F) * 255 / 0x3F;		// right shift blue.
+		b = (rev & 0x1F) * 255 / 0x1F ;
+		vpal32[n] = 0xFF000000 | r << 16 | g << 8 | b; 
 	}
 }
 
@@ -390,4 +431,3 @@ void init_lookup_16bit_be_to_32bit_be(  )
 		vpal32[n] = 0xFF000000 | r << 16 | g << 8 | b; 
 	}
 }
-
