@@ -2818,7 +2818,10 @@ void SetPalette_8bit_screen (int start, int count)
 
 void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num)
 {
-	SetPalette_8bit_screen(0, 256);
+	if (W -> BorderTop == 0)
+	{
+		SetPalette_8bit_screen(0, 256);
+	}
 }
 
 void DX_SetPalette (int start, int count)
@@ -2836,7 +2839,7 @@ void DX_SetPalette (int start, int count)
 		int n;
 		for (n = start ; n<(start+count); n++ ) set_palette_fn( picasso96_state.CLUT, n );
 	}
-	else if (S)
+	else if ((S)&&(W -> BorderTop == 0))
 	{
 		printf("using LoadRGB32 to set colors\n");
 		SetPalette_8bit_screen(start, count);
