@@ -517,21 +517,10 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 		}
 		else
 		{
-			if (Bpp == 4 && need_argb32_hack)
+			while (height-- > 0)
 			{
-				while (height-- > 0)
-				{
-					memcpy_bswap32 (dst, src, width);
-					dst += picasso_vidinfo.rowbytes;
-				}
-			}
-			else
-			{
-				while (height-- > 0)
-				{
-					memcpy (dst, src, width);
-					dst += picasso_vidinfo.rowbytes;
-				}
+				memcpy (dst, src, width);
+				dst += picasso_vidinfo.rowbytes;
 			}
 		}
 	}
@@ -558,6 +547,7 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 		    			dst += picasso_vidinfo.rowbytes;					
 				}
 				break;
+
 			case 4:
 				while (height-- > 0)
 				{
@@ -567,8 +557,8 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 					}
 				    	dst += picasso_vidinfo.rowbytes;
 				}
-	
 				break;
+
 			default:
 				gfx_unlock_picasso ();
 				return;
