@@ -458,7 +458,7 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 {
     uae_u8 *dst;
 
-    P96TRACE (("P96: do_fillrect (src:%08x x:%d y:%d w:%d h%d pen:%08x)\n",
+    P96TRACE(("P96: do_fillrect (src:%08x x:%d y:%d w:%d h:%d pen:%08x)\n",
 	       src, x, y, width, height, pen));
 
     /* Try OS specific fillrect function here; and return if successful. Make
@@ -467,6 +467,8 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 
 	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
 	{
+		unsigned int argb = pen;
+
 		switch (picasso_vidinfo.rgbformat)
 		{
 			case RGBFB_R5G5B5:
@@ -475,16 +477,38 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 					r = (((pen  >> 10) & 0x1F) *255) / 0x1F;
 					g = (((pen >> 5) & 0x1F) * 255) / 0x1F;
 					b = ((pen & 0x1F) * 255) / 0x1F;
-					pen = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
+					argb = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
+				}
+				break;
+
+			case RGBFB_R5G6B5:
+				{
+					int r,g,b;
+					r = (((pen  >> 11) & 0x1F) *255) / 0x1F;
+					g = (((pen >> 5) & 0x3F) * 255) / 0x3F;
+					b = ((pen & 0x1F) * 255) / 0x1F;
+					argb = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
+				}
+				break;
+
+			case RGBFB_R5G6B5PC:
+				{
+					int rev;
+					int r,g,b;
+					rev = (pen << 8)  | (pen >> 8);
+					r = (((rev  >> 11) & 0x1F) *255) / 0x1F;
+					g = (((rev >> 5) & 0x3F) * 255) / 0x3F;
+					b = ((rev & 0x1F) * 255) / 0x1F;
+					argb = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
 				}
 				break;
 
 			case RGBFB_B8G8R8A8:
-				pen = bswap_32 (pen);
+				argb = bswap_32 (pen);
 				break;
 		}
 
-		if (DX_Fill (x, y, width, height, pen, rgbtype)) return;
+		if (DX_Fill (x, y, width, height, argb, rgbtype)) return;
 	}
 	else
 	{
@@ -3104,36 +3128,47 @@ void InitPicasso96 (void)
 	}
 #endif
 
-	for (i = 0; i < mode_count; i++) {
-	    sprintf (DisplayModes[i].name, "%dx%d, %d-bit, %d Hz",
+	for (i = 0; i < mode_count; i++)
+	{
+		sprintf (DisplayModes[i].name, "%dx%d, %d-bit, %d Hz",
 		     DisplayModes[i].res.width, DisplayModes[i].res.height,
 		     DisplayModes[i].depth * 8, DisplayModes[i].refresh);
-	    switch (DisplayModes[i].depth) {
-	    case 1:
-		if (DisplayModes[i].res.width > chunky.width)
-		    chunky.width = DisplayModes[i].res.width;
-		if (DisplayModes[i].res.height > chunky.height)
-		    chunky.height = DisplayModes[i].res.height;
-		break;
-	    case 2:
-		if (DisplayModes[i].res.width > hicolour.width)
-		    hicolour.width = DisplayModes[i].res.width;
-		if (DisplayModes[i].res.height > hicolour.height)
-		    hicolour.height = DisplayModes[i].res.height;
-		break;
-	    case 3:
-		if (DisplayModes[i].res.width > truecolour.width)
-		    truecolour.width = DisplayModes[i].res.width;
-		if (DisplayModes[i].res.height > truecolour.height)
-		    truecolour.height = DisplayModes[i].res.height;
-		break;
-	    case 4:
-		if (DisplayModes[i].res.width > alphacolour.width)
-		    alphacolour.width = DisplayModes[i].res.width;
-		if (DisplayModes[i].res.height > alphacolour.height)
-		    alphacolour.height = DisplayModes[i].res.height;
-		break;
-	    }
+
+		switch (DisplayModes[i].depth)
+		{
+			case 1:
+				if (DisplayModes[i].res.width > chunky.width)
+				    chunky.width = DisplayModes[i].res.width;
+				if (DisplayModes[i].res.height > chunky.height)
+				    chunky.height = DisplayModes[i].res.height;
+				break;
+
+			case 2:
+				if (DisplayModes[i].res.width > hicolour.width)
+				    hicolour.width = DisplayModes[i].res.width;
+				if (DisplayModes[i].res.height > hicolour.height)
+				    hicolour.height = DisplayModes[i].res.height;
+				break;
+
+			case 3:
+
+				if (DisplayModes[i].res.width > truecolour.width)
+					truecolour.width = DisplayModes[i].res.width;
+				if (DisplayModes[i].res.height > truecolour.height)
+					truecolour.height = DisplayModes[i].res.height;
+					break;
+			case 4:
+
+				if (DisplayModes[i].res.width > alphacolour.width)
+					alphacolour.width = DisplayModes[i].res.width;
+				if (DisplayModes[i].res.height > alphacolour.height)
+					alphacolour.height = DisplayModes[i].res.height;
+				break;
+
+			default:
+
+				printf("unexpected depth :-(\n");
+		}
 	}
 	ShowSupportedResolutions ();
 
