@@ -117,7 +117,7 @@ void reset_count()
 }
 
 int screen_is_picasso = 0;
-static int screen_was_picasso;
+static int screen_was_picasso = 0;
 static char *picasso_invalid_lines = NULL;
 static int picasso_has_invalid_lines;
 static int picasso_invalid_start, picasso_invalid_stop;
@@ -126,7 +126,7 @@ static int mode_count;
 extern struct picasso_vidbuf_description picasso_vidinfo;
 
 static int bitdepth;
-static int current_width, current_height;
+static int current_width, current_height, current_depth;
 
 static int red_bits, green_bits, blue_bits;
 static int red_shift, green_shift, blue_shift;
@@ -1613,8 +1613,6 @@ void init_comp( struct Window *W )
 			p96_palette_updated = true;
 		}
 
-		printf("picasso_vidinfo.rgbformat: %08x\n", picasso_vidinfo.rgbformat);
-
 		if (W->BorderTop == 0) 	// in fullscreen mode.
 		{
 			if (output_depth == 8) // if the screen is 8bit!		
@@ -2966,25 +2964,35 @@ static void set_window_for_picasso (void)
 {
 	DEBUG_LOG ("Function: set_window_for_picasso\n");
 
-	if (screen_was_picasso && current_width == picasso_vidinfo.width && current_height == picasso_vidinfo.height)
+ //	if (screen_was_picasso) return;
+
+	if (current_width == picasso_vidinfo.width 
+		&& current_height == picasso_vidinfo.height
+		&& current_depth == picasso_vidinfo.depth)
 		return;
+
+
+	printf("---------------------------------------\n");
+	printf("current_width %d,  current_height %d, current_depth %d \n",current_width,current_height,current_depth);
+	printf("new_width %d,  new_height %d, new_depth %d \n",picasso_vidinfo.width,picasso_vidinfo.height,picasso_vidinfo.depth);
+	printf("----------------------------------------\n");
+
 
 	p96_xoffset = 0;
 	p96_yoffset = 0;
-	screen_was_picasso = 1;
+	
+	picasso96_state.RGBFormat = picasso_vidinfo.rgbformat;
+
 	graphics_subshutdown();
-	current_width  = picasso_vidinfo.width;
+	current_width = picasso_vidinfo.width;
 	current_height = picasso_vidinfo.height;
+	current_depth = picasso_vidinfo.depth;
 	graphics_subinit();
 }
 
-void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
+void update_p96_format()
 {
-//	DEBUG_LOG
-
-	printf ("Function: gfx_set_picasso_modeinfo w: %d h: %d depth: %d rgbfmt: %d\n", w, h, depth, rgbfmt);
-
-	switch (depth)
+	switch (picasso_vidinfo.depth)
 	{
 		case 8:	picasso_vidinfo.pixbytes = 1;
 				picasso_vidinfo.rgbformat = RGBFB_CLUT;
@@ -2998,22 +3006,24 @@ void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)
 				break;
 	}
 
+	picasso_vidinfo.rowbytes = picasso_vidinfo.width * picasso_vidinfo.pixbytes;	// maybe not correct, but its not insane.
+}
+
+void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)		// called from picasso96.c
+{
+	DEBUG_LOG ("Function: gfx_set_picasso_modeinfo w: %d h: %d depth: %d rgbfmt: %d\n", w, h, depth, rgbfmt);
+
 	picasso_vidinfo.width = w;
 	picasso_vidinfo.height = h;
 	picasso_vidinfo.depth = depth;
-	picasso_vidinfo.rowbytes = w * picasso_vidinfo.pixbytes;	// maybe not correct, but its not insane.
 
-	if (screen_is_picasso) set_window_for_picasso();
+	update_p96_format();
+	set_window_for_picasso();
 
-	picasso96_state.RGBFormat = picasso_vidinfo.rgbformat;
-
-	graphics_subshutdown ();
-	graphics_subinit ();
 }
 
 void gfx_set_picasso_state (int on)
 {
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
 	DEBUG_LOG ("Function: gfx_set_picasso_state: %d\n", on);
 
 	if (on == screen_is_picasso)
@@ -3039,7 +3049,7 @@ void gfx_set_picasso_state (int on)
 		// Set height, width for Picasso gfx
 		current_width  = picasso_vidinfo.width;
 		current_height = picasso_vidinfo.height;
-
+		current_depth = picasso_vidinfo.depth;
 		graphics_subinit ();
 	}
 	else
@@ -3047,6 +3057,7 @@ void gfx_set_picasso_state (int on)
 		// Set height, width for Amiga gfx
 		current_width  = gfxvidinfo.width;
 		current_height = gfxvidinfo.height;
+		current_depth = 0;
 		graphics_subinit ();
 	}
 
@@ -3335,6 +3346,7 @@ void p96_conv_all()
 	ULONG src_BytesPerRow,dest_BytesPerRow;
 	uint8 *src_buffer_ptr;
 	char *dest_buffer_ptr;
+	char *dest_tmp_buffer_ptr;
 	int y;
 
 	if (conv_p96_RP.BitMap != draw_p96_RP -> BitMap)
@@ -3352,7 +3364,7 @@ void p96_conv_all()
 	if (picasso_invalid_lines == NULL )
 		{ printf("unexpcted NULL on picasso_invalid_lines\n"); return; }
 
-	char *dest_tmp_buffer_ptr = alloca( (picasso_vidinfo.width & 7 ? (picasso_vidinfo.width & ~7) + 8 : picasso_vidinfo.width ) * 4 );		// becouse output is needs more space.
+	dest_tmp_buffer_ptr = alloca( comp_p96_RP.BitMap -> BytesPerRow );		// becouse output is needs more space.
 
 	if (dest_tmp_buffer_ptr == NULL)
 		{ printf("no dest_tmp_buffer\n"); return ; }
@@ -3375,7 +3387,7 @@ void p96_conv_all()
 	
 			WritePixelArray( (void *) dest_tmp_buffer_ptr,
 				0, 0,
-				p96_output_bpr,
+				comp_p96_RP.BitMap -> BytesPerRow,
 				COMP_FMT_SRC,
 				&comp_p96_RP,
 				0, y,
