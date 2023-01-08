@@ -70,6 +70,7 @@
 
 #include "window_icons.h"
 #include "video_convert.h"
+#include "uae_endian.h"
 
 #if 0
 #define DEBUG_LOG(fmt,...) DebugPrintF(fmt, ##__VA_ARGS__)
@@ -1326,7 +1327,7 @@ bool alloc_p96_draw_bitmap( int w, int h, int depth )
 
 	if (conv_p96_RP.BitMap)
 	{
-		RectFillColor(&conv_p96_RP, 0, 0, w,h, 0xFFFF0000);
+		RectFillColor(&conv_p96_RP, 0, 0, w,h, 0xFF000000);
 		return true;
 	}
 
@@ -1342,7 +1343,7 @@ int init_comp_one( struct Window *W, ULONG output_depth, struct RastPort *rp, in
 	
 	if (rp -> BitMap)
 	{
-		RectFillColor(rp, 0, 0, w,h, 0xFF00FF00);
+		RectFillColor(rp, 0, 0, w,h, 0xFF000000);
 	}
 	else
 	{
@@ -2770,9 +2771,58 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 
 	if (draw_p96_RP -> BitMap)
 	{
+		unsigned int argb = color;
+
+		switch (picasso_vidinfo.rgbformat)
+		{
+			case RGBFB_R5G5B5:
+				{
+					int r,g,b;
+					r = (((color  >> 10) & 0x1F) *255) / 0x1F;
+					g = (((color >> 5) & 0x1F) * 255) / 0x1F;
+					b = ((color & 0x1F) * 255) / 0x1F;
+					argb = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
+				}
+				break;
+
+			case RGBFB_R5G6B5:
+				{
+					int r,g,b;
+					r = (((color  >> 11) & 0x1F) *255) / 0x1F;
+					g = (((color >> 5) & 0x3F) * 255) / 0x3F;
+					b = ((color & 0x1F) * 255) / 0x1F;
+					argb = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
+				}
+				break;
+
+			case RGBFB_R5G6B5PC:
+				{
+					int rev;
+					int r,g,b;
+					rev = (color << 8)  | (color >> 8);
+					r = (((rev  >> 11) & 0x1F) *255) / 0x1F;
+					g = (((rev >> 5) & 0x3F) * 255) / 0x3F;
+					b = ((rev & 0x1F) * 255) / 0x1F;
+					argb = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
+				}
+				break;
+
+			case RGBFB_A8R8G8B8:
+
+				// if you have color problems maybe this... feel free try to remove it.
+				// to see if color problem comes back..
+
+				argb = 0xFF000000 | color;	
+				break;
+
+			case RGBFB_B8G8R8A8:
+				argb = 0xFF000000 | bswap_32 (color);
+				break;
+		}
+
 		dstx += p96_xoffset;
 		dsty += p96_yoffset;
-		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,color);
+		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,argb);
 		p96_gfx_updated = true;
 		DX_Invalidate (dsty, dsty + height - 1);
 		return 1;

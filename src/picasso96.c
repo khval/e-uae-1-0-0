@@ -467,48 +467,7 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 
 	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
 	{
-		unsigned int argb = pen;
-
-		switch (picasso_vidinfo.rgbformat)
-		{
-			case RGBFB_R5G5B5:
-				{
-					int r,g,b;
-					r = (((pen  >> 10) & 0x1F) *255) / 0x1F;
-					g = (((pen >> 5) & 0x1F) * 255) / 0x1F;
-					b = ((pen & 0x1F) * 255) / 0x1F;
-					argb = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
-				}
-				break;
-
-			case RGBFB_R5G6B5:
-				{
-					int r,g,b;
-					r = (((pen  >> 11) & 0x1F) *255) / 0x1F;
-					g = (((pen >> 5) & 0x3F) * 255) / 0x3F;
-					b = ((pen & 0x1F) * 255) / 0x1F;
-					argb = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
-				}
-				break;
-
-			case RGBFB_R5G6B5PC:
-				{
-					int rev;
-					int r,g,b;
-					rev = (pen << 8)  | (pen >> 8);
-					r = (((rev  >> 11) & 0x1F) *255) / 0x1F;
-					g = (((rev >> 5) & 0x3F) * 255) / 0x3F;
-					b = ((rev & 0x1F) * 255) / 0x1F;
-					argb = 0xFF000000 | r * 0x010000 | g * 0x000100 | b * 0x000001;
-				}
-				break;
-
-			case RGBFB_B8G8R8A8:
-				argb = bswap_32 (pen);
-				break;
-		}
-
-		if (DX_Fill (x, y, width, height, argb, rgbtype)) return;
+		if (DX_Fill (x, y, width, height, pen, rgbtype)) return;
 	}
 	else
 	{
