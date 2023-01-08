@@ -2895,6 +2895,26 @@ void DX_SetPalette (int start, int count)
 	if (start > 255) start = 255;
 	if (start + count > 256) count = 256 - start;
 
+	// we need to keep picasso_vidinfo.clut upto date, as used for stuff!
+
+	if (picasso_vidinfo.pixbytes != 1)
+	{
+		int _start = start;
+		int _count = count;
+
+		while (_count-- > 0)
+		{
+			int r = picasso96_state.CLUT[_start].Red;
+			int g = picasso96_state.CLUT[_start].Green;
+			int b = picasso96_state.CLUT[_start].Blue;
+			picasso_vidinfo.clut[_start++] = (doMask256 (r, red_bits, red_shift)
+					     | doMask256 (g, green_bits, green_shift)
+					     | doMask256 (b, blue_bits, blue_shift));
+		}
+	}
+
+	// update other color tables.
+
 	if (set_palette_fn)	// we need to convert !!
 	{
 		int n;
