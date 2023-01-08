@@ -131,9 +131,6 @@ extern struct picasso_vidbuf_description picasso_vidinfo;
 static int bitdepth;
 static int current_width, current_height, current_depth;
 
-static int red_bits, green_bits, blue_bits;
-static int red_shift, green_shift, blue_shift;
-
 uint32 load32_p96_table[1 + (256 * 3)];		// 256 colors + 1 count
 
 // this needs, to be changed when color is changed !!!!!
@@ -148,6 +145,12 @@ void (*p96_conv_fn) (void *src, void *dest, int size) = NULL;
 #define conv_fn_cast void (*)(void *, void *, int)
 
 ULONG p96_output_bpr = 0;
+
+static int redbits,  greenbits,  bluebits;
+static int redshift, greenshift, blueshift;
+static int redmask,  greenmask,  bluemask;
+static int byte_swap_16bit = FALSE;
+
 
 uint32 *vpal32 = NULL;
 uint16 *vpal16 = NULL;
@@ -712,9 +715,6 @@ static int get_nearest_color (int r, int g, int b)
 
 static int init_true_colors_output (const struct RastPort *rp)
 {
-	int redbits,  greenbits,  bluebits;
-	int redshift, greenshift, blueshift;
-	int byte_swap = FALSE;
 	int pixfmt;
 	int found = TRUE;
 
@@ -736,13 +736,13 @@ static int init_true_colors_output (const struct RastPort *rp)
 	{
 #ifdef WORDS_BIGENDIAN
 		case PIXF_R5G5B5PC:
-			byte_swap = TRUE;
+			byte_swap_16bit = TRUE;
 		case PIXF_R5G5B5:
 			redbits  = 5;  greenbits  = 5; bluebits  = 5;
 			redshift = 10; greenshift = 5; blueshift = 0;
 			break;
 		case PIXF_R5G6B5PC:
-			byte_swap = TRUE;
+			byte_swap_16bit = TRUE;
 		case PIXF_R5G6B5:
 			redbits  = 5;  greenbits  = 6;  bluebits  = 5;
 			redshift = 11; greenshift = 5;  blueshift = 0;
@@ -761,13 +761,13 @@ static int init_true_colors_output (const struct RastPort *rp)
 			break;
 #else
 		case PIXF_R5G5B5:
-			byte_swap = TRUE;
+			byte_swap_16bit = TRUE;
 		case PIXF_R5G5B5PC:
 			redbits  = 5;  greenbits  = 5;  bluebits  = 5;
 			redshift = 10; greenshift = 0;  blueshift = 0;
 			break;
 		case PIXF_R5G6B5:
-			byte_swap = TRUE;
+			byte_swap_16bit = TRUE;
 		case PIXF_R5G6B5PC:
 			redbits  = 5;  greenbits  = 6;  bluebits  = 5;
 			redshift = 11; greenshift = 5;  blueshift = 0;
@@ -788,11 +788,16 @@ static int init_true_colors_output (const struct RastPort *rp)
 			break;
 	}
 
+	redmask = 0xFF - (1<<redbits)-1;
+	greenmask = 0xFF - (1<<greenbits)-1;
+	bluemask = 0xFF - (1<<bluebits)-1;
+
+
 	if (found)
 	{
     		alloc_colors64k (redbits,  greenbits,  bluebits,
 			 redshift, greenshift, blueshift,
-			 0, 0, 0, byte_swap);
+			 0, 0, 0, byte_swap_16bit);
 
 		write_log ("AMIGFX: Using a %d-bit true-colour display.\n", redbits + greenbits + bluebits);
 	}
@@ -928,12 +933,6 @@ static int init_colors (void)
 			break;
 		}
 
-	case 15:
-	case 16:
-	case 24:
-	case 32:
-
-		success = init_true_colors_output ( (W -> RPort) );
 		break;
 
     }
@@ -1624,6 +1623,7 @@ void init_comp( struct Window *W )
 				alloc_picasso_invalid_lines();
 			}
 
+			init_true_colors_output ( draw_p96_RP );
 			p96_palette_updated = true;
 		}
 
@@ -2867,11 +2867,16 @@ void SetPalette_8bit_screen (int start, int count)
 
 	int offset = 1;
 
+	printf("---- colors !!\n");
+
 	for (i = start; i < start+count;  i++)
 	{
 		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Red;
 		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Green;
-		load32_p96_table[ offset ++  ] = 0x01010101 * picasso96_state.CLUT[i].Blue;			 
+		load32_p96_table[ offset ++  ] = 0x01010101 * picasso96_state.CLUT[i].Blue;
+
+
+		printf("std rgb %d,%d,%d\n",picasso96_state.CLUT[i].Red,picasso96_state.CLUT[i].Green,picasso96_state.CLUT[i].Blue);		 
 	}
 
 	LoadRGB32( &(S -> ViewPort) , load32_p96_table );
@@ -2890,26 +2895,41 @@ void DX_SetPalette (int start, int count)
     DEBUG_LOG ("Function: DX_SetPalette\n");
 
 	// exit if not valid !!!
-	if (! screen_is_picasso || picasso96_state.RGBFormat != RGBFB_CHUNKY) return;
+	if (! screen_is_picasso) return;
 
 	if (start > 255) start = 255;
 	if (start + count > 256) count = 256 - start;
 
 	// we need to keep picasso_vidinfo.clut upto date, as used for stuff!
 
+	printf("picasso_vidinfo.pixbytes: %d\n",picasso_vidinfo.pixbytes);
+
 	if (picasso_vidinfo.pixbytes != 1)
 	{
 		int _start = start;
 		int _count = count;
 
+		printf("shift %d,%d,%d\n",redshift,greenshift,blueshift);
+
 		while (_count-- > 0)
 		{
+			uint32 raw_data;
+
 			int r = picasso96_state.CLUT[_start].Red;
 			int g = picasso96_state.CLUT[_start].Green;
 			int b = picasso96_state.CLUT[_start].Blue;
-			picasso_vidinfo.clut[_start++] = (doMask256 (r, red_bits, red_shift)
-					     | doMask256 (g, green_bits, green_shift)
-					     | doMask256 (b, blue_bits, blue_shift));
+
+			raw_data = ((r & redmask) << (redshift - (8-redbits))) | 
+					((g & greenmask) << (greenshift - (8-greenbits))) | 
+					((b & bluemask) << (blueshift - (8-bluebits)));
+
+			printf("%d:   %d,%d,%d - %08x\n",_start, r,g,b,raw_data);
+
+			if (byte_swap_16bit) raw_data = raw_data << 8 | raw_data >> 8;
+
+			picasso_vidinfo.clut[_start] = raw_data;
+
+			_start++;
 		}
 	}
 
@@ -2922,8 +2942,10 @@ void DX_SetPalette (int start, int count)
 	}
 	else if ((S)&&(W -> BorderTop == 0))
 	{
-		printf("using LoadRGB32 to set colors\n");
-		SetPalette_8bit_screen(start, count);
+		if (picasso96_state.RGBFormat == RGBFB_CHUNKY) 
+		{
+			SetPalette_8bit_screen(start, count);
+		}
 	}
 
 	dx_pal_count++;
@@ -3139,7 +3161,7 @@ void gfx_set_picasso_state (int on)
 		graphics_subinit ();
 	}
 
-    if (on) DX_SetPalette (0, 256);
+	if (on) DX_SetPalette (0, 256);
 }
 #endif
 
