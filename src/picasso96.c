@@ -104,6 +104,9 @@ static int set_panning_called = 0;
 
 static uae_u32 p2ctab[256][2];
 
+extern void output_update_clut(void);
+
+
 /*
  * Picasso96 seems to have a bug which screws the palette emulation in
  * ARGB32 modes. We work around this by using a BGRA32 framebuffer instead,
@@ -471,6 +474,8 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 	}
 	else
 	{
+		output_update_clut();	// lets do this shit!!!
+
 		if (DX_Fill (x, y, width, height, picasso_vidinfo.clut[src[0]], rgbtype))
 		return;
 	}
@@ -516,6 +521,8 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 			gfx_unlock_picasso ();
 			return;
 		}
+
+		output_update_clut();	// lets do this shit!!!
 
 		int i;
 		switch (psiz)
@@ -661,6 +668,8 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 		return;
 	 	//   abort ();
 	}
+
+	output_update_clut();	// lets do this shit!!!
 
 	while (height-- > 0) {
 	    int i;
