@@ -3096,32 +3096,39 @@ void InitPicasso96 (void)
 		switch (DisplayModes[i].depth)
 		{
 			case 1:
-				if (DisplayModes[i].res.width > chunky.width)
-				    chunky.width = DisplayModes[i].res.width;
-				if (DisplayModes[i].res.height > chunky.height)
-				    chunky.height = DisplayModes[i].res.height;
+				{
+					if (DisplayModes[i].res.width > chunky.width)
+						chunky.width = DisplayModes[i].res.width;
+					if (DisplayModes[i].res.height > chunky.height)
+						chunky.height = DisplayModes[i].res.height;
+				}
 				break;
 
 			case 2:
-				if (DisplayModes[i].res.width > hicolour.width)
-				    hicolour.width = DisplayModes[i].res.width;
-				if (DisplayModes[i].res.height > hicolour.height)
-				    hicolour.height = DisplayModes[i].res.height;
+				{
+					if (DisplayModes[i].res.width > hicolour.width)
+						hicolour.width = DisplayModes[i].res.width;
+					if (DisplayModes[i].res.height > hicolour.height)
+						hicolour.height = DisplayModes[i].res.height;
+				}
 				break;
 
 			case 3:
+				{
+					if (DisplayModes[i].res.width > truecolour.width)
+						truecolour.width = DisplayModes[i].res.width;
+					if (DisplayModes[i].res.height > truecolour.height)
+						truecolour.height = DisplayModes[i].res.height;
+				}
+				break;
 
-				if (DisplayModes[i].res.width > truecolour.width)
-					truecolour.width = DisplayModes[i].res.width;
-				if (DisplayModes[i].res.height > truecolour.height)
-					truecolour.height = DisplayModes[i].res.height;
-					break;
 			case 4:
-
-				if (DisplayModes[i].res.width > alphacolour.width)
-					alphacolour.width = DisplayModes[i].res.width;
-				if (DisplayModes[i].res.height > alphacolour.height)
-					alphacolour.height = DisplayModes[i].res.height;
+				{
+					if (DisplayModes[i].res.width > alphacolour.width)
+						alphacolour.width = DisplayModes[i].res.width;
+					if (DisplayModes[i].res.height > alphacolour.height)
+						alphacolour.height = DisplayModes[i].res.height;
+				}
 				break;
 
 			default:
