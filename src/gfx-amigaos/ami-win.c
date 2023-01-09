@@ -788,10 +788,9 @@ static int init_true_colors_output (const struct RastPort *rp)
 			break;
 	}
 
-	redmask = 0xFF - (1<<redbits)-1;
-	greenmask = 0xFF - (1<<greenbits)-1;
-	bluemask = 0xFF - (1<<bluebits)-1;
-
+	redmask =  ((1<<redbits)-1) << (8 - redbits);
+	greenmask = ((1<<greenbits)-1) << (8 - greenbits);
+	bluemask = ((1<<bluebits)-1) << (8 - bluebits);
 
 	if (found)
 	{
@@ -2919,13 +2918,13 @@ void DX_SetPalette (int start, int count)
 			int g = picasso96_state.CLUT[_start].Green;
 			int b = picasso96_state.CLUT[_start].Blue;
 
-			raw_data = ((r & redmask) << (redshift - (8-redbits))) | 
-					((g & greenmask) << (greenshift - (8-greenbits))) | 
-					((b & bluemask) << (blueshift - (8-bluebits)));
+			raw_data = (((r & redmask) << redshift) >>(8-redbits)) | 
+					(((g & greenmask) << greenshift) >> (8-greenbits)) | 
+					(((b & bluemask) << blueshift) >> (8-bluebits));
 
 			printf("%d:   %d,%d,%d - %08x\n",_start, r,g,b,raw_data);
 
-			if (byte_swap_16bit) raw_data = raw_data << 8 | raw_data >> 8;
+			if (byte_swap_16bit) raw_data = (raw_data & 0xFF) << 8 | (raw_data >> 8) & 0xFF;
 
 			picasso_vidinfo.clut[_start] = raw_data;
 
