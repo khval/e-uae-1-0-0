@@ -2889,25 +2889,13 @@ void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num)
 	}
 }
 
-void DX_SetPalette (int start, int count)
+void output_update_clut()
 {
-    DEBUG_LOG ("Function: DX_SetPalette\n");
-
-	// exit if not valid !!!
-	if (! screen_is_picasso) return;
-
-	if (start > 255) start = 255;
-	if (start + count > 256) count = 256 - start;
-
-	// we need to keep picasso_vidinfo.clut upto date, as used for stuff!
-
-	printf("picasso_vidinfo.pixbytes: %d\n",picasso_vidinfo.pixbytes);
+	int _start = 0;
+	int _count = 256;
 
 	if (picasso_vidinfo.pixbytes != 1)
 	{
-		int _start = start;
-		int _count = count;
-
 		printf("shift %d,%d,%d\n",redshift,greenshift,blueshift);
 
 		while (_count-- > 0)
@@ -2931,6 +2919,20 @@ void DX_SetPalette (int start, int count)
 			_start++;
 		}
 	}
+}
+
+void DX_SetPalette (int start, int count)
+{
+    DEBUG_LOG ("Function: DX_SetPalette\n");
+
+	// exit if not valid !!!
+	if (! screen_is_picasso) return;
+
+	if (start > 255) start = 255;
+	if (start + count > 256) count = 256 - start;
+
+	// we need to keep picasso_vidinfo.clut upto date, as used for stuff!
+
 
 	// update other color tables.
 
