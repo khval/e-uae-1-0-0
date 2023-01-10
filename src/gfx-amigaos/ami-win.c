@@ -2917,7 +2917,7 @@ void output_update_clut()
 
 			printf("%d:   %d,%d,%d - %08x\n",_start, r,g,b,raw_data);
 
-			if (byte_swap_16bit) raw_data = (raw_data & 0xFF) << 8 | (raw_data >> 8) & 0xFF;
+			if (byte_swap_16bit) raw_data = ((raw_data & 0xFF) << 8) | ((raw_data >> 8) & 0xFF);
 
 			picasso_vidinfo.clut[_start] = raw_data;
 
