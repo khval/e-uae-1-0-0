@@ -2861,7 +2861,6 @@ void DX_Invalidate (int first, int last)
 		picasso_invalid_lines[first] = 1;
 		first++;
 	}
-
 }
 
 int DX_BitsPerCannon (void)
@@ -2877,16 +2876,11 @@ void SetPalette_8bit_screen (int start, int count)
 
 	int offset = 1;
 
-	printf("---- colors !!\n");
-
 	for (i = start; i < start+count;  i++)
 	{
 		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Red;
 		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Green;
 		load32_p96_table[ offset ++  ] = 0x01010101 * picasso96_state.CLUT[i].Blue;
-
-
-		printf("std rgb %d,%d,%d\n",picasso96_state.CLUT[i].Red,picasso96_state.CLUT[i].Green,picasso96_state.CLUT[i].Blue);		 
 	}
 
 	LoadRGB32( &(S -> ViewPort) , load32_p96_table );
