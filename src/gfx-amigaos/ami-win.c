@@ -1646,6 +1646,11 @@ void init_comp( struct Window *W )
 				W -> Height,
 				0xFF000000);
 		}
+		else
+		{
+			p96_xoffset = 0;
+			p96_yoffset = 0;
+		}
 	}
 
 	if (screen_is_picasso)
