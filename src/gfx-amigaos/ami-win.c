@@ -294,7 +294,7 @@ static int is_halfbrite;
 static int is_ham;
 
 static int   get_color_failed;
-static int   maxpen;
+static int   maxpen = 0;
 static UBYTE pen[256];
 
 #ifdef __amigaos4__
