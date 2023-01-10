@@ -9,6 +9,7 @@
   */
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -137,6 +138,9 @@ uint32 load32_p96_table[1 + (256 * 3)];		// 256 colors + 1 count
 
 static int palette_update_start = 256;
 static int palette_update_end   = 0;
+
+
+extern bool output_clut_needs_update;
 
 void reset_p96_fn_pointers( void );
 
@@ -2896,13 +2900,14 @@ void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num)
 
 void output_update_clut()
 {
+	if (output_clut_needs_update == false) return;
+	output_clut_needs_update = false;
+	
 	int _start = 0;
 	int _count = 256;
 
 	if (picasso_vidinfo.pixbytes != 1)
 	{
-		printf("shift %d,%d,%d\n",redshift,greenshift,blueshift);
-
 		while (_count-- > 0)
 		{
 			uint32 raw_data;
@@ -2915,12 +2920,8 @@ void output_update_clut()
 					(((g & greenmask) << greenshift) >> (8-greenbits)) | 
 					(((b & bluemask) << blueshift) >> (8-bluebits));
 
-			printf("%d:   %d,%d,%d - %08x\n",_start, r,g,b,raw_data);
-
 			if (byte_swap_16bit) raw_data = ((raw_data & 0xFF) << 8) | ((raw_data >> 8) & 0xFF);
-
 			picasso_vidinfo.clut[_start] = raw_data;
-
 			_start++;
 		}
 	}
