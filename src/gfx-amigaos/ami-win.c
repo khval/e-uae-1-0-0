@@ -1622,7 +1622,6 @@ void init_comp( struct Window *W )
 				alloc_picasso_invalid_lines();
 			}
 
-			init_true_colors_output ( draw_p96_RP );
 			p96_palette_updated = true;
 		}
 
@@ -1651,6 +1650,8 @@ void init_comp( struct Window *W )
 
 	if (screen_is_picasso)
 	{
+		init_true_colors_output ( draw_p96_RP );
+
 		printf("*** this is a picasso96 screen, (using picasso_vidinfo.width: %d, picasso_vidinfo.height: %d)\n",  
 					picasso_vidinfo.width,  
 					picasso_vidinfo.height);
@@ -1660,6 +1661,8 @@ void init_comp( struct Window *W )
 	}
 	else
 	{
+		init_true_colors_output ( draw_aga_RP );
+
 		printf("*** this is a AGA screen, (using gfxvidinfo.width, gfxvidinfo.height)\n");
 	}
 
