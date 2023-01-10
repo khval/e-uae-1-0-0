@@ -31,6 +31,8 @@
  *   programs started from a Picasso workbench.
  */
 
+#include <stdbool.h>
+
 #include "sysconfig.h"
 #include "sysdeps.h"
 
@@ -42,6 +44,8 @@
 #include "xwin.h"
 #include "picasso96.h"
 #include "uae_endian.h"
+
+
 
 #ifdef JIT
 int        have_done_picasso       = 0;         /* For the JIT compiler */
@@ -104,6 +108,7 @@ static int set_panning_called = 0;
 
 static uae_u32 p2ctab[256][2];
 
+bool output_clut_needs_update = false;
 extern void output_update_clut(void);
 
 
@@ -474,7 +479,7 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 	}
 	else
 	{
-		output_update_clut();	// lets do this shit!!!
+		output_update_clut();
 
 		if (DX_Fill (x, y, width, height, picasso_vidinfo.clut[src[0]], rgbtype))
 		return;
@@ -522,7 +527,7 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
 			return;
 		}
 
-		output_update_clut();	// lets do this shit!!!
+		output_update_clut();
 
 		int i;
 		switch (psiz)
@@ -756,39 +761,49 @@ static int     currline_y;       /* row number of this line */
  */
 STATIC_INLINE void write_currline (uae_u8 *srcp, int line_no, int first_byte, int byte_count)
 {
-    uae_u8 *dstp;
+	uae_u8 *dstp;
 
-    if ((dstp = gfx_lock_picasso ()) != 0) {
-	int Bpp = GetBytesPerPixel (picasso_vidinfo.rgbformat);
+	if ((dstp = gfx_lock_picasso ()) != 0)
+	{
+		int Bpp = GetBytesPerPixel (picasso_vidinfo.rgbformat);
 
-	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat) {
-	    dstp += line_no * picasso_vidinfo.rowbytes + first_byte;
+		if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
+		{
+			dstp += line_no * picasso_vidinfo.rowbytes + first_byte;
 
-	    if (need_argb32_hack && Bpp == 4)
-		memcpy_bswap32 (dstp, srcp, byte_count);
-	    else
-		memcpy (dstp, srcp, byte_count);
-	} else {
-	    dstp += line_no * picasso_vidinfo.rowbytes + first_byte * Bpp;
-
-	    switch (Bpp) {
-		case 2: {
-		    int i;
-		    uae_u16 *dstp16 = (uae_u16*) dstp;
-		    for (i = 0; i < byte_count; i++)
-			*dstp16++ = picasso_vidinfo.clut[srcp[i]];
-		    break;
+			if (need_argb32_hack && Bpp == 4)
+				memcpy_bswap32 (dstp, srcp, byte_count);
+			else
+				memcpy (dstp, srcp, byte_count);
 		}
-		case 4: {
-		    int i;
-		    for (i = 0; i < byte_count; i++)
-			*((uae_u32 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
-		    break;
+		else
+		{
+			dstp += line_no * picasso_vidinfo.rowbytes + first_byte * Bpp;
+
+			output_update_clut();
+
+			switch (Bpp)
+			{
+				case 2:
+					{
+						int i;
+						uae_u16 *dstp16 = (uae_u16*) dstp;
+		   				for (i = 0; i < byte_count; i++)
+							*dstp16++ = picasso_vidinfo.clut[srcp[i]];
+					}
+					break;
+
+				case 4: 
+					{
+						int i;
+						for (i = 0; i < byte_count; i++)
+							*((uae_u32 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
+				    	}
+					break;
+			}
 		}
-	    }
+		gfx_unlock_picasso ();
 	}
-	gfx_unlock_picasso ();
-    }
 }
 
 static void flush_currline (void)
@@ -1483,41 +1498,50 @@ void picasso_clip_mouse (int *px, int *py)
  * per cannon your board has. So you might have to shift the colors
  * before writing them to the hardware.
  */
+
 uae_u32 REGPARAM2 picasso_SetColorArray (struct regstruct *regs)
 {
-    /* Fill in some static UAE related structure about this new CLUT setting.
-     * We need this for CLUT-based displays, and for mapping CLUT to hi/true
-     * colour */
-    uaecptr boardinfo = m68k_areg (regs, 0);
-    uae_u16 start     = m68k_dreg (regs, 0);
-    uae_u16 count     = m68k_dreg (regs, 1);
+	// Fill in some static UAE related structure about this new CLUT setting.
+	// We need this for CLUT-based displays, and for mapping CLUT to hi/true
+	// colour 
 
-    uaecptr clut = boardinfo + PSSO_BoardInfo_CLUT + start * 3;
-    int changed = 0;
-    int i;
+	uaecptr boardinfo = m68k_areg (regs, 0);
+	uae_u16 start     = m68k_dreg (regs, 0);
+	uae_u16 count     = m68k_dreg (regs, 1);
 
-    for (i = start; i < start + count; i++) {
-	int r = get_byte (clut);
-	int g = get_byte (clut + 1);
-	int b = get_byte (clut + 2);
+	uaecptr clut = boardinfo + PSSO_BoardInfo_CLUT + start * 3;
+	int changed = 0;
+	int i;
 
-	changed |=   (picasso96_state.CLUT[i].Red   != r
+	for (i = start; i < start + count; i++)
+	{
+		int r = get_byte (clut);
+		int g = get_byte (clut + 1);
+		int b = get_byte (clut + 2);
+
+		changed |=   (picasso96_state.CLUT[i].Red   != r
 		   || picasso96_state.CLUT[i].Green != g
 		   || picasso96_state.CLUT[i].Blue  != b);
 
-	picasso96_state.CLUT[i].Red   = r;
-	picasso96_state.CLUT[i].Green = g;
-	picasso96_state.CLUT[i].Blue  = b;
+		picasso96_state.CLUT[i].Red   = r;
+		picasso96_state.CLUT[i].Green = g;
+		picasso96_state.CLUT[i].Blue  = b;
 
-	clut += 3;
-    }
-    if (changed) {
-	if (start < first_color_changed)
-	    first_color_changed = start;
-	if (start + count > last_color_changed)
-	    last_color_changed = start + count;
-    }
-    return 1;
+		clut += 3;
+    	}
+
+	if (changed)
+	{
+		output_clut_needs_update = true;	// we can't wait for vsync!!
+
+		if (start < first_color_changed)
+			first_color_changed = start;
+
+		if (start + count > last_color_changed)
+			last_color_changed = start + count;
+	}
+
+	return 1;
 }
 
 /*
