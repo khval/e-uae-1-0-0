@@ -2743,8 +2743,11 @@ int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT
 
 	if (opcode == BLIT_SRC ) 
 	{
-		dstx += p96_xoffset;
-		dsty += p96_yoffset;
+		if (draw_p96_RP == W -> RPort)		// We draw direct into the window, and we center it!
+		{
+			dstx += p96_xoffset;
+			dsty += p96_yoffset;
+		}
 
 		ULONG error = BltBitMapTags(
 				BLITA_SrcType, BLITT_BITMAP,
