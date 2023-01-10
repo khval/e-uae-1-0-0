@@ -900,7 +900,8 @@ static int init_colors (void)
 		/* Fall through if !is_halfbrite && !is_ham */
 	case 1: case 2: case 3: case 4: case 5: case 7: case 8:
 
-		if (!screen_is_picasso)
+		ReleaseColors ();
+
 		{
 			int maxcol;
 			maxcol = 1 << RPDepth (W -> RPort);
@@ -933,9 +934,12 @@ static int init_colors (void)
 				int val = get_nearest_color (maxcol >> 8, (maxcol >> 4) & 15, maxcol & 15);
 				xcolors[maxcol] = val * 0x01010101;
 			}
-			break;
 		}
+		break;
 
+	default:
+
+		success = init_true_colors_output ( draw_aga_RP );
 		break;
 
     }
@@ -1659,8 +1663,6 @@ void init_comp( struct Window *W )
 
 	if (screen_is_picasso)
 	{
-		init_true_colors_output ( draw_p96_RP );
-
 		printf("*** this is a picasso96 screen, (using picasso_vidinfo.width: %d, picasso_vidinfo.height: %d)\n",  
 					picasso_vidinfo.width,  
 					picasso_vidinfo.height);
@@ -1670,8 +1672,6 @@ void init_comp( struct Window *W )
 	}
 	else
 	{
-		init_true_colors_output ( draw_aga_RP );
-
 		printf("*** this is a AGA screen, (using gfxvidinfo.width, gfxvidinfo.height)\n");
 	}
 
