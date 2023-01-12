@@ -34,7 +34,6 @@
 #include "osemu.h"
 #include "filesys.h"
 #include "picasso96.h"
-#include "bsdsocket.h"
 #include "uaeexe.h"
 #include "native2amiga.h"
 #include "scsidev.h"

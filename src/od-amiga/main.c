@@ -22,6 +22,8 @@
 #include <proto/exec.h>
 #undef   __USE_BASETYPE__
 #include <exec/execbase.h>
+#include <proto/wb.h>
+#include <proto/timer.h>
 
 #ifdef USE_SDL
 # include <SDL.h>
@@ -68,7 +70,6 @@ struct Library          *LayersBase = NULL;
 struct Library          *AslBase = NULL;
 struct Library          *CyberGfxBase = NULL;
 struct Library          *IconBase = NULL;
-struct Library          *WorkbenchBase = NULL;
 
 struct AslIFace *IAsl = NULL;
 struct GraphicsIFace *IGraphics = NULL;
@@ -76,7 +77,6 @@ struct LayersIFace *ILayers = NULL;
 struct IntuitionIFace *IIntuition = NULL;
 struct CyberGfxIFace *ICyberGfx = NULL;
 struct IconIFace *IIcon = NULL;
-struct WorkbenchIFace *IWorkbench = NULL;
 
 #include "../gfx-amigaos/window_icons.h"
 
