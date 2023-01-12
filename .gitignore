@@ -3,6 +3,7 @@
 # Ignore autoreconf cache directory
 autom4te.cache
 # Ignore generated files
+Makefile
 .deps
 confdefs.h
 config.log
