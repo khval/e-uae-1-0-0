@@ -868,22 +868,25 @@ static int init_colors (void)
 				0xfaa, 0xf6a, 0xa80, 0x06a, 0x6af
 			};
 
-		int i;
-		for (i = 0; i < 32; ++i)
-			get_color (tab[i] >> 8, (tab[i] >> 4) & 15, tab[i] & 15, xcolors);
-		for (i = 0; i < 4096; ++i) {
-			uae_u32 val = get_nearest_color (i >> 8, (i >> 4) & 15, i & 15);
-			xcolors[i] = val * 0x01010101;
-		}
-		write_log ("AMIGFX: Using 32 colours and half-brite\n");
-		break;
+			int i;
+			for (i = 0; i < 32; ++i)
+				get_color (tab[i] >> 8, (tab[i] >> 4) & 15, tab[i] & 15, xcolors);
+
+			for (i = 0; i < 4096; ++i)
+			{
+				uae_u32 val = get_nearest_color (i >> 8, (i >> 4) & 15, i & 15);
+				xcolors[i] = val * 0x01010101;
+			}
+
+			write_log ("AMIGFX: Using 32 colours and half-brite\n");
+			break;
 		} else if (is_ham) {
-		int i;
-		for (i = 0; i < 16; ++i)
-			get_color (i, i, i, xcolors);
-		write_log ("AMIGFX: Using 12 bits pseudo-truecolor (HAM).\n");
-		alloc_colors64k (4, 4, 4, 10, 5, 0, 0, 0, 0, 0);
-		return init_ham ();
+			int i;
+			for (i = 0; i < 16; ++i)
+				get_color (i, i, i, xcolors);
+			write_log ("AMIGFX: Using 12 bits pseudo-truecolor (HAM).\n");
+			alloc_colors64k (4, 4, 4, 10, 5, 0, 0, 0, 0, 0);
+			return init_ham ();
 		}
 		/* Fall through if !is_halfbrite && !is_ham */
 	case 1: case 2: case 3: case 4: case 5: case 7: case 8:
