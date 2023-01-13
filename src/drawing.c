@@ -403,6 +403,12 @@ STATIC_INLINE void fill_line (void)
 	int *start;
 	xcolnr val;
 
+	if (xlinebuffer == NULL)
+	{
+		printf("unexpected: xlinebuffer = NULL, in fill_line()\n");
+		return;
+	}
+
 	shift = 0;
 	if (gfxvidinfo.pixbytes == 2) shift = 1;
 	if (gfxvidinfo.pixbytes == 4)shift = 2;
