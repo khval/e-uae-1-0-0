@@ -3,15 +3,22 @@
 
 #include <proto/exec.h>
 #include <proto/dos.h>
+# include <proto/intuition.h>
+# include <proto/graphics.h>
 
 #include "sysconfig.h"
 #include "sysdeps.h"
 
 #ifdef PICASSO96_SUPPORTED
-#include "picasso96.h"
+#include "include/picasso96.h"
 #endif
 
+extern struct Screen *S;
+extern struct Window *W;
+
 #include "video_convert.h"
+
+uint32 load32_p96_table[1 + (256 * 3)];		// 256 colors + 1 count
 
 extern uint16 *vpal16;
 extern uint32 *vpal32;
@@ -125,7 +132,6 @@ void set_vpal_8bit_to_32bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num1)
 
 void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1)
 {
-
 	int index;
 
 	struct MyCLUTEntry *pal1;
@@ -133,8 +139,6 @@ void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1)
 
 	register unsigned int rgb;
 	// Convert palette to 32 bits virtual buffer.
-
-//	printf("set color %d, src %02x,%02x,%02x , dest: %08x \n", num1, pal[num1].Red, pal[num1].Green, pal[num1].Blue, _BE_ARGB( num1 ));
 
 	// pixel [0,256],[0..256]		// because color 0 is not always black... (we need to redo the first 256 colors also)
 
@@ -150,3 +154,28 @@ void set_vpal_8bit_to_32bit_be(struct MyCLUTEntry *pal, uint32 num1)
 	vpal32[num1] =  _BE_ARGB( num1 ) ;  // ARGB
 }
 
+void SetPalette_8bit_screen (int start, int count)
+{
+	int i;
+
+	load32_p96_table[ 0 ] = count << 16 | start;
+
+	int offset = 1;
+
+	for (i = start; i < start+count;  i++)
+	{
+		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Red;
+		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Green;
+		load32_p96_table[ offset ++  ] = 0x01010101 * picasso96_state.CLUT[i].Blue;
+	}
+
+	LoadRGB32( &(S -> ViewPort) , load32_p96_table );
+}
+
+void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num)
+{
+	if (W -> BorderTop == 0)
+	{
+		SetPalette_8bit_screen(0, 256);
+	}
+}

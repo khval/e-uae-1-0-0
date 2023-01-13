@@ -69,6 +69,10 @@
 #include "hotkeys.h"
 #include "version.h"
 
+#ifdef PICASSO96_SUPPORTED
+#include "picasso96.h"
+#endif
+
 #include "window_icons.h"
 #include "video_convert.h"
 #include "uae_endian.h"
@@ -77,10 +81,6 @@
 #define DEBUG_LOG(fmt,...) DebugPrintF(fmt, ##__VA_ARGS__)
 #else
 #define DEBUG_LOG(fmt,...) 
-#endif
-
-#ifdef PICASSO96_SUPPORTED
-#include "picasso96.h"
 #endif
 
 #undef LockBitMapTags
@@ -160,17 +160,6 @@ uint32 *vpal32 = NULL;
 uint16 *vpal16 = NULL;
 void (*set_palette_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
 void (*set_palette_on_vbl_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
-
-void palette_notify(struct MyCLUTEntry *pal, uint32 num);
-void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num);
-void SetPalette_8bit_screen (int start, int count);
-
-void init_lookup_15bit_to_16bit_le( void );
-void init_lookup_15bit_to_16bit_be( void );
-
-//void init_lookup_16bit_be_to_32bit_le( void );
-//void init_lookup_16bit_be_to_32bit_be( void  );
-void init_lookup_16bit_swap( void );
 
 void init_aga_comp( ULONG output_depth );
 
@@ -278,8 +267,7 @@ struct RastPort  conv_p96_RP ;
 struct RastPort  *draw_p96_RP = &comp_p96_RP;	// draw direct to the output buffer.
 
 static UBYTE			*Line = NULL;
-static struct Screen		*S = NULL;;
-//struct RastPort			*RP = NULL;
+struct Screen			*S = NULL;;
 struct Window			*W = NULL;
 static struct RastPort	*TempRPort = NULL;
 static struct BitMap		*BitMap = NULL;
@@ -2870,32 +2858,6 @@ void DX_Invalidate (int first, int last)
 int DX_BitsPerCannon (void)
 {
 	return 8;
-}
-
-void SetPalette_8bit_screen (int start, int count)
-{
-	int i;
-
-	load32_p96_table[ 0 ] = count << 16 | start;
-
-	int offset = 1;
-
-	for (i = start; i < start+count;  i++)
-	{
-		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Red;
-		load32_p96_table[ offset ++ ] = 0x01010101 * picasso96_state.CLUT[i].Green;
-		load32_p96_table[ offset ++  ] = 0x01010101 * picasso96_state.CLUT[i].Blue;
-	}
-
-	LoadRGB32( &(S -> ViewPort) , load32_p96_table );
-}
-
-void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num)
-{
-	if (W -> BorderTop == 0)
-	{
-		SetPalette_8bit_screen(0, 256);
-	}
 }
 
 void output_update_clut()
