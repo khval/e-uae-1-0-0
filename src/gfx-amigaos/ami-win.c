@@ -1628,14 +1628,26 @@ void init_comp( struct Window *W )
 		{
 			if (output_depth == 8) // if the screen is 8bit!		
 			{
-				p96_xoffset = W -> Width/2 - picasso_vidinfo.width/2;
-				p96_yoffset = W -> Height/2 - picasso_vidinfo.height/2;
+				p96_xoffset = (picasso_vidinfo.width<W -> Width) ?
+					 W -> Width/2 - picasso_vidinfo.width/2 : 0;
 
-				if ((p96_xoffset + picasso_vidinfo.width) > (W -> Width)) p96_xoffset = (p96_xoffset + picasso_vidinfo.width) - (W -> Width);
-				if ((p96_yoffset + picasso_vidinfo.height) > (W -> Height)) p96_yoffset = (p96_xoffset + picasso_vidinfo.height) - (W -> Height);
+				p96_yoffset =  (picasso_vidinfo.height < W -> Height) ?
+					W -> Height/2 - picasso_vidinfo.height/2 : 0;
 
-				if (p96_xoffset<0) p96_xoffset = 0;
-				if (p96_yoffset<0) p96_yoffset = 0;
+				if ((p96_xoffset + picasso_vidinfo.width) > (W -> Width)) p96_xoffset = (int) (p96_xoffset + picasso_vidinfo.width) - (int) (W -> Width);
+				if ((p96_yoffset + picasso_vidinfo.height) > (W -> Height)) p96_yoffset = (int) (p96_xoffset + picasso_vidinfo.height) - (int) (W -> Height);
+
+				if (p96_xoffset<0) 
+				{
+					p96_xoffset = 0;
+					picasso_vidinfo.width = W -> Width;
+				}
+
+				if (p96_yoffset<0)
+				{
+					p96_yoffset = 0;
+					picasso_vidinfo.height = W -> Height;
+				}
 			}
 
 			RectFillColor(W -> RPort, 
