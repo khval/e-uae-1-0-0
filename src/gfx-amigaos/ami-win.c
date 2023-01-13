@@ -1371,11 +1371,14 @@ void set_p96_output_CLUT()
 				set_palette_on_vbl_fn = palette_8bit_update;	// when changing from 32bit to 8bit screen we need to reset palette.
 				break;
 
-		case 15: p96_conv_fn = NULL; break;
+		case 15:	p96_conv_fn = NULL; break;
 
-		case 16: p96_conv_fn = NULL; break;
+		case 16:	p96_conv_fn = NULL; break;
 
-		case 32: p96_conv_fn = NULL; break;
+		case 32:	SetPalette_8bit_grayscreen (0, 256);
+				set_palette_fn = palette_8bit_nope;
+				p96_conv_fn = convert_32bit_to_8bit_grayscale; 
+				break;
 	}
 }
 
@@ -2911,21 +2914,28 @@ void DX_SetPalette (int start, int count)
 	// exit if not valid !!!
 	if (! screen_is_picasso) return;
 
-	if (start > 255) start = 255;
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+
+	start &=255;
 	if (start + count > 256) count = 256 - start;
 
 	// we need to keep picasso_vidinfo.clut upto date, as used for stuff!
-
-
 	// update other color tables.
 
 	if (set_palette_fn)	// we need to convert !!
 	{
 		int n;
+
+		printf("%s:%d\n",__FUNCTION__,__LINE__);
+
 		for (n = start ; n<(start+count); n++ ) set_palette_fn( picasso96_state.CLUT, n );
+
+		printf("%s:%d\n",__FUNCTION__,__LINE__);
 	}
 	else if ((S)&&(W -> BorderTop == 0))
 	{
+		printf("%s:%d\n",__FUNCTION__,__LINE__);
+
 		if (picasso96_state.RGBFormat == RGBFB_CHUNKY) 
 		{
 			SetPalette_8bit_screen(start, count);
@@ -2933,6 +2943,8 @@ void DX_SetPalette (int start, int count)
 	}
 
 	dx_pal_count++;
+
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
 }
 
 void DX_SetPalette_vsync(void)
@@ -3448,7 +3460,9 @@ void p96_conv_all()
 	if (picasso_invalid_lines == NULL )
 		{ printf("unexpcted NULL on picasso_invalid_lines\n"); return; }
 
-	dest_tmp_buffer_ptr = alloca( comp_p96_RP.BitMap -> BytesPerRow );		// becouse output is needs more space.
+	dest_tmp_buffer_ptr = alloca( comp_p96_RP.BitMap ?
+						comp_p96_RP.BitMap -> BytesPerRow : 
+						W -> RPort -> BitMap -> BytesPerRow );		// becouse output is needs more space.
 
 	if (dest_tmp_buffer_ptr == NULL)
 		{ printf("no dest_tmp_buffer\n"); return ; }
@@ -3471,9 +3485,13 @@ void p96_conv_all()
 	
 			WritePixelArray( (void *) dest_tmp_buffer_ptr,
 				0, 0,
-				comp_p96_RP.BitMap -> BytesPerRow,
+				comp_p96_RP.BitMap ?
+					comp_p96_RP.BitMap -> BytesPerRow
+					: W -> RPort -> BitMap -> BytesPerRow,
 				COMP_FMT_SRC,
-				&comp_p96_RP,
+				comp_p96_RP.BitMap ?
+					&comp_p96_RP
+					: W -> RPort,
 				0, y,
 				picasso_vidinfo.width, 1 );
 

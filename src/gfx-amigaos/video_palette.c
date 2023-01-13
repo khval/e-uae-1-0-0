@@ -179,3 +179,27 @@ void palette_8bit_update(struct MyCLUTEntry *pal, uint32 num)
 		SetPalette_8bit_screen(0, 256);
 	}
 }
+
+void SetPalette_8bit_grayscreen (int start, int count)
+{
+	int i;
+
+	load32_p96_table[ 0 ] = count << 16 | start;
+
+	int offset = 1;
+
+	for (i = start; i < start+count;  i++)
+	{
+		load32_p96_table[ offset ++ ] = 0x01010101 * i;
+		load32_p96_table[ offset ++ ] = 0x01010101 * i;
+		load32_p96_table[ offset ++  ] = 0x01010101 * i;
+	}
+
+	LoadRGB32( &(S -> ViewPort) , load32_p96_table );
+}
+
+void palette_8bit_nope(struct MyCLUTEntry *pal, uint32 num)
+{
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+}
+
