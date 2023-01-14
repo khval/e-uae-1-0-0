@@ -437,7 +437,6 @@ void convert_32bit_to_8bit_grayscale(  char *from, char *to,int  pixels )
 #if 0
 	int sum;
 	int n;
-	register uint32 a,b,c,d;
 
 	for (n=0; n<pixels;n++)
 	{
