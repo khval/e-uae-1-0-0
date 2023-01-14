@@ -1380,7 +1380,7 @@ void set_p96_output_CLUT()
 				set_palette_fn = palette_8bit_nope;
 				SetPalette_8bit_grayscreen (0, 256);
 				set_palette_fn = palette_notify;
-				set_palette_on_vbl_fn =SetPalette_8bit_grayscreen;
+				set_palette_on_vbl_fn =palette_8bit_gray_update;
 				p96_conv_fn = convert_32bit_to_8bit_grayscale; 
 				break;
 	}
