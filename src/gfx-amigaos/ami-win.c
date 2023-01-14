@@ -139,6 +139,8 @@ uint32 load32_p96_table[1 + (256 * 3)];		// 256 colors + 1 count
 static int palette_update_start = 256;
 static int palette_update_end   = 0;
 
+extern bool debug_crash;
+#define debug_crashed(fmt,...) if (debug_crash) DebugPrintF(fmt,#__VA_ARGS__)
 
 extern bool output_clut_needs_update;
 
