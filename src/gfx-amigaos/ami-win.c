@@ -132,8 +132,6 @@ extern struct picasso_vidbuf_description picasso_vidinfo;
 static int bitdepth;
 static int current_width, current_height, current_depth;
 
-uint32 load32_p96_table[1 + (256 * 3)];		// 256 colors + 1 count
-
 // this needs, to be changed when color is changed !!!!!
 
 static int palette_update_start = 256;
@@ -1402,7 +1400,7 @@ void set_p96_output_R5G6B5()
 				break;
 
 		case PIXF_R5G5B5:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
-				init_lookup_15bit_to_16bit_be();
+				init_lookup_15bit_be_to_16bit_be();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit;
 				break;
 
@@ -1437,7 +1435,7 @@ void set_p96_output_R5G6B5PC()
 				break;
 
 		case PIXF_R5G5B5:	DRAW_FMT_SRC = PIXF_R5G5B5;
-				init_lookup_15bit_to_16bit_le();
+				init_lookup_15bit_be_to_16bit_le();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; 
 
 				printf("*** this one is expected!! ***\n");

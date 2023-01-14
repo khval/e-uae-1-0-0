@@ -3,9 +3,15 @@
 
 #include <proto/exec.h>
 #include <proto/dos.h>
-#include "video_convert.h"
 
-// uint16 *vpal16 = NULL;
+#include "sysconfig.h"
+#include "sysdeps.h"
+
+#ifdef PICASSO96_SUPPORTED
+#include "include/picasso96.h"
+#endif
+
+#include "video_convert.h"
 
 extern struct TagItem tags_public[] ;
 
@@ -16,8 +22,8 @@ struct video_convert_names vcn[] =	{
 
 	{"convert_8bit_lookup_to_16bit",(void *) convert_8bit_lookup_to_16bit},
 	{"convert_8bit_lookup_to_16bit_2pixels",(void *) convert_8bit_lookup_to_16bit_2pixels},
-	{"convert_15bit_to_16bit_be",(void *) convert_15bit_to_16bit_be},
-	{"convert_15bit_to_16bit_le",(void *) convert_15bit_to_16bit_le},
+	{"convert_15bit_to_16bit_be",(void *) convert_15bit_be_to_16bit_be},
+	{"convert_15bit_to_16bit_le",(void *) convert_15bit_be_to_16bit_le},
 	{"convert_16bit_lookup_to_16bit",(void *) convert_16bit_lookup_to_16bit},
 	{"convert_32bit_to_16bit_be",(void *) convert_32bit_to_16bit_be},
 	{"convert_32bit_to_16bit_le",(void *) convert_32bit_to_16bit_le},
@@ -89,7 +95,7 @@ void convert_8bit_lookup_to_32bit_2pixels(  uint16 *from, double *to,int  pixels
 	}
 }
 
-void convert_15bit_to_16bit_le(  uint16 *from, uint16 *to,int  pixels )
+void convert_15bit_be_to_16bit_le(  uint16 *from, uint16 *to,int  pixels )
 {
 	int n;
 	register unsigned int rgb;
@@ -111,7 +117,7 @@ void convert_15bit_to_16bit_le(  uint16 *from, uint16 *to,int  pixels )
 	}
 }
 
-void convert_15bit_to_16bit_be(  uint16 *from, uint16 *to,int  pixels )
+void convert_15bit_be_to_16bit_be(  uint16 *from, uint16 *to,int  pixels )
 {
 	int n;
 	register unsigned int rgb;
@@ -272,7 +278,7 @@ void init_lookup_16bit_swap(  )
 	}
 }
 
-void init_lookup_15bit_to_16bit_le(  )
+void init_lookup_15bit_be_to_16bit_le(  )
 {
 	int n;
 	register unsigned int rgb;
@@ -293,7 +299,7 @@ void init_lookup_15bit_to_16bit_le(  )
 	}
 }
 
-void init_lookup_15bit_to_16bit_be(  )
+void init_lookup_15bit_be_to_16bit_be(  )
 {
 	int n;
 	register unsigned int rgb;
