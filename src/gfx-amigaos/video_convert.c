@@ -278,6 +278,42 @@ void init_lookup_16bit_swap(  )
 	}
 }
 
+void init_lookup_15bit_be_to_8bit(  )
+{
+	int n;
+	register unsigned int r,g,b;
+
+	if (vpal16) FreeVec(vpal16); 
+	vpal16 = (uint16 *) AllocVecTagList(0x10000 * sizeof(uint16), tags_public);
+	if (vpal16 == NULL) return;
+
+	for (n=0; n<0x10000;n++)
+	{
+		r = ((n >> 10) & 0x1F) * 255 / 0x1F;		// etch channel is 5 bits, two channels shifted out.
+		g = ((n >> 5) & 0x1F) * 255 / 0x1F;
+		b = (n & 0x1F) * 255 / 0x1F ;
+		vpal16[n] = (r+g+b) /3;
+	}
+}
+
+void init_lookup_16bit_be_to_8bit(  )
+{
+	int n;
+	register unsigned int r,g,b;
+
+	if (vpal16) FreeVec(vpal16); 
+	vpal16 = (uint16 *) AllocVecTagList(0x10000 * sizeof(uint16), tags_public);
+	if (vpal16 == NULL) return;
+
+	for (n=0; n<0x10000;n++)
+	{
+		r = ((n >> 11) & 0x1F) * 255 / 0x1F;		// etch channel is 5 bits, two channels shifted out.
+		g = ((n >> 5) & 0x3F) * 255 / 0x3F;
+		b = (n & 0x1F) * 255 / 0x1F ;
+		vpal16[n] = (r+g+b) /3;
+	}
+}
+
 void init_lookup_15bit_be_to_16bit_le(  )
 {
 	int n;
@@ -285,7 +321,7 @@ void init_lookup_15bit_be_to_16bit_le(  )
 	register unsigned int rg;
 	register unsigned int b;
 
-	if (vpal16) free(vpal16); 
+	if (vpal16) FreeVec(vpal16); 
 	vpal16 = (uint16 *) AllocVecTagList(0x10000 * sizeof(uint16), tags_public);
 	if (vpal16 == NULL) return;
 
@@ -306,7 +342,7 @@ void init_lookup_15bit_be_to_16bit_be(  )
 	register unsigned int rg;
 	register unsigned int b;
 
-	if (vpal16) free(vpal16); 
+	if (vpal16) FreeVec(vpal16); 
 	vpal16 = (uint16 *) AllocVecTagList( 0x10000 * sizeof(uint16), tags_public);
 	if (vpal16 == NULL) return;
 
@@ -325,7 +361,7 @@ void init_lookup_15bit_be_to_32bit_le( void  )
 	register unsigned int g;
 	register unsigned int b;
 
-	if (vpal32) free(vpal32); 
+	if (vpal32) FreeVec(vpal32); 
 	vpal32 = AllocVecTagList(0x10000 * sizeof(uint32), tags_public);
 	if (vpal32 == NULL) return;
 
@@ -345,7 +381,7 @@ void init_lookup_15bit_be_to_32bit_be( void  )
 	register unsigned int g;
 	register unsigned int b;
 
-	if (vpal32) free(vpal32); 
+	if (vpal32) FreeVec(vpal32); 
 	vpal32 = AllocVecTagList(0x10000 * sizeof(uint32), tags_public);
 	if (vpal32 == NULL) return;
 
@@ -365,7 +401,7 @@ void init_lookup_16bit_le_to_32bit_le( void )
 	register unsigned int g;
 	register unsigned int b;
 
-	if (vpal32) free(vpal32); 
+	if (vpal32) FreeVec(vpal32); 
 	vpal32 = AllocVecTagList( 0x10000 * sizeof(uint32), tags_public);
 	if (vpal32 == NULL) return;
 
@@ -386,7 +422,7 @@ void init_lookup_16bit_be_to_32bit_le( void )
 	register unsigned int g;
 	register unsigned int b;
 
-	if (vpal32) free(vpal32); 
+	if (vpal32) FreeVec(vpal32); 
 	vpal32 = AllocVecTagList( 0x10000 * sizeof(uint32), tags_public);
 	if (vpal32 == NULL) return;
 

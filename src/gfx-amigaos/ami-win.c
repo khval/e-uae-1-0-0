@@ -1366,18 +1366,37 @@ void set_p96_output_CLUT()
 	DRAW_FMT_SRC = PIXF_CLUT;
 	COMP_FMT_SRC = PIXF_NONE;	
 
-	switch ( picasso_vidinfo.depth )
+	switch ( picasso_vidinfo.rgbformat )
 	{
-		case 8:	p96_conv_fn = NULL;
+		case PIXF_CLUT:	p96_conv_fn = NULL;
 				set_palette_on_vbl_fn = palette_8bit_update;	// when changing from 32bit to 8bit screen we need to reset palette.
 				break;
 
-		case 15:	p96_conv_fn = NULL; break;
+		case PIXF_R5G5B5:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
+				SetPalette_8bit_grayscreen (0, 256);
+				set_palette_fn = palette_notify;
+				set_palette_on_vbl_fn =palette_8bit_gray_update;
+				init_lookup_15bit_be_to_8bit();
+				p96_conv_fn = convert_16bit_to_8bit;
+				break;
 
-		case 16:	p96_conv_fn = NULL; break;
+		case PIXF_R5G6B5:	DRAW_FMT_SRC = PIXF_R5G6B5;	
+				SetPalette_8bit_grayscreen (0, 256);
+				set_palette_fn = palette_notify;
+				set_palette_on_vbl_fn =palette_8bit_gray_update;
+				init_lookup_16bit_be_to_8bit();
+				p96_conv_fn = convert_16bit_to_8bit;  
+				break;
 
-		case 32:	
-				set_palette_fn = palette_8bit_nope;
+		case PIXF_R5G6B5PC:	DRAW_FMT_SRC = PIXF_R5G6B5PC;	
+				SetPalette_8bit_grayscreen (0, 256);
+				set_palette_fn = palette_notify;
+				set_palette_on_vbl_fn =palette_8bit_gray_update;
+				init_lookup_16bit_be_to_8bit();
+				p96_conv_fn = convert_16bit_to_8bit;  
+				break;
+
+		case PIXF_A8R8G8B8:	DRAW_FMT_SRC = PIXF_A8R8G8B8;	
 				SetPalette_8bit_grayscreen (0, 256);
 				set_palette_fn = palette_notify;
 				set_palette_on_vbl_fn =palette_8bit_gray_update;

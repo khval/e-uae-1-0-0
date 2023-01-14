@@ -7,6 +7,9 @@ struct video_convert_names
 
 const char *get_name_converter_fn_ptr( void *fn_ptr);
 
+void init_lookup_15bit_be_to_8bit( void );
+void init_lookup_16bit_be_to_8bit( void );
+
 void init_lookup_16bit_swap( void );
 
 void init_lookup_15bit_be_to_16bit_le( void );
@@ -35,7 +38,8 @@ void convert_16bit_to_32bit( uint16 *from, uint32 *to,int  pixels );
 
 extern uint16 *lookup16bit;
 
-void convert_32bit_to_8bit_grayscale(  char *from, char *to,int  pixels );
+void convert_16bit_to_8bit( uint16 *from, char *to,int  pixels );
+void convert_32bit_to_8bit_grayscale( char *from, char *to,int  pixels );
 
 void palette_notify(struct MyCLUTEntry *pal, uint32 num);
 
