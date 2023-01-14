@@ -1381,7 +1381,7 @@ void set_p96_output_CLUT()
 				SetPalette_8bit_grayscreen (0, 256);
 				set_palette_fn = palette_notify;
 				set_palette_on_vbl_fn =palette_8bit_gray_update;
-				p96_conv_fn = convert_32bit_to_8bit_grayscale; 
+				p96_conv_fn = (conv_fn_cast) convert_32bit_to_8bit_grayscale; 
 				break;
 	}
 }
@@ -3495,16 +3495,24 @@ void p96_conv_all()
 			{
 				p96_conv_fn( src_buffer_ptr + y*src_BytesPerRow, dest_tmp_buffer_ptr, picasso_vidinfo.width );
 
-//				memset( dest_tmp_buffer_ptr, y & 255, dest_bpr );
-
-				WritePixelArray( (void *) dest_tmp_buffer_ptr,
-					0, 0,	dest_bpr,
-					COMP_FMT_SRC,
-					comp_p96_RP.BitMap ?
-						&comp_p96_RP
-						: W -> RPort,
-					0, y,
-					picasso_vidinfo.width, 1 );
+				if ( COMP_FMT_SRC != PIXF_NONE )
+				{
+					WritePixelArray( (void *) dest_tmp_buffer_ptr,
+						0, 0,	dest_bpr,
+						COMP_FMT_SRC,
+						&comp_p96_RP,
+						0, y,
+						picasso_vidinfo.width, 1 );
+				}
+				else
+				{
+					WritePixelArray( (void *) dest_tmp_buffer_ptr,
+						0, 0,	dest_bpr,
+						PIXF_CLUT,
+						 W -> RPort,
+						p96_xoffset, p96_yoffset+y,
+						picasso_vidinfo.width, 1 );
+				}
 			}
 
 #endif
