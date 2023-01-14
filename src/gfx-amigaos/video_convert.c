@@ -440,18 +440,16 @@ void init_lookup_16bit_be_to_32bit_be(  )
 
 void convert_32bit_to_8bit_grayscale(  char *from, char *to,int  pixels )
 {
-#if 0
 	int sum;
 	int n;
 
 	for (n=0; n<pixels;n++)
 	{
 		from ++;
-		sum += *from++;
+		sum = *from++;
 		sum += *from++;
 		sum += *from++;
 		*to++= sum / 3;
 	}
-#endif
 }
 

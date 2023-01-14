@@ -200,7 +200,6 @@ void SetPalette_8bit_grayscreen (int start, int count)
 
 void palette_8bit_gray_update(struct MyCLUTEntry *pal, uint32 num)
 {
-
 	if (W -> BorderTop == 0)
 	{
 		SetPalette_8bit_grayscreen(0, 256);
@@ -209,6 +208,5 @@ void palette_8bit_gray_update(struct MyCLUTEntry *pal, uint32 num)
 
 void palette_8bit_nope(struct MyCLUTEntry *pal, uint32 num)
 {
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
 }
 
