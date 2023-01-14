@@ -1378,8 +1378,11 @@ void set_p96_output_CLUT()
 
 		case 16:	p96_conv_fn = NULL; break;
 
-		case 32:	SetPalette_8bit_grayscreen (0, 256);
+		case 32:	
 				set_palette_fn = palette_8bit_nope;
+				SetPalette_8bit_grayscreen (0, 256);
+				set_palette_fn = palette_notify;
+				set_palette_on_vbl_fn =SetPalette_8bit_grayscreen;
 				p96_conv_fn = convert_32bit_to_8bit_grayscale; 
 				break;
 	}
@@ -3448,33 +3451,30 @@ void p96_conv_all()
 {	
 	bool failed = false;
 	
-#if 1
-
 	APTR lock_src,lock_dest;
 	ULONG src_BytesPerRow,dest_BytesPerRow;
 	uint8 *src_buffer_ptr;
 	char *dest_buffer_ptr;
 	char *dest_tmp_buffer_ptr;
 	int y;
+	int dest_bpr;
 
 	if (conv_p96_RP.BitMap != draw_p96_RP -> BitMap)
 		{ printf("conv bitmap is expected to be draw bitmap\n");return; }
 
-	if (comp_p96_RP.BitMap == draw_p96_RP -> BitMap)
-		{ printf("royal fuck up... draw bitmap can not be the same as comp bitmap\nwhen converting formats\n");return; }
-
-	if (comp_p96_RP.BitMap == NULL)
-		{ printf("comp_p96_RP.BitMap has no bitmap");return; }
-
 	if (draw_p96_RP -> BitMap == NULL)
-		{ printf("draw_p96_RP -> BitMap has no bitmap");return; }
+		{ printf("draw_p96_RP -> BitMap has no bitmap\n");return; }
 
 	if (picasso_invalid_lines == NULL )
 		{ printf("unexpcted NULL on picasso_invalid_lines\n"); return; }
 
-	dest_tmp_buffer_ptr = alloca( comp_p96_RP.BitMap ?
-						comp_p96_RP.BitMap -> BytesPerRow : 
-						W -> RPort -> BitMap -> BytesPerRow );		// becouse output is needs more space.
+	dest_bpr = comp_p96_RP.BitMap ?
+		comp_p96_RP.BitMap -> BytesPerRow : 
+		picasso_vidinfo.width * 4;
+
+		//W -> RPort -> BitMap -> BytesPerRow;
+
+	dest_tmp_buffer_ptr = alloca( dest_bpr );		// becouse output is needs more space.
 
 	if (dest_tmp_buffer_ptr == NULL)
 		{ printf("no dest_tmp_buffer\n"); return ; }
@@ -3493,19 +3493,21 @@ void p96_conv_all()
 
 			src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;
 			src_BytesPerRow = draw_p96_RP -> BitMap -> BytesPerRow;
-			if (src_buffer_ptr) p96_conv_fn( src_buffer_ptr + y*src_BytesPerRow, dest_tmp_buffer_ptr, picasso_vidinfo.width );
-	
-			WritePixelArray( (void *) dest_tmp_buffer_ptr,
-				0, 0,
-				comp_p96_RP.BitMap ?
-					comp_p96_RP.BitMap -> BytesPerRow
-					: W -> RPort -> BitMap -> BytesPerRow,
-				COMP_FMT_SRC,
-				comp_p96_RP.BitMap ?
-					&comp_p96_RP
-					: W -> RPort,
-				0, y,
-				picasso_vidinfo.width, 1 );
+			if (src_buffer_ptr) 
+			{
+				p96_conv_fn( src_buffer_ptr + y*src_BytesPerRow, dest_tmp_buffer_ptr, picasso_vidinfo.width );
+
+//				memset( dest_tmp_buffer_ptr, y & 255, dest_bpr );
+
+				WritePixelArray( (void *) dest_tmp_buffer_ptr,
+					0, 0,	dest_bpr,
+					COMP_FMT_SRC,
+					comp_p96_RP.BitMap ?
+						&comp_p96_RP
+						: W -> RPort,
+					0, y,
+					picasso_vidinfo.width, 1 );
+			}
 
 #endif
 
@@ -3524,12 +3526,8 @@ void p96_conv_all()
 				0, y,
 				picasso_vidinfo.width, 1 );
 #endif
-
-
 		}
 	}
-
-#endif
 }
 
 #define debug_vsync_time 0
@@ -3559,7 +3557,7 @@ int is_vsync (void)
 */
 	if (W)
 	{
-		if ((screen_is_picasso) && (comp_p96_RP.BitMap))
+		if (screen_is_picasso)
 		{
 //			printf("picasso_vidinfo.rowbytes %d pixbytes: %d\n",picasso_vidinfo.rowbytes,picasso_vidinfo.pixbytes);
 
