@@ -31,6 +31,8 @@
  *   programs started from a Picasso workbench.
  */
 
+#include <proto/exec.h>
+
 #include <stdbool.h>
 
 #include "sysconfig.h"
@@ -45,7 +47,8 @@
 #include "picasso96.h"
 #include "uae_endian.h"
 
-
+bool debug_crash = false;
+#define debug_crashed(fmt,...) if (debug_crash) DebugPrintF(fmt, ##__VA_ARGS__)
 
 #ifdef JIT
 int        have_done_picasso       = 0;         /* For the JIT compiler */
@@ -644,58 +647,67 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 
 
 
-
-    if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat) {
-	width *= Bpp;
-	if (Bpp == 4 && need_argb32_hack) {
-	    while (height-- > 0) {
-		memcpy_bswap32 (dstp, srcp, width);
-		srcp += ri->BytesPerRow;
-		dstp += picasso_vidinfo.rowbytes;
-	    }
-	} else {
-	    while (height-- > 0) {
-		memcpy (dstp, srcp, width);
-		srcp += ri->BytesPerRow;
-		dstp += picasso_vidinfo.rowbytes;
-	    }
-	}
-    } else {
-	int psiz = GetBytesPerPixel (picasso_vidinfo.rgbformat);
-
-	if (picasso96_state.RGBFormat != RGBFB_CHUNKY)
+	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
 	{
-  		gfx_unlock_picasso ();
+		width *= Bpp;
+
+		debug_crashed("%s:%d - memcpy (dstp: %d, srcp: %d, width: %d);\n",__FUNCTION__,__LINE__, dstp, srcp, width);
+
+		while (height-- > 0)
+		{
+			memcpy (dstp, srcp, width);
+			srcp += ri->BytesPerRow;
+			dstp += picasso_vidinfo.rowbytes;
+		}
+	}
+	 else
+	{
+		int psiz = GetBytesPerPixel (picasso_vidinfo.rgbformat);
 
 
-		printf("Error: picasso96_state.RGBFormat: %08x\npicasso_vidinfo.rgbformat: %08x\n\n",picasso96_state.RGBFormat,picasso_vidinfo.rgbformat);
+		if (picasso96_state.RGBFormat != RGBFB_CHUNKY)
+		{
+			gfx_unlock_picasso ();
+			DebugPrintF("Error: picasso96_state.RGBFormat: %08x\npicasso_vidinfo.rgbformat: %08x\n\n",picasso96_state.RGBFormat,picasso_vidinfo.rgbformat);
+			return;
+		}
 
-		return;
-	 	//   abort ();
+		output_update_clut();
+
+		int i;
+		switch (psiz)
+		{
+			case 2:
+
+				while (height-- > 0)
+				{
+					for (i = 0; i < width; i++)
+						*((uae_u16 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
+
+					srcp += ri->BytesPerRow;
+					dstp += picasso_vidinfo.rowbytes;
+				}
+				break;
+
+			case 4:
+
+				while (height-- > 0)
+				{
+					for (i = 0; i < width; i++)
+						*((uae_u32 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
+
+					srcp += ri->BytesPerRow;
+					dstp += picasso_vidinfo.rowbytes;
+				}
+				break;
+
+			default:
+				abort ();
+		}
 	}
 
-	output_update_clut();	// lets do this shit!!!
-
-	while (height-- > 0) {
-	    int i;
-	    switch (psiz) {
-	    case 2:
-		for (i = 0; i < width; i++)
-		    *((uae_u16 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
-		break;
-	    case 4:
-		for (i = 0; i < width; i++)
-		    *((uae_u32 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
-		break;
-	    default:
-		abort ();
-	    }
-	    srcp += ri->BytesPerRow;
-	    dstp += picasso_vidinfo.rowbytes;
-	}
-    }
-  out:
-    gfx_unlock_picasso ();
+out:
+	gfx_unlock_picasso ();
 }
 
 /*
