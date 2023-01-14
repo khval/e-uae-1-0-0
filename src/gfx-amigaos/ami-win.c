@@ -396,6 +396,7 @@ bool p96_update_format = false;
 
 int p96_xoffset = 0;
 int p96_yoffset = 0;
+bool is_p96_dest_offset = false;
 
 void palette_notify(struct MyCLUTEntry *pal, uint32 num)
 {
@@ -1667,6 +1668,8 @@ void init_comp( struct Window *W )
 			p96_xoffset = 0;
 			p96_yoffset = 0;
 		}
+
+		is_p96_dest_offset = (W->BorderTop == 0) && (output_depth == 8) && (p96_conv_fn == NULL);
 	}
 
 	if (screen_is_picasso)
@@ -2755,7 +2758,7 @@ int DX_Blit (int srcx, int srcy, int dstx, int dsty, int width, int height, BLIT
 
 	if (opcode == BLIT_SRC ) 
 	{
-		if (draw_p96_RP == W -> RPort)		// We draw direct into the window, and we center it!
+		if (is_p96_dest_offset)		// if we draw direct into the window, and we center it!
 		{
 			dstx += p96_xoffset;
 			dsty += p96_yoffset;
@@ -2842,8 +2845,12 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 				break;
 		}
 
-		dstx += p96_xoffset;
-		dsty += p96_yoffset;
+		if (is_p96_dest_offset)
+		{
+			dstx += p96_xoffset;
+			dsty += p96_yoffset;
+		}
+
 		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,argb);
 		p96_gfx_updated = true;
 		DX_Invalidate (dsty, dsty + height - 1);
@@ -3036,10 +3043,13 @@ uae_u8 *gfx_lock_picasso (void)
 
 		if (p96_lock)
 		{
-			address += (p96_xoffset + p96_yoffset * picasso_vidinfo.rowbytes);
+			if (is_p96_dest_offset)
+			{
+				 address += (p96_xoffset + p96_yoffset * picasso_vidinfo.rowbytes);
+			}
 		}
 	}
-
+	
 	return (APTR ) address;
 }
 
