@@ -133,6 +133,22 @@ void convert_15bit_be_to_16bit_be(  uint16 *from, uint16 *to,int  pixels )
 	}
 }
 
+void convert_16bit_to_8bit( uint16 *from, char *to,int  pixels )
+{
+	register int n;
+
+	if (!vpal16)
+	{
+		DebugPrintF("vpal16 is NULL, can't convert!!\n");
+		return;
+	}
+
+	for (n=0; n<pixels;n++)
+	{
+		to[n] = (char) vpal16[ from[n] ];
+	}
+}
+
 void convert_16bit_lookup_to_16bit(  uint16 *from, uint16 *to,int  pixels )
 {
 	register int n;
