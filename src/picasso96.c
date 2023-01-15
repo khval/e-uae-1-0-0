@@ -578,80 +578,81 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 		     int dstx, int dsty, int width, int height,
 		     BLIT_OPCODE opcode, int can_do_blit)
 {
-    int xoff = picasso96_state.XOffset;
-    int yoff = picasso96_state.YOffset;
-    uae_u8 *srcp, *dstp;
+	int xoff = picasso96_state.XOffset;
+	int yoff = picasso96_state.YOffset;
+	uae_u8 *srcp, *dstp;
 
-    /* Clipping.  */
-    dstx -= xoff;
-    dsty -= yoff;
-    if (srcy < yoff || srcx < xoff
-	|| srcx - xoff + width > picasso96_state.Width
-	|| srcy - yoff + height > picasso96_state.Height)
-    {
-	can_do_blit = 0;
-    }
-    if (dstx < 0) {
-	srcx -= dstx;
-	width += dstx;
-	dstx = 0;
-    }
-    if (dsty < 0) {
-	srcy -= dsty;
-	height += dsty;
-	dsty = 0;
-    }
-    if (dstx + width > picasso96_state.Width)
-	width = picasso96_state.Width - dstx;
-    if (dsty + height > picasso96_state.Height)
-	height = picasso96_state.Height - dsty;
-    if (width <= 0 || height <= 0)
-	return;
+debug_crashed("%s:%d\n",__FUNCTION__,__LINE__);
 
-    /* If this RenderInfo points at something else than the currently visible
-     * screen, we must ignore the blit.  */
-    if (can_do_blit) {
-	/*
-	 * Call OS blitting function that can do it in video memory.
-	 * Should return if it was successful
-	 */
-	if (DX_Blit (srcx, srcy, dstx, dsty, width, height, opcode))
-	    return;
-    }
+	// Clipping. 
 
-    /* If no OS blit available, we do a copy from the P96 framebuffer in Amiga
-       memory to the host's frame buffer.  */
+	dstx -= xoff;
+	dsty -= yoff;
 
-    DX_Invalidate (dsty, dsty + height - 1);
-    if (!picasso_vidinfo.extra_mem)
-	return;
+	if (srcy < yoff || srcx < xoff
+		|| srcx - xoff + width > picasso96_state.Width
+		|| srcy - yoff + height > picasso96_state.Height)
+	{
+		can_do_blit = 0;
+	}
 
-    dstp = gfx_lock_picasso ();
-    if (dstp == 0)
-	goto out;
+	if (dstx < 0)
+	{
+		srcx -= dstx;
+		width += dstx;
+		dstx = 0;
+	}
 
-    /* Since the blit has already been performed in the framebuffer, we only need
-     * to blit the updated area to the screen. Therefore we use the destination
-     * coordinates for the source rectangle in the framebuffer - not the source
-     * coordinates.
-     */
-    srcp = ri->Memory + (dstx + xoff) * Bpp + (dsty + yoff) * ri->BytesPerRow;
+	if (dsty < 0)
+	{
+		srcy -= dsty;
+		height += dsty;
+		dsty = 0;
+	}
 
-    dstp += dsty * picasso_vidinfo.rowbytes + dstx * picasso_vidinfo.pixbytes;
+	if (dstx + width > picasso96_state.Width) width = picasso96_state.Width - dstx;
+	if (dsty + height > picasso96_state.Height) height = picasso96_state.Height - dsty;
+	if (width <= 0 || height <= 0) return;
 
-    P96TRACE (("P96: do_blit with srcp 0x%x, dstp 0x%x, dst_rowbytes %d, srcx"
+	// If this RenderInfo points at something else than the currently visible
+	// screen, we must ignore the blit.
+
+	if (can_do_blit)
+	{
+		// Call OS blitting function that can do it in video memory.
+		// Should return if it was successful
+
+		if (DX_Blit (srcx, srcy, dstx, dsty, width, height, opcode)) return;
+	}
+
+	// If no OS blit available, we do a copy from the P96 framebuffer in Amiga
+	// memory to the host's frame buffer.  
+
+	DX_Invalidate (dsty, dsty + height - 1);
+
+	if (!picasso_vidinfo.extra_mem) return;
+
+	dstp = gfx_lock_picasso ();
+	if (dstp == 0) goto out;
+
+	// Since the blit has already been performed in the framebuffer, we only need
+	// to blit the updated area to the screen. Therefore we use the destination
+	// coordinates for the source rectangle in the framebuffer - not the source
+	// coordinates.
+    
+	srcp = ri->Memory + (dstx + xoff) * Bpp + (dsty + yoff) * ri->BytesPerRow;
+
+	dstp += dsty * picasso_vidinfo.rowbytes + dstx * picasso_vidinfo.pixbytes;
+
+	P96TRACE (("P96: do_blit with srcp 0x%x, dstp 0x%x, dst_rowbytes %d, srcx"
 	       " %d, srcy %d, dstx %d, dsty %d, w %d, h %d, dst_pixbytes %d\n",
 	       srcp, dstp, picasso_vidinfo.rowbytes, srcx, srcy, dstx, dsty,
 	       width,height, picasso_vidinfo.pixbytes));
-    P96TRACE (("P96: gfxmem is at 0x%x\n", gfxmemory));
-
-
+	P96TRACE (("P96: gfxmem is at 0x%x\n", gfxmemory));
 
 	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
 	{
 		width *= Bpp;
-
-		debug_crashed("%s:%d - memcpy (dstp: %d, srcp: %d, width: %d);\n",__FUNCTION__,__LINE__, dstp, srcp, width);
 
 		while (height-- > 0)
 		{
@@ -663,7 +664,6 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 	 else
 	{
 		int psiz = GetBytesPerPixel (picasso_vidinfo.rgbformat);
-
 
 		if (picasso96_state.RGBFormat != RGBFB_CHUNKY)
 		{
@@ -810,7 +810,7 @@ STATIC_INLINE void write_currline (uae_u8 *srcp, int line_no, int first_byte, in
 						int i;
 						for (i = 0; i < byte_count; i++)
 							*((uae_u32 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
-				    	}
+					}
 					break;
 			}
 		}
@@ -880,47 +880,58 @@ STATIC_INLINE int renderinfo_is_current_screen (struct RenderInfo *ri)
  */
 extern unsigned int new_beamcon0;
 
+
+
 void picasso_refresh (int call_setpalette)
 {
-    struct RenderInfo ri;
+	struct RenderInfo ri;
 
-    if (!picasso_on)
-	return;
+	if (!picasso_on) return;
 
-    { // for higher P96 mousedraw rate
-	extern uae_u16 vtotal;
-	if (p96hack_vpos2) {
-	    vtotal = p96hack_vpos2;
-	    new_beamcon0 |= 0x80;
-	    p96refresh_active=1;
-	} else new_beamcon0 |= 0x20;
-    }
+	{ // for higher P96 mousedraw rate
+		extern uae_u16 vtotal;
+		if (p96hack_vpos2)
+		{
+			vtotal = p96hack_vpos2;
+			new_beamcon0 |= 0x80;
+			p96refresh_active=1;
+		}
+		else new_beamcon0 |= 0x20;
+	}
 
 #ifdef JIT
     have_done_picasso=1;
 #endif
 
-    /* Make sure that the first time we show a Picasso video mode, we don't
-     * blit any crap. We can do this by checking if we have an Address yet. */
-    if (picasso96_state.Address) {
-	unsigned int width, height;
-	/* blit the stuff from our static frame-buffer to the gfx-card */
-	ri.Memory = gfxmemory + (picasso96_state.Address - gfxmem_start);
-	ri.BytesPerRow = picasso96_state.BytesPerRow;
-	ri.RGBFormat = picasso96_state.RGBFormat;
+	// Make sure that the first time we show a Picasso video mode, we don't
+	// blit any crap. We can do this by checking if we have an Address yet. 
 
-	if (set_panning_called) {
-	    width = picasso96_state.VirtualWidth;
-	    height = picasso96_state.VirtualHeight;
-	} else {
-	    width = picasso96_state.Width;
-	    height = picasso96_state.Height;
+	if (picasso96_state.Address)
+	{
+		unsigned int width, height;
+
+		/* blit the stuff from our static frame-buffer to the gfx-card */
+
+		ri.Memory = gfxmemory + (picasso96_state.Address - gfxmem_start);
+		ri.BytesPerRow = picasso96_state.BytesPerRow;
+		ri.RGBFormat = picasso96_state.RGBFormat;
+
+		if (set_panning_called)
+		{
+			width = picasso96_state.VirtualWidth;
+			height = picasso96_state.VirtualHeight;
+		}
+		else
+		{
+			width = picasso96_state.Width;
+			height = picasso96_state.Height;
+		}
+
+		do_blit (&ri, picasso96_state.BytesPerPixel, 0, 0, 0, 0, width, height, BLIT_SRC, 0);
 	}
+	else
+		write_log ("P96: ERROR - picasso_refresh() can't refresh!\n");
 
-	do_blit (&ri, picasso96_state.BytesPerPixel, 0, 0, 0, 0, width,
-		 height, BLIT_SRC, 0);
-    } else
-	write_log ("P96: ERROR - picasso_refresh() can't refresh!\n");
 }
 
 /*
