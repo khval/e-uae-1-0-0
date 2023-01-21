@@ -118,6 +118,28 @@ static void free_libs (void)
 	closeLib(Icon);
 }
 
+char remap_scancode[256];
+
+static init_remap_keyboard()
+{
+	int sc;
+
+	for (sc=0;sc<256;sc++)
+		remap_scancode[sc] = sc;
+	
+	remap_scancode[58]=11;
+	remap_scancode[11]=12;
+	remap_scancode[12]=13;
+
+	remap_scancode[112]=0x5A;	// Home to 0xFA
+	remap_scancode[113]=0x5B;	// End to 0x5B
+	remap_scancode[71]=0x5F;	// insert to Help key.
+	remap_scancode[107]=0x3A;	// Menu key to 0x3A
+
+	// swaped to avoid issue with host system...
+	remap_scancode[101]=0x67;	// Right AltGr to Right Amiga
+	remap_scancode[103]=0x64;	// Right Window to Right Alt.
+}
 
 static BOOL init_libs (void)
 {
@@ -171,6 +193,8 @@ static BOOL init_libs (void)
 	if (!IIcon)  return FALSE;
 
 	if(!ITimer || !IExpansion) return FALSE;
+
+	init_remap_keyboard();
 
 #endif
 

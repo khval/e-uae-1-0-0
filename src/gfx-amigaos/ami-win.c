@@ -94,6 +94,8 @@ extern struct GraphicsIFace *IGraphics;
 
 ULONG CFG_16bit_mode,CFG_32bit_mode;
 
+extern char remap_scancode[256];
+
 struct 
 {
 	int x,y;
@@ -179,6 +181,8 @@ void set_p96_output_A8R8G8B8( void );
  void set_vpal_8bit_to_32bit_be(struct MyCLUTEntry *pal, uint32 num1);
  void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num);
  void set_vpal_8bit_to_32bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num);
+
+static void set_window_for_picasso (void);
 
 struct screen_rect
 {
@@ -2295,8 +2299,6 @@ void close_window()
 
 static void graphics_subshutdown (void)
 {
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
-
 	appw_exit ();
 
 	if (BitMap)
@@ -2359,8 +2361,6 @@ static void graphics_subshutdown (void)
 
 void graphics_leave (void)
 {
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
-
 	if (oldpixbuf)
 	{
 		free(oldpixbuf);
@@ -2618,105 +2618,126 @@ void handle_events(void)
 				uae_quit ();
 				break;
 
-		case IDCMP_RAWKEY: {
-		int keycode = code & 127;
-		int state   = code & 128 ? 0 : 1;
-		int ievent;
-
-		if ((qualifier & IEQUALIFIER_REPEAT) == 0) {
-			/* We just want key up/down events - not repeats */
-			if ((ievent = match_hotkey_sequence (keycode, state)))
-			handle_hotkey_event (ievent, state);
-			else
-			inputdevice_do_keyboard (keycode, state);
-		}
-		break;
-		 }
-
-		case IDCMP_MOUSEMOVE:
-		setmousestate (0, 0, dmx, 0);
-		setmousestate (0, 1, dmy, 0);
-
-		if (usepub) {
-			POINTER_STATE new_state = get_pointer_state (W, mx, my);
-			if (new_state != pointer_state) {
-			pointer_state = new_state;
-			if (pointer_state == INSIDE_WINDOW)
-				hide_pointer (W);
-			else
-				show_pointer (W);
-			}
-		}
-		break;
-
-		case IDCMP_MOUSEBUTTONS:
-		if (code == SELECTDOWN) setmousebuttonstate (0, 0, 1);
-		if (code == SELECTUP)   setmousebuttonstate (0, 0, 0);
-		if (code == MIDDLEDOWN) setmousebuttonstate (0, 2, 1);
-		if (code == MIDDLEUP)   setmousebuttonstate (0, 2, 0);
-		if (code == MENUDOWN)   setmousebuttonstate (0, 1, 1);
-		if (code == MENUUP)     setmousebuttonstate (0, 1, 0);
-		break;
-
-		/* Those 2 could be of some use later. */
-		case IDCMP_DISKINSERTED:
-		/*printf("diskinserted(%d)\n",code);*/
-		break;
-
-		case IDCMP_DISKREMOVED:
-		/*printf("diskremoved(%d)\n",code);*/
-		break;
-
-		case IDCMP_ACTIVEWINDOW:
-		/* When window regains focus (presumably after losing focus at some
-		 * point) UAE needs to know any keys that have changed state in between.
-		 * A simple fix is just to tell UAE that all keys have been released.
-		 * This avoids keys appearing to be "stuck" down.
-		 */
-		inputdevice_acquire ();
-		inputdevice_release_all_keys ();
-		reset_hotkeys ();
-
-		break;
-
-		case IDCMP_INACTIVEWINDOW:
-		inputdevice_unacquire ();
-		break;
-
-		case IDCMP_INTUITICKS:
+			case IDCMP_RAWKEY:
+				{
+					int state   = code & 128 ? 0 : 1;
+					int ievent;
 #ifdef __amigaos4__
-		grabTicks--;
-		if (grabTicks < 0) {
-			grabTicks = GRAB_TIMEOUT;
-			#ifdef __amigaos4__
-			if (mouseGrabbed)
-				grab_pointer (W);
-			#endif
-		}
+					int keycode = remap_scancode[code & 127];
+#else
+					int keycode = code & 127;
 #endif
-		break;
+					if (lcode != code & 127) 
+					{
+//						printf("code: %03d (%02X) ==> %d (%02X)\n",code & 127, code & 127, keycode, keycode);
+						lcode = code & 127;
+					}
 
-		default:
-		write_log ("Unknown event class: %x\n", class);
-		break;
-        }
-    }
+					if ((qualifier & IEQUALIFIER_REPEAT) == 0)
+					{
 
-    appw_events();
+						// We just want key up/down events - not repeats 
+
+						if ((ievent = match_hotkey_sequence (keycode, state)))
+							handle_hotkey_event (ievent, state);
+						else
+							inputdevice_do_keyboard (keycode, state);
+					}
+					break;
+				}
+
+			case IDCMP_MOUSEMOVE:
+
+				setmousestate (0, 0, dmx, 0);
+				setmousestate (0, 1, dmy, 0);
+
+				if (usepub)
+				{
+					POINTER_STATE new_state = get_pointer_state (W, mx, my);
+
+					if (new_state != pointer_state)
+					{
+						pointer_state = new_state;
+						if (pointer_state == INSIDE_WINDOW)
+							hide_pointer (W);
+						else
+							show_pointer (W);
+					}
+				}
+				break;
+
+			case IDCMP_MOUSEBUTTONS:
+				if (code == SELECTDOWN) setmousebuttonstate (0, 0, 1);
+				if (code == SELECTUP)   setmousebuttonstate (0, 0, 0);
+				if (code == MIDDLEDOWN) setmousebuttonstate (0, 2, 1);
+				if (code == MIDDLEUP)   setmousebuttonstate (0, 2, 0);
+				if (code == MENUDOWN)   setmousebuttonstate (0, 1, 1);
+				if (code == MENUUP)	 setmousebuttonstate (0, 1, 0);
+				break;
+
+				// Those 2 could be of some use later. 
+
+			case IDCMP_DISKINSERTED:
+
+				// printf("diskinserted(%d)\n",code);
+				break;
+
+			case IDCMP_DISKREMOVED:
+
+				// printf("diskremoved(%d)\n",code);
+				break;
+
+			case IDCMP_ACTIVEWINDOW:
+
+				// When window regains focus (presumably after losing focus at some
+				// point) UAE needs to know any keys that have changed state in between.
+				// A simple fix is just to tell UAE that all keys have been released.
+				// This avoids keys appearing to be "stuck" down.
+
+				inputdevice_acquire ();
+				inputdevice_release_all_keys ();
+				reset_hotkeys ();
+				break;
+
+			case IDCMP_INACTIVEWINDOW:
+				inputdevice_unacquire ();
+				break;
+
+			case IDCMP_INTUITICKS:
+
+#ifdef __amigaos4__
+				grabTicks--;
+				if (grabTicks < 0)
+				{
+					grabTicks = GRAB_TIMEOUT;
+
+					if (mouseGrabbed)
+						grab_pointer (W);
+				}
+#endif
+				break;
+
+			default:
+				write_log ("Unknown event class: %x\n", class);
+				break;
+		}
+	}
+
+	appw_events();
 }
 
 /***************************************************************************/
 
 int debuggable (void)
 {
-    return 1;
+	return 1;
 }
 
 /***************************************************************************/
 
 int mousehack_allowed (void)
 {
-    return 0;
+	return 0;
 }
 
 /***************************************************************************/
