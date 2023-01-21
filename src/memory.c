@@ -1029,12 +1029,23 @@ static int kickstart_checksum (uae_u8 *mem, int size)
 	    cksum++;
 	prevck = cksum;
     }
+
+	if (cksum == 0x334e16f8) return 1;		// DiagROM V1.2.1
+
 #ifndef SINGLEFILE
-    if (cksum != 0xFFFFFFFFul) {
-	gui_message("Kickstart checksum incorrect. You probably have a corrupted ROM image.\n");
-	return 0;
+
+	if (cksum != 0xFFFFFFFFul) 
+	{
+		const char *fmt = "Kickstart checksum %08x incorrect.\nYou probably have a corrupted ROM image.\n";
+		char buffer[100];
+
+		sprintf(buffer,fmt,cksum);
+		gui_message(buffer);
+		return 0;
     }
 #endif
+
+
     return 1;
 }
 
