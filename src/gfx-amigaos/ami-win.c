@@ -223,7 +223,7 @@ static void dispose_Iconify(void);
 
 static int need_dither;			// well.. guess :-) //
 static int use_delta_buffer;		// this will redraw only needed places //
-static int output_is_true_color;            // this is for truecolor mode //
+static int output_is_true_color;			// this is for truecolor mode //
 static int use_approx_color;
 
 extern void write_log(const char *fmt, ... ) ;
@@ -234,10 +234,10 @@ static uae_u8 *oldpixbuf = NULL;
 
 /* Values for amiga_screen_type */
 enum {
-    UAESCREENTYPE_CUSTOM,
-    UAESCREENTYPE_PUBLIC,
-    UAESCREENTYPE_ASK,
-    UAESCREENTYPE_LAST
+	UAESCREENTYPE_CUSTOM,
+	UAESCREENTYPE_PUBLIC,
+	UAESCREENTYPE_ASK,
+	UAESCREENTYPE_LAST
 };
 
 //****************************************************************************//
@@ -245,13 +245,13 @@ enum {
 // prototypes & global vars
 //
 
-extern struct IntuitionBase    *IntuitionBase ;
-extern struct GfxBase          *GfxBase ;
-extern struct Library          *LayersBase ;
-extern struct Library          *AslBase ;
-extern struct Library          *CyberGfxBase ;
+extern struct IntuitionBase	*IntuitionBase ;
+extern struct GfxBase		  *GfxBase ;
+extern struct Library		  *LayersBase ;
+extern struct Library		  *AslBase ;
+extern struct Library		  *CyberGfxBase ;
 #ifdef USE_CGX_OVERLAY
-extern struct Library          *CGXVideoBase;
+extern struct Library		  *CGXVideoBase;
 #endif
 
 extern struct AslIFace *IAsl;
@@ -262,7 +262,7 @@ extern struct CyberGfxIFace *ICyberGfx;
 
 bool empty_msg_queue(struct MsgPort *port);
 
-unsigned long            frame_num; /* for arexx */
+unsigned long			frame_num; /* for arexx */
 
 struct RastPort  comp_aga_RP;
 struct RastPort *draw_aga_RP = &comp_aga_RP;
@@ -282,10 +282,10 @@ extern struct kIcon fullscreenicon;
 
 static uae_u8 *CybBuffer = NULL;
 static struct ColorMap  *CM = NULL;
-static int              XOffset,YOffset;
+static int			  XOffset,YOffset;
 
-static int os39;        /* kick 39 present */
-static int usepub;      /* use public screen */
+static int os39;		/* kick 39 present */
+static int usepub;	  /* use public screen */
 static int is_halfbrite;
 static int is_ham;
 
@@ -480,46 +480,46 @@ static void flush_block_planar_nodither (struct vidbuf_description *gfxinfo, int
  */
 STATIC_INLINE void flush_line_planar_dither (struct vidbuf_description *gfxinfo, int line_no)
 {
-    int      xs      = 0;
-    int      len     = gfxinfo->width;
-    int      yoffset = line_no * gfxinfo->rowbytes;
-    uae_u16 *src;
-    uae_u16 *dst;
-    uae_u16 *newp = (uae_u16 *)(gfxinfo->bufmem + yoffset);
-    uae_u16 *oldp = (uae_u16 *)(oldpixbuf + yoffset);
+	int	  xs	  = 0;
+	int	  len	 = gfxinfo->width;
+	int	  yoffset = line_no * gfxinfo->rowbytes;
+	uae_u16 *src;
+	uae_u16 *dst;
+	uae_u16 *newp = (uae_u16 *)(gfxinfo->bufmem + yoffset);
+	uae_u16 *oldp = (uae_u16 *)(oldpixbuf + yoffset);
 
-    /* Find first pixel changed on this line */
-    while (*newp++ == *oldp++) {
+	/* Find first pixel changed on this line */
+	while (*newp++ == *oldp++) {
 	if (!--len)
 		return; /* line not changed - so don't draw it */
-    }
-    src   = --newp;
-    dst   = --oldp;
-    newp += len;
-    oldp += len;
+	}
+	src   = --newp;
+	dst   = --oldp;
+	newp += len;
+	oldp += len;
 
-    /* Find last pixel changed on this line */
-    while (*--newp == *--oldp)
+	/* Find last pixel changed on this line */
+	while (*--newp == *--oldp)
 	;
 
-    len = (1 + (oldp - dst));
-    xs  = src - (uae_u16 *)(gfxinfo->bufmem + yoffset);
+	len = (1 + (oldp - dst));
+	xs  = src - (uae_u16 *)(gfxinfo->bufmem + yoffset);
 
-    /* Copy changed pixels to delta buffer */
-    CopyMem (src, dst, len * 2);
+	/* Copy changed pixels to delta buffer */
+	CopyMem (src, dst, len * 2);
 
-    /* Dither changed pixels to Line buffer */
-    DitherLine (Line, src, xs, line_no, (len + 3) & ~3, 8);
+	/* Dither changed pixels to Line buffer */
+	DitherLine (Line, src, xs, line_no, (len + 3) & ~3, 8);
 
-    /* Blit dithered pixels from Line buffer to the display */
-    WritePixelLine8 ( draw_aga_RP, xs + XOffset, line_no + YOffset, len, Line, TempRPort);
+	/* Blit dithered pixels from Line buffer to the display */
+	WritePixelLine8 ( draw_aga_RP, xs + XOffset, line_no + YOffset, len, Line, TempRPort);
 }
 
 static void flush_block_planar_dither (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
-    int line_no;
+	int line_no;
 
-    for (line_no = first_line; line_no <= last_line; line_no++)
+	for (line_no = first_line; line_no <= last_line; line_no++)
 	flush_line_planar_dither (gfxinfo, line_no);
 }
 
@@ -528,19 +528,19 @@ static void flush_block_planar_dither (struct vidbuf_description *gfxinfo, int f
  */
 STATIC_INLINE void flush_line_ham (struct vidbuf_description *gfxinfo, int line_no)
 {
-    int     len = gfxinfo->width;
-    uae_u8 *src = gfxinfo->bufmem + (line_no * gfxinfo->rowbytes);
+	int	 len = gfxinfo->width;
+	uae_u8 *src = gfxinfo->bufmem + (line_no * gfxinfo->rowbytes);
 
-    ham_conv ((void*) src, Line, len);
-    WritePixelLine8 (draw_aga_RP, 0, line_no, len, Line, TempRPort);
+	ham_conv ((void*) src, Line, len);
+	WritePixelLine8 (draw_aga_RP, 0, line_no, len, Line, TempRPort);
 
-    return;
+	return;
 }
 
 static void flush_block_ham (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
-    int line_no;
-    for (line_no = first_line; line_no <= last_line; line_no++) flush_line_ham (gfxinfo, line_no);
+	int line_no;
+	for (line_no = first_line; line_no <= last_line; line_no++) flush_line_ham (gfxinfo, line_no);
 }
 
 
@@ -586,9 +586,9 @@ static void flush_clear_screen_gfxlib (struct vidbuf_description *gfxinfo)
 		if (output_is_true_color)
 		{
 			RectFillColor (draw_aga_RP, W->BorderLeft, W->BorderTop,
-				    W->Width - W->BorderLeft - W->BorderRight,
-				    W->Height - W->BorderTop - W->BorderBottom,
-				    0);
+					W->Width - W->BorderLeft - W->BorderRight,
+					W->Height - W->BorderTop - W->BorderBottom,
+					0);
 		}
 		else
 		{
@@ -616,28 +616,28 @@ static int RPDepth (struct RastPort *RP)
 
 static int get_color (int r, int g, int b, xcolnr *cnp)
 {
-    int col;
+	int col;
 
-    if (currprefs.amiga_use_grey)
+	if (currprefs.amiga_use_grey)
 	r = g = b = (77 * r + 151 * g + 29 * b) / 16;
-    else {
+	else {
 	r *= 0x11;
 	g *= 0x11;
 	b *= 0x11;
-    }
+	}
 
-    r *= 0x01010101;
-    g *= 0x01010101;
-    b *= 0x01010101;
-    col = ObtainColor (r, g, b);
+	r *= 0x01010101;
+	g *= 0x01010101;
+	b *= 0x01010101;
+	col = ObtainColor (r, g, b);
 
-    if (col == -1) {
+	if (col == -1) {
 	get_color_failed = 1;
 	return 0;
-    }
+	}
 
-    *cnp = col;
-    return 1;
+	*cnp = col;
+	return 1;
 }
 
 /****************************************************************************/
@@ -647,37 +647,37 @@ static int get_color (int r, int g, int b, xcolnr *cnp)
  */
 static __inline__ void rgb2xyz (int r, int g, int b,	int *x, int *y, int *z)
 {
-    *x = r * 1024 - (g + b) * 512;
-    *y = 886 * (g - b);
-    *z = (r + g + b) * 341;
+	*x = r * 1024 - (g + b) * 512;
+	*y = 886 * (g - b);
+	*z = (r + g + b) * 341;
 }
 
 static __inline__ int calc_err (int r1, int g1, int b1, int r2, int g2, int b2)
 {
-    int x1, y1, z1, x2, y2, z2;
+	int x1, y1, z1, x2, y2, z2;
 
-    rgb2xyz (r1, g1, b1, &x1, &y1, &z1);
-    rgb2xyz (r2, g2, b2, &x2, &y2, &z2);
-    x1 -= x2; y1 -= y2; z1 -= z2;
-    return x1 * x1 + y1 * y1 + z1 * z1;
+	rgb2xyz (r1, g1, b1, &x1, &y1, &z1);
+	rgb2xyz (r2, g2, b2, &x2, &y2, &z2);
+	x1 -= x2; y1 -= y2; z1 -= z2;
+	return x1 * x1 + y1 * y1 + z1 * z1;
 }
 
 /****************************************************************************/
 
 static int get_nearest_color (int r, int g, int b)
 {
-    int i, best, err, besterr;
-    int colors;
-    int br=0,bg=0,bb=0;
+	int i, best, err, besterr;
+	int colors;
+	int br=0,bg=0,bb=0;
 
    if (currprefs.amiga_use_grey)
 	r = g = b = (77 * r + 151 * g + 29 * b) / 256;
 
-    best    = 0;
-    besterr = calc_err (0, 0, 0, 15, 15, 15);
-    colors  = is_halfbrite ? 32 :(1 << RPDepth (draw_aga_RP));
+	best	= 0;
+	besterr = calc_err (0, 0, 0, 15, 15, 15);
+	colors  = is_halfbrite ? 32 :(1 << RPDepth (draw_aga_RP));
 
-    for (i = 0; i < colors; i++) {
+	for (i = 0; i < colors; i++) {
 	long rgb;
 	int cr, cg, cb;
 
@@ -704,8 +704,8 @@ static int get_nearest_color (int r, int g, int b)
 		br = cr; bg = cg; bb = cb;
 		}
 	}
-    }
-    return best;
+	}
+	return best;
 }
 
 /****************************************************************************/
@@ -791,9 +791,10 @@ static int init_true_colors_output (const struct RastPort *rp)
 
 	if (found)
 	{
-    		alloc_colors64k (redbits,  greenbits,  bluebits,
-			 redshift, greenshift, blueshift,
-			 0, 0, 0, byte_swap_16bit);
+
+		alloc_colors64k (redbits,  greenbits,  bluebits,
+				redshift, greenshift, blueshift,
+				0, 0, 0, byte_swap_16bit);
 
 		write_log ("AMIGFX: Using a %d-bit true-colour display.\n", redbits + greenbits + bluebits);
 	}
@@ -938,8 +939,8 @@ static int init_colors (void)
 		success = init_true_colors_output ( draw_aga_RP );
 		break;
 
-    }
-    return success;
+	}
+	return success;
 }
 
 /****************************************************************************/
@@ -952,19 +953,19 @@ static APTR blank_pointer;
  */
 static void init_pointer (void)
 {
-    static struct BitMap bitmap;
-    static UWORD	 row[2] = {0, 0};
+	static struct BitMap bitmap;
+	static UWORD	 row[2] = {0, 0};
 
-    InitBitMap (&bitmap, 2, 16, 1);
-    bitmap.Planes[0] = (PLANEPTR) &row[0];
-    bitmap.Planes[1] = (PLANEPTR) &row[1];
+	InitBitMap (&bitmap, 2, 16, 1);
+	bitmap.Planes[0] = (PLANEPTR) &row[0];
+	bitmap.Planes[1] = (PLANEPTR) &row[1];
 
-    blank_pointer = NewObject (NULL, POINTERCLASS,
+	blank_pointer = NewObject (NULL, POINTERCLASS,
 				   POINTERA_BitMap,	(ULONG)&bitmap,
 				   POINTERA_WordWidth,	1,
 				   TAG_DONE);
 
-    if (!blank_pointer)
+	if (!blank_pointer)
 	write_log ("Warning: Unable to allocate blank mouse pointer.\n");
 }
 
@@ -1018,45 +1019,45 @@ static void grab_pointer (struct Window *w)
 /****************************************************************************/
 
 typedef enum {
-    DONT_KNOW = -1,
-    INSIDE_WINDOW,
-    OUTSIDE_WINDOW
+	DONT_KNOW = -1,
+	INSIDE_WINDOW,
+	OUTSIDE_WINDOW
 } POINTER_STATE;
 
 static POINTER_STATE pointer_state;
 
 static POINTER_STATE get_pointer_state (const struct Window *w, int mousex, int mousey)
 {
-    POINTER_STATE new_state = OUTSIDE_WINDOW;
+	POINTER_STATE new_state = OUTSIDE_WINDOW;
 
-    /*
-     * Is pointer within the bounds of the inner window?
-     */
-    if ((mousex >= w->BorderLeft)
-     && (mousey >= w->BorderTop)
-     && (mousex < (w->Width - w->BorderRight))
-     && (mousey < (w->Height - w->BorderBottom))) {
-	/*
-	 * Yes. Now check whetehr the window is obscured by
-	 * another window at the pointer position
-	 */
-	struct Screen *scr = w->WScreen;
-	struct Layer  *layer;
+	// Is pointer within the bounds of the inner window?
 
-	/* Find which layer the pointer is in */
-	LockLayerInfo (&scr->LayerInfo);
-	layer = WhichLayer (&scr->LayerInfo, scr->MouseX, scr->MouseY);
-	UnlockLayerInfo (&scr->LayerInfo);
+	if ((mousex >= w->BorderLeft)
+		&& (mousey >= w->BorderTop)
+		&& (mousex < (w->Width - w->BorderRight))
+		&& (mousey < (w->Height - w->BorderBottom)))
+	{
+		 // Yes. Now check whetehr the window is obscured by
+		 // another window at the pointer position
 
-	/* Is this layer our window's layer? */
-	if (layer == w->WLayer) {
-		/*
-		 * Yes. Therefore, pointer is inside the window.
-		 */
-		new_state = INSIDE_WINDOW;
+		struct Screen *scr = w->WScreen;
+		struct Layer  *layer;
+
+		// Find which layer the pointer is in 
+
+		LockLayerInfo (&scr->LayerInfo);
+		layer = WhichLayer (&scr->LayerInfo, scr->MouseX, scr->MouseY);
+		UnlockLayerInfo (&scr->LayerInfo);
+
+		// Is this layer our window's layer? 
+
+		if (layer == w->WLayer)
+		{
+			// Yes. Therefore, pointer is inside the window.
+			new_state = INSIDE_WINDOW;
+		}
 	}
-    }
-    return new_state;
+	return new_state;
 }
 
 /****************************************************************************/
@@ -1070,10 +1071,10 @@ static ULONG find_rtg_mode (ULONG *width, ULONG *height, ULONG depth)
 	struct DisplayInfo dispi;
 	struct DimensionInfo di;
 
-	ULONG ID           = INVALID_ID;
-	ULONG best_mode      = INVALID_ID;
-	ULONG best_width     = (ULONG) -1L;
-	ULONG best_height    = (ULONG) -1L;
+	ULONG ID		   = INVALID_ID;
+	ULONG best_mode	  = INVALID_ID;
+	ULONG best_width	 = (ULONG) -1L;
+	ULONG best_height	= (ULONG) -1L;
 
 	ULONG largest_mode   = INVALID_ID;
 	ULONG largest_width  = 0;
@@ -1121,7 +1122,7 @@ static ULONG find_rtg_mode (ULONG *width, ULONG *height, ULONG depth)
 	{
 		best_mode = largest_mode;
 		*height   = largest_height;
-		*width    = largest_width;
+		*width	= largest_width;
 	}
 
 	return best_mode;
@@ -1143,7 +1144,7 @@ static int setup_customscreen (void)
 	ULONG error;
 	ULONG width,height;
 
-    static struct NewWindow NewWindowStructure = {
+	static struct NewWindow NewWindowStructure = {
 	0, 0, 800, 600, 0, 1,
 	IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY | IDCMP_DISKINSERTED | IDCMP_DISKREMOVED
 		| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW | IDCMP_MOUSEMOVE
@@ -1152,7 +1153,7 @@ static int setup_customscreen (void)
 	 | WFLG_BORDERLESS | WFLG_ACTIVATE | WFLG_REPORTMOUSE,
 	NULL, NULL, NULL, NULL, NULL, 5, 5, 800, 600,
 	CUSTOMSCREEN
-    };
+	};
 
 	if (screen_is_picasso)
 	{
@@ -1199,13 +1200,13 @@ static int setup_customscreen (void)
 	do
 	{
 		screen = OpenScreenTags (NULL,
-				SA_Width,     width,
-				SA_Height,    height,
-				SA_Depth,     depth,
+				SA_Width,	 width,
+				SA_Height,	height,
+				SA_Depth,	 depth,
 				SA_DisplayID, mode,
-				SA_Behind,    TRUE,
+				SA_Behind,	TRUE,
 				SA_ShowTitle, FALSE,
-				SA_Quiet,     TRUE,
+				SA_Quiet,	 TRUE,
 				SA_ErrorCode, (ULONG)&error,
 				TAG_DONE);
 
@@ -1237,7 +1238,7 @@ static int setup_customscreen (void)
 
 	is_fullscreen_state = TRUE;
 
-    return 1;
+	return 1;
 }
 
 /****************************************************************************/
@@ -1245,7 +1246,7 @@ static int setup_customscreen (void)
 static void open_window_as_last(void)
 {
 	W = OpenWindowTags (NULL,
-			WA_Title,        (ULONG)PACKAGE_NAME,
+			WA_Title,		(ULONG)PACKAGE_NAME,
 			WA_AutoAdjust,   TRUE,
 
 			WA_Left, save_window.x,
@@ -1253,17 +1254,17 @@ static void open_window_as_last(void)
 			WA_InnerWidth, save_window.w - save_window.bw,
 			WA_InnerHeight, save_window.h - save_window.bh,
 
-			WA_PubScreen,    (ULONG)S,
+			WA_PubScreen,	(ULONG)S,
 
-			WA_IDCMP,        IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
+			WA_IDCMP,		IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
 					| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW
-					| IDCMP_MOUSEMOVE    | IDCMP_DELTAMOVE
+					| IDCMP_MOUSEMOVE	| IDCMP_DELTAMOVE
 					| IDCMP_CLOSEWINDOW  | IDCMP_REFRESHWINDOW
 					| IDCMP_NEWSIZE | IDCMP_INTUITICKS | IDCMP_GADGETUP,
 
-			WA_Flags,	 WFLG_DRAGBAR     | WFLG_DEPTHGADGET
+			WA_Flags,	 WFLG_DRAGBAR	 | WFLG_DEPTHGADGET
 					| WFLG_REPORTMOUSE | WFLG_RMBTRAP
-					| WFLG_ACTIVATE    | WFLG_CLOSEGADGET
+					| WFLG_ACTIVATE	| WFLG_CLOSEGADGET
 					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
 					| WFLG_SMART_REFRESH,
 
@@ -1286,21 +1287,21 @@ static void open_window_as_last(void)
 static void open_window(void)
 {
 	W = OpenWindowTags (NULL,
-			WA_Title,        (ULONG)PACKAGE_NAME,
+			WA_Title,		(ULONG)PACKAGE_NAME,
 			WA_AutoAdjust,   TRUE,
 			WA_InnerWidth,   gfxvidinfo.width,
 			WA_InnerHeight,  gfxvidinfo.height,
-			WA_PubScreen,    (ULONG)S,
+			WA_PubScreen,	(ULONG)S,
 
-			WA_IDCMP,        IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
+			WA_IDCMP,		IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
 					| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW
-					| IDCMP_MOUSEMOVE    | IDCMP_DELTAMOVE
+					| IDCMP_MOUSEMOVE	| IDCMP_DELTAMOVE
 					| IDCMP_CLOSEWINDOW  | IDCMP_REFRESHWINDOW
 					| IDCMP_NEWSIZE | IDCMP_INTUITICKS | IDCMP_GADGETUP,
 
-			WA_Flags,	 WFLG_DRAGBAR     | WFLG_DEPTHGADGET
+			WA_Flags,	 WFLG_DRAGBAR	 | WFLG_DEPTHGADGET
 					| WFLG_REPORTMOUSE | WFLG_RMBTRAP
-					| WFLG_ACTIVATE    | WFLG_CLOSEGADGET
+					| WFLG_ACTIVATE	| WFLG_CLOSEGADGET
 					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
 					| WFLG_SMART_REFRESH,
 
@@ -1769,23 +1770,34 @@ static int setup_publicscreen(void)
 
 static char *get_num (char *s, int *n)
 {
-   int i=0;
-   while(isspace(*s)) ++s;
-   if(*s=='0') {
-     ++s;
-     if(*s=='x' || *s=='X') {
-       do {char c=*++s;
-           if(c>='0' && c<='9') {i*=16; i+= c-'0';}    else
-           if(c>='a' && c<='f') {i*=16; i+= c-'a'+10;} else
-           if(c>='A' && c<='F') {i*=16; i+= c-'A'+10;} else break;
-       } while(1);
-     } else while(*s>='0' && *s<='7') {i*=8; i+= *s++ - '0';}
-   } else {
-     while(*s>='0' && *s<='9') {i*=10; i+= *s++ - '0';}
-   }
-   *n=i;
-   while(isspace(*s)) ++s;
-   return s;
+	int i=0;
+	while(isspace(*s)) ++s;
+	if(*s=='0')
+	{
+		++s;
+		if(*s=='x' || *s=='X')
+		{
+			do
+			{
+				char c=*++s;
+
+				if(c>='0' && c<='9') {i*=16; i+= c-'0';}
+				else if(c>='a' && c<='f') {i*=16; i+= c-'a'+10;}
+				else if(c>='A' && c<='F') {i*=16; i+= c-'A'+10;}
+				else break;
+
+			} while(1);
+
+		} else while(*s>='0' && *s<='7') {i*=8; i+= *s++ - '0';}
+	}
+	else
+	{
+		while(*s>='0' && *s<='9') {i*=10; i+= *s++ - '0';}
+	}
+
+	*n=i;
+	while(isspace(*s)) ++s;
+	return s;
 }
 
 /****************************************************************************/
@@ -1808,13 +1820,13 @@ static void get_displayid (ULONG *DI, LONG *DE)
 
 static int setup_userscreen (void)
 {
-    struct ScreenModeRequester *ScreenRequest;
-    ULONG DisplayID;
+	struct ScreenModeRequester *ScreenRequest;
+	ULONG DisplayID;
 
-    LONG ScreenWidth = 0, ScreenHeight = 0, Depth = 0;
-    UWORD OverscanType = OSCAN_STANDARD;
-    BOOL AutoScroll = TRUE;
-    int release_asl = 0;
+	LONG ScreenWidth = 0, ScreenHeight = 0, Depth = 0;
+	UWORD OverscanType = OSCAN_STANDARD;
+	BOOL AutoScroll = TRUE;
+	int release_asl = 0;
 
 	ScreenRequest = AllocAslRequest (ASL_ScreenModeRequest, NULL);
 
@@ -1824,44 +1836,44 @@ static int setup_userscreen (void)
 		return 0;
 	}
 
-    get_displayid (&DisplayID, &Depth);
+	get_displayid (&DisplayID, &Depth);
 
-    if (DisplayID == (ULONG)INVALID_ID) {
+	if (DisplayID == (ULONG)INVALID_ID) {
 	if (AslRequestTags (ScreenRequest,
 			ASLSM_TitleText, (ULONG)"Select screen display mode",
-			ASLSM_InitialDisplayID,    0,
+			ASLSM_InitialDisplayID,	0,
 			ASLSM_InitialDisplayDepth, 8,
 			ASLSM_InitialDisplayWidth, gfxvidinfo.width,
 			ASLSM_InitialDisplayHeight,gfxvidinfo.height,
-			ASLSM_MinWidth,            320, //currprefs.gfx_width_win,
-			ASLSM_MinHeight,           200, //currprefs.gfx_height_win,
-			ASLSM_DoWidth,             TRUE,
-			ASLSM_DoHeight,            TRUE,
-			ASLSM_DoDepth,             TRUE,
-			ASLSM_DoOverscanType,      TRUE,
-			ASLSM_PropertyFlags,       0,
-			ASLSM_PropertyMask,        DIPF_IS_DUALPF | DIPF_IS_PF2PRI,
+			ASLSM_MinWidth,			320, //currprefs.gfx_width_win,
+			ASLSM_MinHeight,		   200, //currprefs.gfx_height_win,
+			ASLSM_DoWidth,			 TRUE,
+			ASLSM_DoHeight,			TRUE,
+			ASLSM_DoDepth,			 TRUE,
+			ASLSM_DoOverscanType,	  TRUE,
+			ASLSM_PropertyFlags,	   0,
+			ASLSM_PropertyMask,		DIPF_IS_DUALPF | DIPF_IS_PF2PRI,
 			TAG_DONE)) {
 		ScreenWidth  = ScreenRequest->sm_DisplayWidth;
 		ScreenHeight = ScreenRequest->sm_DisplayHeight;
-		Depth        = ScreenRequest->sm_DisplayDepth;
-		DisplayID    = ScreenRequest->sm_DisplayID;
+		Depth		= ScreenRequest->sm_DisplayDepth;
+		DisplayID	= ScreenRequest->sm_DisplayID;
 		OverscanType = ScreenRequest->sm_OverscanType;
 		AutoScroll   = ScreenRequest->sm_AutoScroll;
 	} else
 		DisplayID = INVALID_ID;
-    }
-    FreeAslRequest (ScreenRequest);
+	}
+	FreeAslRequest (ScreenRequest);
 
-    if (DisplayID == (ULONG)INVALID_ID)
+	if (DisplayID == (ULONG)INVALID_ID)
 	return 0;
 
-    output_is_true_color = (Depth > 8)  ? 1 : 0;
+	output_is_true_color = (Depth > 8)  ? 1 : 0;
 
-    if ((DisplayID & HAM_KEY) && !output_is_true_color ) Depth = 6; /* only ham6 for the moment */
+	if ((DisplayID & HAM_KEY) && !output_is_true_color ) Depth = 6; /* only ham6 for the moment */
 
 #if 0
-    if(DisplayID & DIPF_IS_HAM) Depth = 6; /* only ham6 for the moment */
+	if(DisplayID & DIPF_IS_HAM) Depth = 6; /* only ham6 for the moment */
 #endif
 
 	S = OpenScreenTags (NULL,
@@ -1887,9 +1899,9 @@ static int setup_userscreen (void)
 		return 0;
 	}
 
-	CM           =  S->ViewPort.ColorMap;
+	CM		   =  S->ViewPort.ColorMap;
 	is_halfbrite = (S->ViewPort.Modes & EXTRA_HALFBRITE);
-	is_ham       = (S->ViewPort.Modes & HAM);
+	is_ham	   = (S->ViewPort.Modes & HAM);
 
 	W = OpenWindowTags (NULL,
 			WA_Width,		S -> Width,
@@ -1974,10 +1986,10 @@ static void set_prWindowPtr (struct Window *w)
 
 static void restore_prWindowPtr (void)
 {
-   struct Process *self = (struct Process *) FindTask (NULL);
+	struct Process *self = (struct Process *) FindTask (NULL);
 
-   if (saved_prWindowPtr)
-	self->pr_WindowPtr = saved_prWindowPtr;
+	if (saved_prWindowPtr)
+		self->pr_WindowPtr = saved_prWindowPtr;
 }
 
 
@@ -1995,8 +2007,8 @@ static APTR setup_classic_buffer (struct vidbuf_description *gfxinfo, const stru
 	buffer = AllocVecTagList ( bytes_per_row  * gfxinfo->height , tags_any);
 	if (buffer)
 	{
-		gfxinfo->bufmem      = buffer;
-		gfxinfo->rowbytes    = bytes_per_row;
+		gfxinfo->bufmem	  = buffer;
+		gfxinfo->rowbytes	= bytes_per_row;
 		gfxinfo->flush_line  = flush_line_cgx_v41;
 		gfxinfo->flush_block = flush_block_cgx_v41;
 	}
@@ -2024,7 +2036,7 @@ void alloc_picasso_invalid_lines()
 
 static int graphics_subinit_picasso(void)
 {
-	/* Initialize structure for Picasso96 video modes */
+	// Initialize structure for Picasso96 video modes
 
 	picasso_vidinfo.rowbytes	= 0;
 	picasso_vidinfo.extra_mem = 1;
@@ -2091,14 +2103,11 @@ static int graphics_subinit (void)
 	gfxvidinfo.emergmem = 0;
 	gfxvidinfo.linemem  = 0;
 
-
 	CybBuffer = setup_classic_buffer (&gfxvidinfo, draw_aga_RP);
 	if (!CybBuffer)
 	{
+		 // Failed to allocate bitmap - we need to fall back on gfx.lib rendering
 
-		/*
-		 * Failed to allocate bitmap - we need to fall back on gfx.lib rendering
-		 */
 		gfxvidinfo.bufmem = NULL;
 		output_is_true_color = 0;
 		if (bitdepth > 8)
@@ -2110,19 +2119,21 @@ static int graphics_subinit (void)
 
 	if (is_ham)
 	{
-		// ham 6 
-		use_delta_buffer       = 0; /* needless as the line must be fully recomputed */
-		need_dither            = 0;
-		gfxvidinfo.pixbytes    = 2;
+		// ham 6
+
+		use_delta_buffer	   = 0; // needless as the line must be fully recomputed 
+		need_dither			= 0;
+		gfxvidinfo.pixbytes	= 2;
 		gfxvidinfo.flush_line  = flush_line_ham;
 		gfxvidinfo.flush_block = flush_block_ham;
 	}
 	else if (bitdepth <= 8)
 	{
-		// chunk2planar is slow so we define use_delta_buffer for all modes //
-		use_delta_buffer       = 1;
-		need_dither            = currprefs.amiga_use_dither || (bitdepth <= 1);
-		gfxvidinfo.pixbytes    = need_dither ? 2 : 1;
+		// chunk2planar is slow so we define use_delta_buffer for all modes
+
+		use_delta_buffer	   = 1;
+		need_dither			= currprefs.amiga_use_dither || (bitdepth <= 1);
+		gfxvidinfo.pixbytes	= need_dither ? 2 : 1;
 		gfxvidinfo.flush_line  = need_dither ? flush_line_planar_dither  : flush_line_planar_nodither;
 		gfxvidinfo.flush_block = need_dither ? flush_block_planar_dither : flush_block_planar_nodither;
 	}
@@ -2134,10 +2145,8 @@ static int graphics_subinit (void)
 
 	if (!output_is_true_color)
 	{
-		//
 		// We're not using GGX/P96 for output, so allocate a dumb
 		// display buffer
-		//
 
 		gfxvidinfo.rowbytes = gfxvidinfo.pixbytes * gfxvidinfo.width;
 
@@ -2237,7 +2246,7 @@ int graphics_init (void)
 			if (setup_userscreen ()) break;
 
 			write_log ("Trying on public screen...\n");
-			/* fall trough */
+			// fall trough 
 
 		case UAESCREENTYPE_PUBLIC:
 
@@ -2248,7 +2257,7 @@ int graphics_init (void)
 				break;
 			}
 			write_log ("Trying on custom screen...\n");
-			/* fall trough */
+			// fall trough 
 
 		case UAESCREENTYPE_CUSTOM:
 
@@ -2430,6 +2439,7 @@ struct AppIcon *appicon = NULL;
 bool empty_msg_queue(struct MsgPort *port)
 {
 	struct Message *msg;
+
 	// empty que.
 	while ((msg = (struct Message *) GetMsg( port ) ))
 	{
@@ -2455,9 +2465,8 @@ bool is_uniconifyed()
 
 bool enable_Iconify()
 {
-	int n;
-
 	const char *files[]={"progdir:uae","envarc:sys/def_tool",NULL};
+	int n;
 
 	for (n=0;files[n];n++)
 	{
@@ -2523,28 +2532,32 @@ void refresh_aga()
 	EndRefresh (W, TRUE);
 }
 
+int lcode ;
+
 void handle_events(void)
 {
-		struct IntuiMessage *msg;
+	struct IntuiMessage *msg;
 	int dmx, dmy, mx, my, class, code, qualifier;
 	UWORD GadgetID;
 
-   /* this function is called at each frame, so: */
-    ++frame_num;       /* increase frame counter */
+	// this function is called at each frame, so: 
+
+	++frame_num;	// increase frame counter
+
 #if 0
-    save_frame();      /* possibly save frame    */
+	save_frame();	// possibly save frame
 #endif
 
 #ifdef DEBUGGER
-    /*
-     * This is a hack to simulate ^C as is seems that break_handler
-     * is lost when system() is called.
-     */
+
+	// This is a hack to simulate ^C as is seems that break_handler
+	// is lost when system() is called.
 
 	if (SetSignal (0L, SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_D) & (SIGBREAKF_CTRL_C|SIGBREAKF_CTRL_D)) 
 	{
 		activate_debugger ();
 	}
+
 #endif
 
 	if (iconifyPort)		// iconifyed mode..
@@ -2568,12 +2581,12 @@ void handle_events(void)
 
 	while ( (W) && (msg = (struct IntuiMessage*) GetMsg (W->UserPort)) )
 	{
-		class     = msg->Class;
-		code      = msg->Code;
-		dmx       = msg->MouseX;
-		dmy       = msg->MouseY;
-		mx        = msg->IDCMPWindow->MouseX; // Absolute pointer coordinates
-		my        = msg->IDCMPWindow->MouseY; // relative to the window
+		class	 = msg->Class;
+		code	  = msg->Code;
+		dmx	   = msg->MouseX;
+		dmy	   = msg->MouseY;
+		mx		= msg->IDCMPWindow->MouseX; // Absolute pointer coordinates
+		my		= msg->IDCMPWindow->MouseY; // relative to the window
 		qualifier = msg->Qualifier;
 	 	GadgetID = (msg -> IAddress) ? ((struct Gadget *) ( msg -> IAddress)) -> GadgetID : 0 ;
 
@@ -2748,13 +2761,11 @@ void LED (int on)
 
 /***************************************************************************/
 
-/* sam: need to put all this in a separate module */
+// sam: need to put all this in a separate module 
 
 #ifdef PICASSO96
 
-/*
- * Add a screenmode to the emulated P96 display database
- */
+// Add a screenmode to the emulated P96 display database
 
 static void add_p96_mode (int width, int height, int depth, int *count)
 {
@@ -2764,8 +2775,8 @@ static void add_p96_mode (int width, int height, int depth, int *count)
 	{
 		DisplayModes[*count].res.width  = width;
 		DisplayModes[*count].res.height = height;
-		DisplayModes[*count].depth      = depth >> 3;
-		DisplayModes[*count].refresh    = 75;
+		DisplayModes[*count].depth	  = depth >> 3;
+		DisplayModes[*count].refresh	= 75;
 		(*count)++;
 
 		write_log ("AMIGFX: Added P96 mode: %dx%dx%d\n", width, height, depth);
@@ -2907,7 +2918,7 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 
 void DX_Invalidate (int first, int last)
 {
-//    DEBUG_LOG ("Function: DX_Invalidate %d - %d\n", first, last);
+//	DEBUG_LOG ("Function: DX_Invalidate %d - %d\n", first, last);
 
 	if (!picasso_invalid_lines) return;
 	if (first > last) return;
@@ -2957,14 +2968,12 @@ void output_update_clut()
 	}
 }
 
-void DX_SetPalette (int start, int count)
+void 	DX_SetPalette (int start, int count)
 {
-    DEBUG_LOG ("Function: DX_SetPalette\n");
+	DEBUG_LOG ("Function: DX_SetPalette\n");
 
 	// exit if not valid !!!
 	if (! screen_is_picasso) return;
-
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
 
 	start &=255;
 	if (start + count > 256) count = 256 - start;
@@ -2976,16 +2985,10 @@ void DX_SetPalette (int start, int count)
 	{
 		int n;
 
-		printf("%s:%d\n",__FUNCTION__,__LINE__);
-
 		for (n = start ; n<(start+count); n++ ) set_palette_fn( picasso96_state.CLUT, n );
-
-		printf("%s:%d\n",__FUNCTION__,__LINE__);
 	}
 	else if ((S)&&(W -> BorderTop == 0))
 	{
-		printf("%s:%d\n",__FUNCTION__,__LINE__);
-
 		if (picasso96_state.RGBFormat == RGBFB_CHUNKY) 
 		{
 			SetPalette_8bit_screen(start, count);
@@ -2993,8 +2996,6 @@ void DX_SetPalette (int start, int count)
 	}
 
 	dx_pal_count++;
-
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
 }
 
 void DX_SetPalette_vsync(void)
@@ -3040,10 +3041,10 @@ void add_native_modes( int depth, int *count )
 
 int DX_FillResolutions (uae_u16 *ppixel_format)
 {
-    int i;
-    int count = 0;
+	int i;
+	int count = 0;
 
-    DEBUG_LOG ("Function: DX_FillResolutions\n");
+	DEBUG_LOG ("Function: DX_FillResolutions\n");
 
 //	CFG_16bit_mode = RGBFB_R5G5B5;
 	CFG_16bit_mode = RGBFB_R5G6B5;
@@ -3056,7 +3057,7 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
 	*ppixel_format |= 1 << CFG_16bit_mode;
 	*ppixel_format |= 1 << CFG_32bit_mode;
 
-    /* Check list of standard P96 screenmodes */
+ // Check list of standard P96 screenmodes 
 
 	add_native_modes( 8, &count );
 	add_native_modes( 16, &count );
@@ -3119,12 +3120,10 @@ static void set_window_for_picasso (void)
 		&& current_depth == picasso_vidinfo.depth)
 		return;
 
-
 	printf("---------------------------------------\n");
 	printf("current_width %d,  current_height %d, current_depth %d \n",current_width,current_height,current_depth);
 	printf("new_width %d,  new_height %d, new_depth %d \n",picasso_vidinfo.width,picasso_vidinfo.height,picasso_vidinfo.depth);
 	printf("----------------------------------------\n");
-
 
 	p96_xoffset = 0;
 	p96_yoffset = 0;
@@ -3168,17 +3167,13 @@ void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)		// called f
 
 	update_p96_format();
 	set_window_for_picasso();
-
 }
 
 void gfx_set_picasso_state (int on)
 {
 	DEBUG_LOG ("Function: gfx_set_picasso_state: %d\n", on);
 
-	if (on == screen_is_picasso)
-	{
-		return;
-	}
+	if (on == screen_is_picasso) return;
 
 	// We can get called by drawing_init() when there's 
 	// no window opened yet...
@@ -3239,7 +3234,7 @@ static void set_title (void)
 
 	sprintf (ScreenTitle,
 		"UAE-%d.%d.%d (%s%s%s)  by Bernd Schmidt & contributors, "
-                 "Amiga Port by Samuel Devulder.",
+				 "Amiga Port by Samuel Devulder.",
 		UAEMAJOR, UAEMINOR, UAESUBREV,
 		currprefs.cpu_level==0?"68000":
 		currprefs.cpu_level==1?"68010":
@@ -3247,7 +3242,7 @@ static void set_title (void)
 		currprefs.address_space_24?" 24bits":"",
 		currprefs.cpu_compatible?" compat":"");
 
-        SetWindowTitles(W, title, ScreenTitle);
+		SetWindowTitles(W, title, ScreenTitle);
 
 #else
 
@@ -3259,7 +3254,7 @@ static void set_title (void)
 
 /****************************************************************************/
 
-void main_window_led (int led, int on)                /* is used in amigui.c */
+void main_window_led (int led, int on)				/* is used in amigui.c */
 {
 
 #if 0
@@ -3329,10 +3324,10 @@ static LONG ObtainColor (ULONG r,ULONG g,ULONG b)
  */
 static void ReleaseColors(void)
 {
-    if (os39 && usepub && CM)
+	if (os39 && usepub && CM)
 	while (maxpen > 0)
 		ReleasePen (CM, pen[--maxpen]);
-    else
+	else
 	maxpen = 0;
 }
 
@@ -3351,17 +3346,17 @@ static void ReleaseColors(void)
 
 static int dist4 (LONG rgb1, LONG rgb2) /* computes distance very quickly */
 {
-    int d = 0, t;
-    t = (rgb1&0xF00)-(rgb2&0xF00); t>>=8; if (t<0) d -= t; else d += t;
-    t = (rgb1&0x0F0)-(rgb2&0x0F0); t>>=4; if (t<0) d -= t; else d += t;
-    t = (rgb1&0x00F)-(rgb2&0x00F); t>>=0; if (t<0) d -= t; else d += t;
+	int d = 0, t;
+	t = (rgb1&0xF00)-(rgb2&0xF00); t>>=8; if (t<0) d -= t; else d += t;
+	t = (rgb1&0x0F0)-(rgb2&0x0F0); t>>=4; if (t<0) d -= t; else d += t;
+	t = (rgb1&0x00F)-(rgb2&0x00F); t>>=0; if (t<0) d -= t; else d += t;
 #if 0
-    t = rgb1^rgb2;
-    if(t&15) ++d; t>>=4;
-    if(t&15) ++d; t>>=4;
-    if(t&15) ++d;
+	t = rgb1^rgb2;
+	if(t&15) ++d; t>>=4;
+	if(t&15) ++d; t>>=4;
+	if(t&15) ++d;
 #endif
-    return d;
+	return d;
 }
 
 #define d_dst (00000+(UBYTE*)cidx) /* let's use cidx as a buffer */
@@ -3370,36 +3365,44 @@ static int dist4 (LONG rgb1, LONG rgb2) /* computes distance very quickly */
 
 static int init_ham (void)
 {
-    int i,t,RGB;
+	int i,t,RGB;
 
-    /* try direct color first */
-    for (RGB = 0; RGB < 4096; ++RGB) {
-	int c,d;
-	c = d = 50;
-	for (i = 0; i < 16; ++i) {
-		t = dist4 (i*0x111, RGB);
-		if (t<d) {
-		d = t;
-		c = i;
+	// try direct color first
+
+	for (RGB = 0; RGB < 4096; ++RGB)
+	{
+		int c,d;
+		c = d = 50;
+		for (i = 0; i < 16; ++i)
+		{
+			t = dist4 (i*0x111, RGB);
+			if (t<d)
+			{
+				d = t;
+				c = i;
+			}
 		}
+		i = (RGB & 0x00F) | ((RGB & 0x0F0) << 1) | ((RGB & 0xF00) << 2);
+
+		d_dst[i] = (d << 2) | 3;	// the "|3" is a trick to speedup comparison
+		d_cmd[i] = c;			// in the conversion process
 	}
-	i = (RGB & 0x00F) | ((RGB & 0x0F0) << 1) | ((RGB & 0xF00) << 2);
-	d_dst[i] = (d << 2) | 3; /* the "|3" is a trick to speedup comparison */
-	d_cmd[i] = c;		 /* in the conversion process */
-    }
-    /* then hold & modify */
-    for (i = 0; i < 32768; ++i) {
-	int dr, dg, db, d, c;
-	dr = (i>>10) & 0x1F; dr -= 0x10; if (dr < 0) dr = -dr;
-	dg = (i>>5)  & 0x1F; dg -= 0x10; if (dg < 0) dg = -dg;
-	db = (i>>0)  & 0x1F; db -= 0x10; if (db < 0) db = -db;
-	c  = 0; d = 50;
-	t = dist4 (0,  0*256 + dg*16 + db); if (t < d) {d = t; c = 0;}
-	t = dist4 (0, dr*256 +  0*16 + db); if (t < d) {d = t; c = 1;}
-	t = dist4 (0, dr*256 + dg*16 +  0); if (t < d) {d = t; c = 2;}
-	h_buf[i] = (d<<2) | c;
-    }
-    return 1;
+
+	// then hold & modify
+
+	for (i = 0; i < 32768; ++i)
+	{
+		int dr, dg, db, d, c;
+		dr = (i>>10) & 0x1F; dr -= 0x10; if (dr < 0) dr = -dr;
+		dg = (i>>5)  & 0x1F; dg -= 0x10; if (dg < 0) dg = -dg;
+		db = (i>>0)  & 0x1F; db -= 0x10; if (db < 0) db = -db;
+		c  = 0; d = 50;
+		t = dist4 (0,  0*256 + dg*16 + db); if (t < d) {d = t; c = 0;}
+		t = dist4 (0, dr*256 +  0*16 + db); if (t < d) {d = t; c = 1;}
+		t = dist4 (0, dr*256 + dg*16 +  0); if (t < d) {d = t; c = 2;}
+		h_buf[i] = (d<<2) | c;
+	}
+	return 1;
 }
 
 /* great algorithm: convert trucolor into ham using precalc buffers */
@@ -3471,18 +3474,18 @@ int check_prefs_changed_gfx (void)
 void toggle_mousegrab (void)
 {
 #ifdef __amigaos4__
-    mouseGrabbed = 1 - mouseGrabbed;
-    grabTicks    = GRAB_TIMEOUT;
-    if (W)
-	grab_pointer (W);
+	mouseGrabbed = 1 - mouseGrabbed;
+	grabTicks	= GRAB_TIMEOUT;
+	if (W)
+		grab_pointer (W);
 #else
-    write_log ("Mouse grab not supported\n");
+	write_log ("Mouse grab not supported\n");
 #endif
 }
 
 int is_fullscreen (void)
 {
-    return is_fullscreen_state ? 1: 0;
+	return is_fullscreen_state ? 1: 0;
 }
 
 void p96_conv_all()
@@ -3526,6 +3529,7 @@ void p96_conv_all()
 #define pickmode 1
 
 #if pickmode == 1
+
 // custom conversion.
 // 800x600 15bit to 32bit = 8.800 ms.
 
@@ -3558,6 +3562,7 @@ void p96_conv_all()
 #endif
 
 #if pickmode == 2
+
 // no custom conversion.
 // 800x600 15bit ti 32bit = 17.200 ms. (slower)
 
@@ -3601,6 +3606,7 @@ int is_vsync (void)
 			: 0,
  			COMP_FMT_SRC);
 */
+
 	if (W)
 	{
 		if (screen_is_picasso)
@@ -3690,7 +3696,7 @@ void toggle_fullscreen (void)
 
 void screenshot (int type)
 {
-    write_log ("Screenshot not implemented yet\n");
+	write_log ("Screenshot not implemented yet\n");
 }
 
 /****************************************************************************
@@ -3705,37 +3711,37 @@ void screenshot (int type)
 
 static int init_mouse (void)
 {
-   return 1;
+	return 1;
 }
 
 static void close_mouse (void)
 {
-   return;
+	return;
 }
 
 static int acquire_mouse (unsigned int num, int flags)
 {
-   return 1;
+	return 1;
 }
 
 static void unacquire_mouse (unsigned int num)
 {
-   return;
+	return;
 }
 
 static unsigned int get_mouse_num (void)
 {
-    return 1;
+	return 1;
 }
 
 static const char *get_mouse_name (unsigned int mouse)
 {
-    return "Default mouse";
+	return "Default mouse";
 }
 
 static unsigned int get_mouse_widget_num (unsigned int mouse)
 {
-    return MAX_AXES + MAX_BUTTONS;
+	return MAX_AXES + MAX_BUTTONS;
 }
 
 static int get_mouse_widget_first (unsigned int mouse, int type)
@@ -3802,34 +3808,34 @@ void input_get_default_mouse (struct uae_input_device *uid)
  */
 static unsigned int get_kb_num (void)
 {
-    return 1;
+	return 1;
 }
 
 static const char *get_kb_name (unsigned int kb)
 {
-    return "Default keyboard";
+	return "Default keyboard";
 }
 
 static unsigned int get_kb_widget_num (unsigned int kb)
 {
-    return 128;
+	return 128;
 }
 
 static int get_kb_widget_first (unsigned int kb, int type)
 {
-    return 0;
+	return 0;
 }
 
 static int get_kb_widget_type (unsigned int kb, unsigned int num, char *name, uae_u32 *code)
 {
-    // fix me
-    *code = num;
-    return IDEV_WIDGET_KEY;
+	// fix me
+	*code = num;
+	return IDEV_WIDGET_KEY;
 }
 
 static int keyhack (int scancode, int pressed, int num)
 {
-    return scancode;
+	return scancode;
 }
 
 static void read_kb (void)
@@ -3838,7 +3844,7 @@ static void read_kb (void)
 
 static int init_kb (void)
 {
-    return 1;
+	return 1;
 }
 
 static void close_kb (void)
@@ -3847,7 +3853,7 @@ static void close_kb (void)
 
 static int acquire_kb (unsigned int num, int flags)
 {
-    return 1;
+	return 1;
 }
 
 static void unacquire_kb (unsigned int num)
@@ -3856,21 +3862,21 @@ static void unacquire_kb (unsigned int num)
 
 struct inputdevice_functions inputdevicefunc_keyboard =
 {
-    init_kb,
-    close_kb,
-    acquire_kb,
-    unacquire_kb,
-    read_kb,
-    get_kb_num,
-    get_kb_name,
-    get_kb_widget_num,
-    get_kb_widget_type,
-    get_kb_widget_first
+	init_kb,
+	close_kb,
+	acquire_kb,
+	unacquire_kb,
+	read_kb,
+	get_kb_num,
+	get_kb_name,
+	get_kb_widget_num,
+	get_kb_widget_type,
+	get_kb_widget_first
 };
 
 int getcapslockstate (void)
 {
-    return 0;
+	return 0;
 }
 
 void setcapslockstate (int state)
@@ -3886,10 +3892,10 @@ static const char *screen_type[] = { "custom", "public", "ask", 0 };
 
 void gfx_default_options (struct uae_prefs *p)
 {
-	p->amiga_screen_type     = UAESCREENTYPE_PUBLIC;
+	p->amiga_screen_type	 = UAESCREENTYPE_PUBLIC;
 	p->amiga_publicscreen[0] = '\0';
-	p->amiga_use_dither      = 1;
-	p->amiga_use_grey        = 0;
+	p->amiga_use_dither	  = 1;
+	p->amiga_use_grey		= 0;
 }
 
 void gfx_save_options (FILE *f, const struct uae_prefs *p)
@@ -3897,7 +3903,7 @@ void gfx_save_options (FILE *f, const struct uae_prefs *p)
 	cfgfile_write (f, GFX_NAME ".screen_type=%s\n",  screen_type[p->amiga_screen_type]);
 	cfgfile_write (f, GFX_NAME ".publicscreen=%s\n", p->amiga_publicscreen);
 	cfgfile_write (f, GFX_NAME ".use_dither=%s\n",   p->amiga_use_dither ? "true" : "false");
-	cfgfile_write (f, GFX_NAME ".use_grey=%s\n",     p->amiga_use_grey ? "true" : "false");
+	cfgfile_write (f, GFX_NAME ".use_grey=%s\n",	 p->amiga_use_grey ? "true" : "false");
 }
 
 int gfx_parse_option (struct uae_prefs *p, const char *option, const char *value)
