@@ -727,6 +727,8 @@ static int init_true_colors_output (const struct RastPort *rp)
 		return 0;
 	}
 
+	byte_swap_16bit = FALSE;
+
 	pixfmt = GetBitMapAttr (rp->BitMap, (LONG)BMA_PIXELFORMAT);
 
 	switch (pixfmt)
