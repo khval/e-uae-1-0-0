@@ -2211,6 +2211,9 @@ static int graphics_subinit (void)
 	set_default_hotkeys (ami_hotkeys);
 	pointer_state = DONT_KNOW;
 
+	if (set_palette_on_vbl_fn) set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
+	if (p96_conv_fn) p96_conv_all();
+
 	return 1;
 }
 
