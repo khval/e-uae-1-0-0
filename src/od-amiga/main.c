@@ -131,12 +131,18 @@ static init_remap_keyboard()
 	remap_scancode[11]=12;
 	remap_scancode[12]=13;
 
+	// map dead keys to closest keys on a win/dos keyboard.
+
 	remap_scancode[112]=0x5A;	// Home to 0xFA
 	remap_scancode[113]=0x5B;	// End to 0x5B
 	remap_scancode[71]=0x5F;	// insert to Help key.
 	remap_scancode[107]=0x3A;	// Menu key to 0x3A
 
-	// swaped to avoid issue with host system...
+	// swaped to avoid issues with host system... (Amiga+M etc.)
+
+	remap_scancode[100]=102;	// Left Alt to Left Amiga
+	remap_scancode[102]=100;	// Left Window to Left Alt.
+
 	remap_scancode[101]=0x67;	// Right AltGr to Right Amiga
 	remap_scancode[103]=0x64;	// Right Window to Right Alt.
 }
