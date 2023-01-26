@@ -266,7 +266,7 @@ unsigned long			frame_num; /* for arexx */
 struct RastPort  comp_aga_RP;
 struct RastPort *draw_aga_RP = &comp_aga_RP;
 struct RastPort  comp_p96_RP;
-struct RastPort  conv_p96_RP ;
+// struct RastPort  conv_p96_RP ;
 struct RastPort  *draw_p96_RP = &comp_p96_RP;	// draw direct to the output buffer.
 
 static UBYTE			*Line = NULL;
@@ -1318,26 +1318,6 @@ static void open_window(void)
 	}
 }
 
-bool alloc_p96_draw_bitmap( int w, int h, int depth )
-{
-	printf("draw bitmap is %d,%d,%d, 0x%08x\n",w,h,depth, DRAW_FMT_SRC);
-
-	conv_p96_RP.BitMap = AllocBitMapTags( w, h+1, depth, 
-			BMATags_PixelFormat, DRAW_FMT_SRC,
-			BMATags_Displayable, FALSE,
-			BMATags_UserPrivate, TRUE,
-			BMATags_Alignment, 4,
-			TAG_END);
-
-	if (conv_p96_RP.BitMap)
-	{
-		RectFillColor(&conv_p96_RP, 0, 0, w,h, 0xFF000000);
-		return true;
-	}
-
-	return false;
-}
-
 
 int init_comp_one( struct Window *W, ULONG output_depth, struct RastPort *rp, int w, int h )
 {
@@ -1638,17 +1618,7 @@ void init_comp( struct Window *W )
 
 			if (p96_conv_fn)
 			{
-				printf("**** Need to convert *** \n");
-				if (alloc_p96_draw_bitmap( picasso_vidinfo.width, picasso_vidinfo.height, picasso_vidinfo.depth ))
-				{
-					draw_p96_RP = &conv_p96_RP;
-				}
-				else
-				{
-					printf("*** Failed to alloc p96 draw buffer ***\n");
-					p96_conv_fn = NULL;
-				}
-
+				draw_p96_RP = &comp_p96_RP;
 				free_picasso_invalid_lines();
 				alloc_picasso_invalid_lines();
 			}
@@ -1713,7 +1683,6 @@ void init_comp( struct Window *W )
 	}
 
 	if (draw_p96_RP == W -> RPort) printf( "*** draw_p96_RP is Window RastPort\n" );
-	if (draw_p96_RP == &conv_p96_RP) printf( "*** draw_p96_RP is &conv_p96_RP\n" );
 	if (draw_p96_RP == &comp_p96_RP) printf( "*** draw_p96_RP is &comp_p96_RP\n" );
 }
 
@@ -2238,7 +2207,6 @@ int graphics_init (void)
 
 	InitRastPort(&comp_aga_RP);
 	InitRastPort(&comp_p96_RP);
-	InitRastPort(&conv_p96_RP);
 
 	reset_p96_fn_pointers();
 	update_gfxvidinfo_width_height();
@@ -2337,12 +2305,6 @@ static void graphics_subshutdown (void)
 	{
 		FreeVec (CybBuffer);
 		CybBuffer = NULL;
-	}
-
-	if (conv_p96_RP.BitMap)
-	{
-		FreeBitMap(conv_p96_RP.BitMap);
-		conv_p96_RP.BitMap = NULL;
 	}
 
 	if (comp_p96_RP.BitMap)
@@ -2916,8 +2878,7 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 			dsty += p96_yoffset;
 		}
 
-//		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,argb);
-		RectFillColor(&comp_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,argb);
+		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,argb);
 		p96_gfx_updated = true;
 		DX_Invalidate (dsty, dsty + height - 1);
 		return 1;
@@ -3098,12 +3059,10 @@ uae_u8 *gfx_lock_picasso (void)
 
 	if (p96_lock) gfx_unlock_picasso ();
 
-//	if (draw_p96_RP -> BitMap)
-	if (comp_p96_RP.BitMap)
+	if (draw_p96_RP -> BitMap)
 	{
 		p96_lock = IGraphics -> LockBitMapTags(
-			comp_p96_RP.BitMap,
-//draw_p96_RP -> BitMap,
+			draw_p96_RP -> BitMap,
 			LBM_BaseAddress, (APTR *) &address,
 			LBM_PixelFormat, (APTR *) &format,
 			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
@@ -3514,99 +3473,6 @@ int is_fullscreen (void)
 	return is_fullscreen_state ? 1: 0;
 }
 
-void p96_conv_all()
-{	
-	bool failed = false;
-	
-	APTR lock_src,lock_dest;
-	ULONG src_BytesPerRow,dest_BytesPerRow;
-	uint8 *src_buffer_ptr;
-	char *dest_buffer_ptr;
-	char *dest_tmp_buffer_ptr;
-	int y;
-	int dest_bpr;
-
-	if (conv_p96_RP.BitMap != draw_p96_RP -> BitMap)
-		{ printf("conv bitmap is expected to be draw bitmap\n");return; }
-
-	if (draw_p96_RP -> BitMap == NULL)
-		{ printf("draw_p96_RP -> BitMap has no bitmap\n");return; }
-
-	if (picasso_invalid_lines == NULL )
-		{ printf("unexpcted NULL on picasso_invalid_lines\n"); return; }
-
-	dest_bpr = comp_p96_RP.BitMap ?
-		comp_p96_RP.BitMap -> BytesPerRow : 
-		picasso_vidinfo.width * 4;
-
-		//W -> RPort -> BitMap -> BytesPerRow;
-
-	dest_tmp_buffer_ptr = alloca( dest_bpr );		// becouse output is needs more space.
-
-	if (dest_tmp_buffer_ptr == NULL)
-		{ printf("no dest_tmp_buffer\n"); return ; }
-
-	for (y=0;y<picasso_vidinfo.height;y++)
-	{
-//		if (picasso_invalid_lines[y]) 
-		{
-//			picasso_invalid_lines[y] = 0;
-
-#define pickmode 1
-
-#if pickmode == 1
-
-// custom conversion.
-// 800x600 15bit to 32bit = 8.800 ms.
-
-			src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;
-			src_BytesPerRow = draw_p96_RP -> BitMap -> BytesPerRow;
-			if (src_buffer_ptr) 
-			{
-				p96_conv_fn( src_buffer_ptr + y*src_BytesPerRow, dest_tmp_buffer_ptr, picasso_vidinfo.width );
-
-				if ( COMP_FMT_SRC != PIXF_NONE )
-				{
-					WritePixelArray( (void *) dest_tmp_buffer_ptr,
-						0, 0,	dest_bpr,
-						COMP_FMT_SRC,
-						&comp_p96_RP,
-						0, y,
-						picasso_vidinfo.width, 1 );
-				}
-				else
-				{
-					WritePixelArray( (void *) dest_tmp_buffer_ptr,
-						0, 0,	dest_bpr,
-						PIXF_CLUT,
-						 W -> RPort,
-						p96_xoffset, p96_yoffset+y,
-						picasso_vidinfo.width, 1 );
-				}
-			}
-
-#endif
-
-#if pickmode == 2
-
-// no custom conversion.
-// 800x600 15bit ti 32bit = 17.200 ms. (slower)
-
-			src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;
-			src_BytesPerRow = draw_p96_RP -> BitMap -> BytesPerRow;
-
-			WritePixelArray( (void *) (src_buffer_ptr + y*src_BytesPerRow),
-				0, 0,
-				src_BytesPerRow,
-				DRAW_FMT_SRC,
-				&comp_p96_RP,
-				0, y,
-				picasso_vidinfo.width, 1 );
-#endif
-		}
-	}
-}
-
 #define debug_vsync_time 0
 
 #if debug_vsync_time
@@ -3622,23 +3488,10 @@ int is_vsync (void)
 	gettimeofday(&t1,NULL);
 #endif
 
-/*
-	printf("DRAW_FMT_SRC: %d:%d, COMP_FMT_SRC: %d\n", 
-			DRAW_FMT_SRC ,
-			draw_p96_RP ?
-				draw_p96_RP -> BitMap ? 
-					GetBitMapAttr( draw_p96_RP -> BitMap, BMA_PIXELFORMAT ) 
-					: 0
-			: 0,
- 			COMP_FMT_SRC);
-*/
-
 	if (W)
 	{
 		if (screen_is_picasso)
 		{
-//			printf("picasso_vidinfo.rowbytes %d pixbytes: %d\n",picasso_vidinfo.rowbytes,picasso_vidinfo.pixbytes);
-
 			if (p96_update_format)
 			{
 				gfx_lock_picasso ();
@@ -3653,7 +3506,6 @@ int is_vsync (void)
 					set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
 					p96_gfx_updated = true;
 				}
-//				p96_palette_updated = false;
 
 				picasso_refresh (0);
 			}
