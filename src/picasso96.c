@@ -51,7 +51,7 @@
 #include <proto/intuition.h>
 #include <proto/graphics.h>
 
-extern ULONG COMP_FMT_SRC;
+extern ULONG COMP_FMT_SRC,DRAW_FMT_SRC;
 extern struct RastPort  *draw_p96_RP;
 extern void (*p96_conv_fn) (void *src, void *dest, int size);
 #endif 
@@ -119,9 +119,6 @@ static int set_panning_called = 0;
 //static uaecptr oldscr;
 
 static uae_u32 p2ctab[256][2];
-
-bool output_clut_needs_update = false;
-extern void output_update_clut(void);
 
 
 /*
@@ -658,51 +655,6 @@ static int     currline_y;       /* row number of this line */
  * byte_count = Number of bytes to write from source line.
  */
 
-
-STATIC_INLINE void old_write_currline (uae_u8 *srcp, int line_no, int first_byte, int byte_count)
-{
-	uae_u8 *dstp;
-
-	if ((dstp = gfx_lock_picasso ()) != 0)
-	{
-		int Bpp = GetBytesPerPixel (picasso_vidinfo.rgbformat);
-
-		if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
-		{
-			dstp += line_no * picasso_vidinfo.rowbytes + first_byte;
-			memcpy (dstp, srcp, byte_count);
-		}
-		else
-		{
-			dstp += line_no * picasso_vidinfo.rowbytes + first_byte * Bpp;
-
-			output_update_clut();
-
-			switch (Bpp)
-			{
-				case 2:
-					{
-						int i;
-						uae_u16 *dstp16 = (uae_u16*) dstp;
-		   				for (i = 0; i < byte_count; i++)
-							*dstp16++ = picasso_vidinfo.clut[srcp[i]];
-					}
-					break;
-
-				case 4: 
-					{
-						int i;
-						for (i = 0; i < byte_count; i++)
-							*((uae_u32 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
-					}
-					break;
-			}
-		}
-		gfx_unlock_picasso ();
-	}
-}
-
-
 static void new_write_currline (uae_u8 *srcp, int line_no, int x, int byte_count, int fb_bpp)
 {
 	uae_u8 *dstp;
@@ -759,14 +711,22 @@ static void flush_currline (void)
 
 		if (byte_count > 0)
 		{
-			if ((draw_p96_RP -> BitMap)&&(p96_conv_fn) &&(COMP_FMT_SRC != PIXF_NONE))
+			if ((picasso96_state.RGBFormat == DRAW_FMT_SRC) && (draw_p96_RP -> BitMap))
+			{
+				int x = first_byte / fb_bpp;
+				int w = byte_count / fb_bpp;
+
+				WritePixelArray( (void *) srcp,
+					0, 0,	byte_count,
+					picasso96_state.RGBFormat,
+					draw_p96_RP,
+					x, line_no, w, 1 );
+			}
+			else 	if ((draw_p96_RP -> BitMap)&&(p96_conv_fn) &&(COMP_FMT_SRC != PIXF_NONE))
 			{
 				new_write_currline (srcp, line_no, first_byte / fb_bpp, byte_count, fb_bpp);
 			}
-			else
-			{
-				old_write_currline (srcp, line_no, first_byte, byte_count);
-			}
+			else	printf("unexpected format!!!\n");
 		}
 	}
     }
@@ -1474,8 +1434,6 @@ uae_u32 REGPARAM2 picasso_SetColorArray (struct regstruct *regs)
 
 	if (changed)
 	{
-		output_clut_needs_update = true;	// we can't wait for vsync!!
-
 		if (start < first_color_changed)
 			first_color_changed = start;
 

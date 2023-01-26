@@ -2914,6 +2914,8 @@ int DX_BitsPerCannon (void)
 	return 8;
 }
 
+/*
+
 void output_update_clut()
 {
 #if 1
@@ -2949,6 +2951,8 @@ void output_update_clut()
 #endif
 }
 
+*/
+
 void 	DX_SetPalette (int start, int count)
 {
 	DEBUG_LOG ("Function: DX_SetPalette\n");
@@ -2974,10 +2978,13 @@ void 	DX_SetPalette (int start, int count)
 			SetPalette_8bit_screen(start, count);
 		}
 	}
+
+/*
 	else
 	{
 		output_update_clut();
 	}
+*/
 
 	dx_pal_count++;
 }
