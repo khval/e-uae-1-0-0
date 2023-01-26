@@ -88,7 +88,6 @@
 extern struct GraphicsIFace *IGraphics;
 
 #undef BitMap
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
@@ -432,43 +431,43 @@ static void dummy_flush_screen (struct vidbuf_description *gfxinfo, int first_li
  */
 STATIC_INLINE void flush_line_planar_nodither (struct vidbuf_description *gfxinfo, int line_no)
 {
-    int     xs      = 0;
-    int     len     = gfxinfo->width;
-    int     yoffset = line_no * gfxinfo->rowbytes;
-    uae_u8 *src;
-    uae_u8 *dst;
-    uae_u8 *newp = gfxinfo->bufmem + yoffset;
-    uae_u8 *oldp = oldpixbuf + yoffset;
+	int	 xs	  = 0;
+	int	 len	 = gfxinfo->width;
+	int	 yoffset = line_no * gfxinfo->rowbytes;
+	uae_u8 *src;
+	uae_u8 *dst;
+	uae_u8 *newp = gfxinfo->bufmem + yoffset;
+	uae_u8 *oldp = oldpixbuf + yoffset;
 
-    /* Find first pixel changed on this line */
-    while (*newp++ == *oldp++) {
+	/* Find first pixel changed on this line */
+	while (*newp++ == *oldp++) {
 	if (!--len)
 		return; /* line not changed - so don't draw it */
-    }
-    src   = --newp;
-    dst   = --oldp;
-    newp += len;
-    oldp += len;
+	}
+	src   = --newp;
+	dst   = --oldp;
+	newp += len;
+	oldp += len;
 
-    /* Find last pixel changed on this line */
-    while (*--newp == *--oldp)
+	/* Find last pixel changed on this line */
+	while (*--newp == *--oldp)
 	;
 
-    len = 1 + (oldp - dst);
-    xs  = src - (uae_u8 *)(gfxinfo->bufmem + yoffset);
+	len = 1 + (oldp - dst);
+	xs  = src - (uae_u8 *)(gfxinfo->bufmem + yoffset);
 
-    /* Copy changed pixels to delta buffer */
-    CopyMem (src, dst, len);
+	/* Copy changed pixels to delta buffer */
+	CopyMem (src, dst, len);
 
-    /* Blit changed pixels to the display */
-    WritePixelLine8 (draw_aga_RP, xs + XOffset, line_no + YOffset, len, dst, TempRPort);
+	/* Blit changed pixels to the display */
+	WritePixelLine8 (draw_aga_RP, xs + XOffset, line_no + YOffset, len, dst, TempRPort);
 }
 
 static void flush_block_planar_nodither (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
-    int line_no;
+	int line_no;
 
-    for (line_no = first_line; line_no <= last_line; line_no++)
+	for (line_no = first_line; line_no <= last_line; line_no++)
 	flush_line_planar_nodither (gfxinfo, line_no);
 }
 
@@ -1169,8 +1168,8 @@ static int setup_customscreen (void)
 	}
 
 
-    /* First try to find an RTG screen that matches the requested size  */
-    {
+	/* First try to find an RTG screen that matches the requested size  */
+	{
 	unsigned int i;
 	const UBYTE preferred_depth[] = {15, 16, 32, 8}; /* Try depths in this order of preference */
 
@@ -1178,12 +1177,12 @@ static int setup_customscreen (void)
 		depth = preferred_depth[i];
 		mode = find_rtg_mode (&width, &height, depth);
 	}
-    }
+	}
 
-    if (mode != (ULONG) INVALID_ID) {
+	if (mode != (ULONG) INVALID_ID) {
 	if (depth > 8)
 		output_is_true_color = 1;
-    } else {
+	} else {
 
 	/* No (suitable) RTG screen available. Try a native mode */
 	depth = os39 ? 8 : (currprefs.gfx_lores ? 5 : 4);
@@ -1192,7 +1191,7 @@ static int setup_customscreen (void)
 		mode |= (gfxvidinfo.height > 256) ? LORESLACE_KEY : LORES_KEY;
 	else
 		mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
-    }
+	}
 
 
 	/* If the screen is larger than requested, centre UAE's display */
@@ -2212,7 +2211,7 @@ static int graphics_subinit (void)
 	pointer_state = DONT_KNOW;
 
 	if (set_palette_on_vbl_fn) set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
-	if (p96_conv_fn) p96_conv_all();
+	picasso_refresh (0);
 
 	return 1;
 }
@@ -2645,11 +2644,20 @@ void handle_events(void)
 #else
 					int keycode = code & 127;
 #endif
+
+					if ((state)&&(keycode==110))
+					{
+						debug_crash = 1 - debug_crash;
+						printf("debug_crash: %s\n", debug_crash ? "on" : "off");
+					}
+
+#if 1
 					if (lcode != code & 127) 
 					{
 //						printf("code: %03d (%02X) ==> %d (%02X)\n",code & 127, code & 127, keycode, keycode);
 						lcode = code & 127;
 					}
+#endif
 
 					if ((qualifier & IEQUALIFIER_REPEAT) == 0)
 					{
@@ -2908,7 +2916,8 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 			dsty += p96_yoffset;
 		}
 
-		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,argb);
+//		RectFillColor(draw_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,argb);
+		RectFillColor(&comp_p96_RP, dstx, dsty, dstx + width - 1, dsty + height - 1,argb);
 		p96_gfx_updated = true;
 		DX_Invalidate (dsty, dsty + height - 1);
 		return 1;
@@ -2946,6 +2955,7 @@ int DX_BitsPerCannon (void)
 
 void output_update_clut()
 {
+#if 1
 	if (output_clut_needs_update == false) return;
 	output_clut_needs_update = false;
 	
@@ -2962,6 +2972,10 @@ void output_update_clut()
 			int g = picasso96_state.CLUT[_start].Green;
 			int b = picasso96_state.CLUT[_start].Blue;
 
+			r = 0;
+			g = 0;
+			b = 0;
+
 			raw_data = (((r & redmask) << redshift) >>(8-redbits)) | 
 					(((g & greenmask) << greenshift) >> (8-greenbits)) | 
 					(((b & bluemask) << blueshift) >> (8-bluebits));
@@ -2971,6 +2985,7 @@ void output_update_clut()
 			_start++;
 		}
 	}
+#endif
 }
 
 void 	DX_SetPalette (int start, int count)
@@ -2989,7 +3004,6 @@ void 	DX_SetPalette (int start, int count)
 	if (set_palette_fn)	// we need to convert !!
 	{
 		int n;
-
 		for (n = start ; n<(start+count); n++ ) set_palette_fn( picasso96_state.CLUT, n );
 	}
 	else if ((S)&&(W -> BorderTop == 0))
@@ -2998,6 +3012,10 @@ void 	DX_SetPalette (int start, int count)
 		{
 			SetPalette_8bit_screen(start, count);
 		}
+	}
+	else
+	{
+		output_update_clut();
 	}
 
 	dx_pal_count++;
@@ -3080,9 +3098,12 @@ uae_u8 *gfx_lock_picasso (void)
 
 	if (p96_lock) gfx_unlock_picasso ();
 
-	if (draw_p96_RP -> BitMap)
+//	if (draw_p96_RP -> BitMap)
+	if (comp_p96_RP.BitMap)
 	{
-		p96_lock = IGraphics -> LockBitMapTags(draw_p96_RP -> BitMap,
+		p96_lock = IGraphics -> LockBitMapTags(
+			comp_p96_RP.BitMap,
+//draw_p96_RP -> BitMap,
 			LBM_BaseAddress, (APTR *) &address,
 			LBM_PixelFormat, (APTR *) &format,
 			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
@@ -3632,13 +3653,9 @@ int is_vsync (void)
 					set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
 					p96_gfx_updated = true;
 				}
-				p96_palette_updated = false;
-			}
+//				p96_palette_updated = false;
 
-			if (p96_gfx_updated)
-			{
-				if (p96_conv_fn) p96_conv_all();
-				p96_gfx_updated = false;
+				picasso_refresh (0);
 			}
 
 			BackFill_Func(NULL, NULL);
@@ -3709,10 +3726,10 @@ void screenshot (int type)
  * Mouse inputdevice functions
  */
 
-#define MAX_BUTTONS     3
-#define MAX_AXES        3
-#define FIRST_AXIS      0
-#define FIRST_BUTTON    MAX_AXES
+#define MAX_BUTTONS	 3
+#define MAX_AXES		3
+#define FIRST_AXIS	  0
+#define FIRST_BUTTON	MAX_AXES
 
 static int init_mouse (void)
 {
@@ -3751,45 +3768,45 @@ static unsigned int get_mouse_widget_num (unsigned int mouse)
 
 static int get_mouse_widget_first (unsigned int mouse, int type)
 {
-    switch (type) {
-        case IDEV_WIDGET_BUTTON:
-            return FIRST_BUTTON;
-        case IDEV_WIDGET_AXIS:
-            return FIRST_AXIS;
-    }
-    return -1;
+	switch (type) {
+		case IDEV_WIDGET_BUTTON:
+			return FIRST_BUTTON;
+		case IDEV_WIDGET_AXIS:
+			return FIRST_AXIS;
+	}
+	return -1;
 }
 
 static int get_mouse_widget_type (unsigned int mouse, unsigned int num, char *name, uae_u32 *code)
 {
-    if (num >= MAX_AXES && num < MAX_AXES + MAX_BUTTONS) {
-        if (name)
-            sprintf (name, "Button %d", num + 1 + MAX_AXES);
-        return IDEV_WIDGET_BUTTON;
-    } else if (num < MAX_AXES) {
-        if (name)
-            sprintf (name, "Axis %d", num + 1);
-        return IDEV_WIDGET_AXIS;
-    }
-    return IDEV_WIDGET_NONE;
+	if (num >= MAX_AXES && num < MAX_AXES + MAX_BUTTONS) {
+		if (name)
+			sprintf (name, "Button %d", num + 1 + MAX_AXES);
+		return IDEV_WIDGET_BUTTON;
+	} else if (num < MAX_AXES) {
+		if (name)
+			sprintf (name, "Axis %d", num + 1);
+		return IDEV_WIDGET_AXIS;
+	}
+	return IDEV_WIDGET_NONE;
 }
 
 static void read_mouse (void)
 {
-    /* We handle mouse input in handle_events() */
+	/* We handle mouse input in handle_events() */
 }
 
 struct inputdevice_functions inputdevicefunc_mouse = {
-    init_mouse,
-    close_mouse,
-    acquire_mouse,
-    unacquire_mouse,
-    read_mouse,
-    get_mouse_num,
-    get_mouse_name,
-    get_mouse_widget_num,
-    get_mouse_widget_type,
-    get_mouse_widget_first
+	init_mouse,
+	close_mouse,
+	acquire_mouse,
+	unacquire_mouse,
+	read_mouse,
+	get_mouse_num,
+	get_mouse_name,
+	get_mouse_widget_num,
+	get_mouse_widget_type,
+	get_mouse_widget_first
 };
 
 /*
@@ -3797,14 +3814,14 @@ struct inputdevice_functions inputdevicefunc_mouse = {
  */
 void input_get_default_mouse (struct uae_input_device *uid)
 {
-    /* Supports only one mouse for now */
-    uid[0].eventid[ID_AXIS_OFFSET + 0][0]   = INPUTEVENT_MOUSE1_HORIZ;
-    uid[0].eventid[ID_AXIS_OFFSET + 1][0]   = INPUTEVENT_MOUSE1_VERT;
-    uid[0].eventid[ID_AXIS_OFFSET + 2][0]   = INPUTEVENT_MOUSE1_WHEEL;
-    uid[0].eventid[ID_BUTTON_OFFSET + 0][0] = INPUTEVENT_JOY1_FIRE_BUTTON;
-    uid[0].eventid[ID_BUTTON_OFFSET + 1][0] = INPUTEVENT_JOY1_2ND_BUTTON;
-    uid[0].eventid[ID_BUTTON_OFFSET + 2][0] = INPUTEVENT_JOY1_3RD_BUTTON;
-    uid[0].enabled = 1;
+	/* Supports only one mouse for now */
+	uid[0].eventid[ID_AXIS_OFFSET + 0][0]   = INPUTEVENT_MOUSE1_HORIZ;
+	uid[0].eventid[ID_AXIS_OFFSET + 1][0]   = INPUTEVENT_MOUSE1_VERT;
+	uid[0].eventid[ID_AXIS_OFFSET + 2][0]   = INPUTEVENT_MOUSE1_WHEEL;
+	uid[0].eventid[ID_BUTTON_OFFSET + 0][0] = INPUTEVENT_JOY1_FIRE_BUTTON;
+	uid[0].eventid[ID_BUTTON_OFFSET + 1][0] = INPUTEVENT_JOY1_2ND_BUTTON;
+	uid[0].eventid[ID_BUTTON_OFFSET + 2][0] = INPUTEVENT_JOY1_3RD_BUTTON;
+	uid[0].enabled = 1;
 }
 
 /****************************************************************************
