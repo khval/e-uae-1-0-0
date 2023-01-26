@@ -52,7 +52,7 @@
 #include <proto/graphics.h>
 
 extern ULONG COMP_FMT_SRC;
-extern struct RastPort  comp_p96_RP;
+extern struct RastPort  *draw_p96_RP;
 extern void (*p96_conv_fn) (void *src, void *dest, int size);
 #endif 
 
@@ -506,18 +506,6 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 	int yoff = picasso96_state.YOffset;
 	uae_u8 *srcp; 
 
-// *dstp;
-
-/*
-debug_crashed("%s:%d -- do_blit (ri: %08x, Bpp: %d, srcx: %d, srcy: %d,dstx: %d, dsty: %d, width: %d, height: %d, BLIT_OPCODE opcode, can_do_blit)\n",
-		__FUNCTION__,__LINE__, ri,  Bpp,  srcx,  srcy, dstx,  dsty,  width,  height );
-
-debug_crashed("ri -> RGBFormat: %d, picasso_vidinfo.rgbformat: %d picasso96_state.RGBFormat: %d\n", ri ? ri -> RGBFormat : 0, picasso_vidinfo.rgbformat , picasso96_state.RGBFormat );
-	if (debug_crash) return;
-*/
-
-	// Clipping. 
-
 	dstx -= xoff;
 	dsty -= yoff;
 
@@ -578,7 +566,7 @@ debug_crashed("ri -> RGBFormat: %d, picasso_vidinfo.rgbformat: %d picasso96_stat
 	P96TRACE (("P96: gfxmem is at 0x%x\n", gfxmemory));
 
 
-	if ((comp_p96_RP.BitMap)&&(p96_conv_fn) &&(COMP_FMT_SRC != PIXF_NONE))
+	if ((draw_p96_RP -> BitMap)&&(p96_conv_fn) &&(COMP_FMT_SRC != PIXF_NONE))
 	{
 		int dest_bpr = width * 4;
 		char *dest_tmp_buffer_ptr = alloca( dest_bpr );		// becouse output is needs more space.
@@ -590,7 +578,7 @@ debug_crashed("ri -> RGBFormat: %d, picasso_vidinfo.rgbformat: %d picasso96_stat
 			WritePixelArray( (void *) dest_tmp_buffer_ptr,
 				0, 0,	dest_bpr,
 				COMP_FMT_SRC,
-				&comp_p96_RP,
+				draw_p96_RP,
 				dstx, dsty ++,
 				width, 1 );
 
@@ -601,8 +589,8 @@ debug_crashed("ri -> RGBFormat: %d, picasso_vidinfo.rgbformat: %d picasso96_stat
 	{
 		WritePixelArray( (void *) srcp,
 			0, 0,	ri->BytesPerRow,
-			COMP_FMT_SRC,
-			&comp_p96_RP,
+			ri -> RGBFormat,
+			draw_p96_RP,
 			dstx, dsty ++,
 			width, height );
 	}
@@ -729,7 +717,7 @@ static void new_write_currline (uae_u8 *srcp, int line_no, int x, int byte_count
 	WritePixelArray( (void *) dest_tmp_buffer_ptr,
 			0, 0,	dest_bpr,
 			COMP_FMT_SRC,
-			&comp_p96_RP,
+			draw_p96_RP,
 			x, line_no, 
 			w, 1 );
 }
@@ -771,7 +759,7 @@ static void flush_currline (void)
 
 		if (byte_count > 0)
 		{
-			if ((comp_p96_RP.BitMap)&&(p96_conv_fn) &&(COMP_FMT_SRC != PIXF_NONE))
+			if ((draw_p96_RP -> BitMap)&&(p96_conv_fn) &&(COMP_FMT_SRC != PIXF_NONE))
 			{
 				new_write_currline (srcp, line_no, first_byte / fb_bpp, byte_count, fb_bpp);
 			}
