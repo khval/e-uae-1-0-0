@@ -2914,44 +2914,7 @@ int DX_BitsPerCannon (void)
 	return 8;
 }
 
-/*
 
-void output_update_clut()
-{
-#if 1
-	if (output_clut_needs_update == false) return;
-	output_clut_needs_update = false;
-	
-	int _start = 0;
-	int _count = 256;
-
-	if (picasso_vidinfo.pixbytes != 1)
-	{
-		while (_count-- > 0)
-		{
-			uint32 raw_data;
-
-			int r = picasso96_state.CLUT[_start].Red;
-			int g = picasso96_state.CLUT[_start].Green;
-			int b = picasso96_state.CLUT[_start].Blue;
-
-			r = 0;
-			g = 0;
-			b = 0;
-
-			raw_data = (((r & redmask) << redshift) >>(8-redbits)) | 
-					(((g & greenmask) << greenshift) >> (8-greenbits)) | 
-					(((b & bluemask) << blueshift) >> (8-bluebits));
-
-			if (byte_swap_16bit) raw_data = ((raw_data & 0xFF) << 8) | ((raw_data >> 8) & 0xFF);
-			picasso_vidinfo.clut[_start] = raw_data;
-			_start++;
-		}
-	}
-#endif
-}
-
-*/
 
 void 	DX_SetPalette (int start, int count)
 {
@@ -2978,13 +2941,6 @@ void 	DX_SetPalette (int start, int count)
 			SetPalette_8bit_screen(start, count);
 		}
 	}
-
-/*
-	else
-	{
-		output_update_clut();
-	}
-*/
 
 	dx_pal_count++;
 }
@@ -3511,18 +3467,14 @@ int is_vsync (void)
 				if (set_palette_on_vbl_fn) 
 				{
 					set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
-					p96_gfx_updated = true;
 				}
 
-				picasso_refresh (0);
+				p96_palette_updated = false;
 			}
+		}
 
-			BackFill_Func(NULL, NULL);
-		}
-		else
-		{
-			BackFill_Func(NULL, NULL);
-		}
+		picasso_refresh (0);
+		BackFill_Func(NULL, NULL);
 	}
 
 
