@@ -1322,20 +1322,23 @@ static int last_color_changed = -1;
 
 void picasso_handle_vsync (void)
 {
-    if (first_color_changed < last_color_changed) {
-	DX_SetPalette (first_color_changed,
-		       last_color_changed - first_color_changed);
-	/* If we're emulating a CLUT mode, we need to redraw the entire
-	 * screen. */
-	if (picasso_vidinfo.rgbformat != picasso96_state.RGBFormat)
-	    picasso_refresh (1);
-    }
 
-    first_color_changed = 256;
-    last_color_changed = -1;
+	if (first_color_changed < last_color_changed)
+	{
+		DX_SetPalette (first_color_changed,   last_color_changed - first_color_changed);
 
-    /* Flush any cached changes to the screen. */
+//		if (picasso_vidinfo.rgbformat != picasso96_state.RGBFormat) picasso_refresh (1);
+	}
+
+	first_color_changed = 256;
+	last_color_changed = -1;
+
+/*
+    // Flush any cached changes to the screen. 
     wgfx_flushline ();
+
+*/
+
 }
 
 void picasso_handle_hsync (void)
@@ -1655,12 +1658,15 @@ uae_u32 REGPARAM2 picasso_InvertRect (struct regstruct *regs)
 	for (lines = 0; lines < Height; lines++, uae_mem += ri.BytesPerRow)
 	    do_xor8 (uae_mem, width_in_bytes, xorval);
 
+/*
 	if (renderinfo_is_current_screen (&ri)) {
 	    if (mask == 0xFF)
 		do_invertrect (&ri, Bpp, X, Y, Width, Height);
 	    else
 		do_blit (&ri, Bpp, X, Y, X, Y, Width, Height, BLIT_SRC, 0);
 	}
+*/
+
 	result = 1;
     }
     return result;
@@ -1824,7 +1830,7 @@ uae_u32 REGPARAM2 picasso_FillRect (struct regstruct *regs)
 		    if (Y+Height > picasso96_state.Height)
 			Height = picasso96_state.Height - Y;
 
-		    do_fillrect (src, X, Y, Width, Height, Pen, Bpp, RGBFormat);
+//		    do_fillrect (src, X, Y, Width, Height, Pen, Bpp, RGBFormat);
 		}
 	    }
 	    result = 1;
@@ -1849,8 +1855,10 @@ uae_u32 REGPARAM2 picasso_FillRect (struct regstruct *regs)
 			}
 		    }
 		}
+/*
 		if (renderinfo_is_current_screen (&ri))
 		    do_blit (&ri, Bpp, X, Y, X, Y, Width, Height, BLIT_SRC, 0);
+*/
 		result = 1;
 	    }
 	}
@@ -1943,6 +1951,9 @@ STATIC_INLINE int BlitRectHelper (void)
 
 
     /* Now we do the on-screen display, if renderinfo points to it */
+
+#if 0
+
     if (renderinfo_is_current_screen (dstri)) {
 	if (mask == 0xFF || Bpp > 1) {
 	    if (can_do_visible_blit)
@@ -1956,6 +1967,8 @@ STATIC_INLINE int BlitRectHelper (void)
     } else {
 	P96TRACE (("P96: Did not do_blit 1 in BlitRect()\n"));
     }
+
+#endif
 
     return 1;
 }
@@ -2274,9 +2287,11 @@ uae_u32 REGPARAM picasso_BlitPattern (struct regstruct *regs)
 	    } /* for (rows) */
 
 	    /* If we need to update a second-buffer (extra_mem is set), then do it only if visible! */
+
+/*
 	    if (picasso_vidinfo.extra_mem && renderinfo_is_current_screen (&ri))
 		do_blit (&ri, Bpp, X, Y, X, Y, W, H, BLIT_SRC, 0);
-
+*/
 	    result = 1;
 	}
     }
@@ -2449,8 +2464,11 @@ uae_u32 REGPARAM2 picasso_BlitTemplate (struct regstruct *regs)
 	    } /* for (rows) */
 
 	    /* If we need to update a second-buffer (extra_mem is set), then do it only if visible! */
+
+/*
 	    if (picasso_vidinfo.extra_mem && renderinfo_is_current_screen (&ri))
 		do_blit (&ri, Bpp, X, Y, X, Y, W, H, BLIT_SRC, 0);
+*/
 	}
     }
     return 1;
@@ -2624,10 +2642,14 @@ uae_u32 REGPARAM2 picasso_BlitPlanar2Chunky (struct regstruct *regs)
 
     PlanarToChunky (&local_ri, &local_bm, srcx, srcy, dstx, dsty,
 		    width, height, mask);
+
+/*
     if (renderinfo_is_current_screen (&local_ri)) {
 	do_blit (&local_ri, GetBytesPerPixel (local_ri.RGBFormat), dstx, dsty,
 		 dstx, dsty, width, height, BLIT_SRC, 0);
     }
+*/
+
     return 1;
 }
 
@@ -2777,10 +2799,15 @@ uae_u32 REGPARAM2 picasso_BlitPlanar2Direct (struct regstruct *regs)
 	    PlanarToDirect (&local_ri, &local_bm, srcx, srcy, dstx, dsty,
 			    width, height, Mask, &local_cim);
 
+
+/*
 	    if (renderinfo_is_current_screen (&local_ri)) {
 		do_blit (&local_ri, GetBytesPerPixel (local_ri.RGBFormat),
 			 dstx, dsty, dstx, dsty, width, height, BLIT_SRC, 0);
 	    }
+*/
+
+
 	    result = 1;
 	} else {
 	    P96TRACE (("P96: WARNING - BlitPlanar2Direct() failed."
@@ -2898,8 +2925,8 @@ static void REGPARAM2 gfxmem_lput (uaecptr addr, uae_u32 l)
     m = (uae_u32 *)(((addr - gfxmem_start) & gfxmem_mask) + gfxmemory);
     do_put_mem_long (m, l);
 
-    /* Flush long written to the display */
-    flush_write (addr, 4);
+    // Flush long written to the display //
+//    flush_write (addr, 4);
 }
 
 static void REGPARAM2 gfxmem_wput (uaecptr addr, uae_u32 w)
@@ -2911,8 +2938,8 @@ static void REGPARAM2 gfxmem_wput (uaecptr addr, uae_u32 w)
     m = (uae_u16 *)(((addr - gfxmem_start) & gfxmem_mask) + gfxmemory);
     do_put_mem_word (m, (uae_u16)w);
 
-    /* Flush word written to the display */
-    flush_write (addr, 2);
+    // Flush word written to the display //
+//    flush_write (addr, 2);
 }
 
 static void REGPARAM2 gfxmem_bput (uaecptr addr, uae_u32 b)
@@ -2924,8 +2951,8 @@ static void REGPARAM2 gfxmem_bput (uaecptr addr, uae_u32 b)
     m = (uae_u8 *)(((addr - gfxmem_start) & gfxmem_mask) + gfxmemory);
     *m = (uae_u8) b;
 
-    /* Flush byte written to the display */
-    flush_write (addr, 1);
+    // Flush byte written to the display //
+//    flush_write (addr, 1);
 }
 
 static int REGPARAM2 gfxmem_check (uaecptr addr, uae_u32 size)
