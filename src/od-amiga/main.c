@@ -127,7 +127,7 @@ static init_remap_keyboard()
 	for (sc=0;sc<256;sc++)
 		remap_scancode[sc] = sc;
 	
-	remap_scancode[58]=11;
+	remap_scancode[107]=11; // dead to MENU key
 	remap_scancode[11]=12;
 	remap_scancode[12]=13;
 
@@ -136,7 +136,6 @@ static init_remap_keyboard()
 	remap_scancode[112]=0x5A;	// Home to 0xFA
 	remap_scancode[113]=0x5B;	// End to 0x5B
 	remap_scancode[71]=0x5F;	// insert to Help key.
-	remap_scancode[107]=0x3A;	// Menu key to 0x3A
 
 	// swaped to avoid issues with host system... (Amiga+M etc.)
 
