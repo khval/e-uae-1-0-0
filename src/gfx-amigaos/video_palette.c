@@ -158,7 +158,7 @@ void SetPalette_8bit_screen (int start, int count)
 {
 	int i;
 
-	load32_p96_table[ 0 ] = count << 16 | start;
+	load32_p96_table[ 0 ] = (count << 16) | start;
 
 	int offset = 1;
 

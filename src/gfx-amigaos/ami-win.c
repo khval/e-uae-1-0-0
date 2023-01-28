@@ -141,7 +141,7 @@ static int palette_update_end   = 0;
 extern bool debug_crash;
 #define debug_crashed(fmt,...) if (debug_crash) DebugPrintF(fmt,#__VA_ARGS__)
 
-extern bool output_clut_needs_update;
+// extern bool output_clut_needs_update;
 
 void reset_p96_fn_pointers( void );
 
