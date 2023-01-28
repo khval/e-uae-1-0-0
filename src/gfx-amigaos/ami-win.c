@@ -3442,7 +3442,13 @@ int is_fullscreen (void)
 int every = 0;
 #endif
 
-int is_vsync (void)
+int is_vsync (void)		// this one is for AGA mostly!!
+{
+	BackFill_Func(NULL, NULL);
+	return 0;
+}
+
+void ext_p96_vsync()
 {
 
 #if debug_vsync_time

@@ -1320,6 +1320,8 @@ void picasso_enablescreen (int on)
 static int first_color_changed = 256;
 static int last_color_changed = -1;
 
+extern void ext_p96_vsync();
+
 void picasso_handle_vsync (void)
 {
 
@@ -1338,6 +1340,8 @@ void picasso_handle_vsync (void)
     wgfx_flushline ();
 
 */
+
+	ext_p96_vsync();
 
 }
 
