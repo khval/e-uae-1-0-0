@@ -495,6 +495,10 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
  * must do it by hand using the data in the save area, pointed to by
  * srcp.
  */
+
+int line_skip = 2;
+int off_skip ;
+
 static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 		     int dstx, int dsty, int width, int height,
 		     BLIT_OPCODE opcode, int can_do_blit)
@@ -562,11 +566,17 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 	       width,height, picasso_vidinfo.pixbytes));
 	P96TRACE (("P96: gfxmem is at 0x%x\n", gfxmemory));
 
+	off_skip = (off_skip + 1) % line_skip;
 
 	if ((draw_p96_RP -> BitMap)&&(p96_conv_fn) &&(COMP_FMT_SRC != PIXF_NONE))
 	{
 		int dest_bpr = width * 4;
 		char *dest_tmp_buffer_ptr = alloca( dest_bpr );		// becouse output is needs more space.
+
+		srcp += (ri->BytesPerRow * off_skip);
+		dsty += off_skip;
+
+		height /= line_skip;
 
 		while (height-- > 0)
 		{
@@ -576,20 +586,41 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 				0, 0,	dest_bpr,
 				COMP_FMT_SRC,
 				draw_p96_RP,
-				dstx, dsty ++,
+				dstx, dsty +=line_skip,
 				width, 1 );
 
-			srcp += ri->BytesPerRow;
+			srcp += (ri->BytesPerRow * line_skip);
 		}
 	}
 	else
 	{
-		WritePixelArray( (void *) srcp,
-			0, 0,	ri->BytesPerRow,
-			ri -> RGBFormat,
-			draw_p96_RP,
-			dstx, dsty ++,
-			width, height );
+		if (line_skip)
+		{
+			srcp += (ri->BytesPerRow * off_skip);
+			dsty += off_skip;
+
+			height /= line_skip;
+			while (height--)
+			{
+				WritePixelArray( (void *) srcp,
+				0, 0,	ri->BytesPerRow,
+				ri -> RGBFormat,
+				draw_p96_RP,
+				dstx, dsty +=line_skip,
+				width, 1 );
+
+				srcp += (ri->BytesPerRow * line_skip);
+			}
+		}
+		else
+		{
+			WritePixelArray( (void *) srcp,
+				0, 0,	ri->BytesPerRow,
+				ri -> RGBFormat,
+				draw_p96_RP,
+				dstx, dsty,
+				width, height );
+		}
 	}
 }
 
