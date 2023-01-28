@@ -3480,7 +3480,6 @@ void ext_p96_vsync()
 		}
 
 		picasso_refresh (0);
-		BackFill_Func(NULL, NULL);
 	}
 
 
