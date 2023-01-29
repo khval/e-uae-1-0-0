@@ -586,10 +586,11 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 				0, 0,	dest_bpr,
 				COMP_FMT_SRC,
 				draw_p96_RP,
-				dstx, dsty +=line_skip,
+				dstx, dsty,
 				width, 1 );
 
 			srcp += (ri->BytesPerRow * line_skip);
+			dsty +=line_skip;
 		}
 	}
 	else
