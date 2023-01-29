@@ -1354,27 +1354,37 @@ static int last_color_changed = -1;
 
 extern void ext_p96_vsync();
 
+static struct timeval t1, t2;
+
 void picasso_handle_vsync (void)
 {
+	double delta_ms;
+	gettimeofday(&t2,NULL);
 
-	if (first_color_changed < last_color_changed)
+	delta_ms = (t2.tv_sec - t1.tv_sec) * 1000.0f;		// s to ms
+	delta_ms += (t2.tv_usec - t1.tv_usec) / 1000.0f;	// us to ms
+
+	if (delta_ms>=33.0f)		// 1 / 30hz = 33 ms long delays...
 	{
-		DX_SetPalette (first_color_changed,   last_color_changed - first_color_changed);
+		t1 = t2;	
 
-//		if (picasso_vidinfo.rgbformat != picasso96_state.RGBFormat) picasso_refresh (1);
-	}
+//		printf("delta_ms: %f\n", delta_ms);
 
-	first_color_changed = 256;
-	last_color_changed = -1;
+		if (first_color_changed < last_color_changed)
+		{
+			DX_SetPalette (first_color_changed,   last_color_changed - first_color_changed);
+//			if (picasso_vidinfo.rgbformat != picasso96_state.RGBFormat) picasso_refresh (1);
+		}
+
+		first_color_changed = 256;
+		last_color_changed = -1;
 
 /*
     // Flush any cached changes to the screen. 
     wgfx_flushline ();
-
 */
-
-	ext_p96_vsync();
-
+		ext_p96_vsync();
+	}
 }
 
 void picasso_handle_hsync (void)
