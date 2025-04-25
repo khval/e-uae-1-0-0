@@ -34,6 +34,7 @@
 #include "osemu.h"
 #include "filesys.h"
 #include "picasso96.h"
+#include "bsdsocket.h"
 #include "uaeexe.h"
 #include "native2amiga.h"
 #include "scsidev.h"
@@ -52,6 +53,12 @@
 #include "windows.h"
 #endif
 
+#ifdef __AMIGAOS4__
+#define __USE_INLINE__
+#include <proto/dos.h>
+#include <proto/timer.h>
+#endif
+
 struct uae_prefs currprefs, changed_prefs;
 
 static int restart_program;
@@ -63,6 +70,9 @@ int cloanto_rom = 0;
 int log_scsi;
 
 struct gui_info gui_data;
+
+extern void bsdsocket_os41_install(void);
+extern void bsdsocket_os41_reset (void);
 
 
 /*
@@ -626,12 +636,17 @@ static int do_init_machine (void)
 #ifdef FILESYS
     filesys_install ();
 #endif
+
 #ifdef AUTOCONFIG
     bsdlib_install ();
     emulib_install ();
     uaeexe_install ();
     native2amiga_install ();
 #endif
+
+//	dogshit_install();
+
+	bsdsocket_os41_install();
 
     if (custom_init ()) { /* Must come after memory_init */
 #ifdef SERIAL_PORT
@@ -677,9 +692,16 @@ static void reset_all_systems (void)
     init_eventtab ();
 
     memory_reset ();
+
+
 #ifdef BSDSOCKET
     bsdlib_reset ();
 #endif
+
+//	dogshit_reset();
+
+	bsdsocket_os41_reset();
+
 #ifdef FILESYS
     filesys_reset ();
     filesys_start_threads ();

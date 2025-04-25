@@ -15,19 +15,20 @@
 #include "debug.h"
 
 #include "signal.h"
-
 #include "version.h"
+#include "win32_handle_emu.h"
+#include "win32_thread_emu.h"
 
 #define  __USE_BASETYPE__
 #include <proto/exec.h>
 #undef   __USE_BASETYPE__
 #include <exec/execbase.h>
-#include <proto/wb.h>
-#include <proto/timer.h>
 
 #ifdef USE_SDL
 # include <SDL.h>
 #endif
+
+struct handle_thread_s main_thread;
 
 /* Get compiler/libc to enlarge stack to this size - if possible */
 #if defined __PPC__ || defined __ppc__ || defined POWERPC || defined __POWERPC__
@@ -57,6 +58,9 @@ char* AMIGAOS_VERSION_TAG = "$VER: " UAE_VERSION_STRING " (" __DATE__ ")";
 
 
 #include <intuition/imageclass.h>
+#include <proto/gfxconvert.h>
+
+#include <proto/bsdsocket.h>
 
 struct Library *ExpansionBase = NULL;
 struct TimerIFace *ITimer = NULL;
@@ -70,6 +74,10 @@ struct Library          *LayersBase = NULL;
 struct Library          *AslBase = NULL;
 struct Library          *CyberGfxBase = NULL;
 struct Library          *IconBase = NULL;
+struct Library          *WorkbenchBase = NULL;
+struct Library          *gfxconvertBase = NULL;
+
+struct Library          *SocketBase = NULL;
 
 struct AslIFace *IAsl = NULL;
 struct GraphicsIFace *IGraphics = NULL;
@@ -77,26 +85,59 @@ struct LayersIFace *ILayers = NULL;
 struct IntuitionIFace *IIntuition = NULL;
 struct CyberGfxIFace *ICyberGfx = NULL;
 struct IconIFace *IIcon = NULL;
+struct WorkbenchIFace *IWorkbench = NULL;
+struct gfxconvertIFace *Igfxconvert = NULL;
+
+struct SocketIFace *ISocket = NULL;
 
 #include "../gfx-amigaos/window_icons.h"
+
+APTR amiga_thread_safe_mx = NULL;
+int thread_triggered_sigbit = 0;
+
+static init_remap_keyboard();
 
 struct kIcon iconifyIcon = { NULL, NULL };
 struct kIcon zoomIcon = { NULL, NULL };
 struct kIcon padlockicon = { NULL, NULL };
 struct kIcon fullscreenicon = { NULL, NULL };
 
-#define closeLib(x) \
-	if (I ## x ) DropInterface ((struct Interface *) I ## x ); I ## x = NULL; \
-	if (x ## Base) CloseLibrary ( x ## Base); x ## Base= NULL;
+	#define libOpen(name,ver) \
+		name ## Base = OpenLibrary( #name ".library", ver); \
+		if (name ## Base) I ## name = (struct name ## IFace *) GetInterface (name ## Base, "main", 1, NULL);
+
+	#define libClose(name) \
+		if (I ## name ) DropInterface ((struct Interface *) I ## name ); I ## name = NULL; \
+		if (name ## Base) CloseLibrary ( (struct Library *) name ## Base); name ## Base= NULL;
 
 #else
 
-#define closeLib(x) if (x ## Base) CloseLibrary ( x ## Base); x ## Base= NULL;
+	#define libOpen(name,ver) name ## Base = OpenLibrary ( #name ".library", ver); 
+	#define libClose(x) if (x ## Base) CloseLibrary ( x ## Base); x ## Base= NULL;
 
 #endif
 
+
+
+
+#define safe(metod,ptr) if (ptr) { metod(ptr); *ptr = NULL; }
+
+int socket_thread_triggered_sigbit = -1;
+struct Task *main_task = NULL;
+
 static void free_libs (void)
 {
+	if (socket_thread_triggered_sigbit != -1 )
+	{
+		FreeSignal(socket_thread_triggered_sigbit);
+		socket_thread_triggered_sigbit = -1;
+	}
+
+	if (amiga_thread_safe_mx)
+	{
+		FreeSysObject( ASOT_MUTEX, amiga_thread_safe_mx);
+		amiga_thread_safe_mx = NULL;
+	}
 
 #ifdef __amigaos4__
 	if (ITimer) DropInterface ((struct Interface *)ITimer);
@@ -108,14 +149,109 @@ static void free_libs (void)
 	}
 #endif
 
-	closeLib(Expansion);
-	closeLib(Asl);
-	closeLib(Graphics);
-	closeLib(Layers);
-	closeLib(Intuition);
-	closeLib(CyberGfx);
-	closeLib(Workbench);
-	closeLib(Icon);
+	libClose(Socket);
+	libClose(Expansion);
+	libClose(Asl);
+	libClose(Graphics);
+	libClose(Layers);
+	libClose(Intuition);
+	libClose(CyberGfx);
+	libClose(Workbench);
+	libClose(Icon);
+	libClose(gfxconvert);
+}
+
+static BOOL init_libs (void)
+{
+    atexit (free_libs);
+
+#ifndef __amigaos4__
+    TimerBase = (struct Device *) FindName(&SysBase->DeviceList, "timer.device");
+#endif
+
+#ifdef __amigaos4__
+
+	if (OpenDevice(TIMERNAME, UNIT_MICROHZ, (struct IORequest *) &timereq, 0))
+	{
+		return FALSE;
+	}
+
+	timer_device_open = TRUE;
+
+	TimerBase = (struct Device *) timereq.Request.io_Device;
+	ITimer = (struct TimerIFace *) GetInterface( (struct Library *) TimerBase,"main",1L,NULL) ;
+
+	ExpansionBase = OpenLibrary ("expansion.library", 0);
+	if (ExpansionBase) IExpansion = (struct ExpansionIFace *) GetInterface(ExpansionBase, "main", 1, 0);
+
+  	IntuitionBase = (void*) OpenLibrary ("intuition.library", 0L);
+	if (IntuitionBase) IIntuition = (struct IntuitionIFace *) GetInterface ((struct Library *) IntuitionBase, "main", 1, NULL);
+	if (!IIntuition)  return FALSE;
+
+	LayersBase = OpenLibrary ("layers.library", 0L);
+	if (LayersBase) ILayers = (struct LayersIFace *) GetInterface (LayersBase, "main", 1, NULL);
+	if (!ILayers) return FALSE;
+
+	GraphicsBase = (void*) OpenLibrary ("graphics.library", 0L);
+	if (GraphicsBase) IGraphics = (struct GraphicsIFace *) GetInterface ((struct Library *) GraphicsBase, "main", 1, NULL);
+	if (!IGraphics) return FALSE;
+
+#ifndef __AmigaOS4__
+
+	CyberGfxBase = OpenLibrary ("cybergraphics.library", 40);
+	if (CyberGfxBase) ICyberGfx = (struct CyberGfxIFace *) GetInterface (CyberGfxBase, "main", 1, NULL);
+	if (!ICyberGfx)  return FALSE;
+
+#endif
+
+	SocketBase = OpenLibrary ("bsdsocket.library", 4);
+	if (SocketBase) ISocket = (struct SocketIFace *) GetInterface (SocketBase, "main", 1, NULL);
+	if (!ISocket)  return FALSE;
+
+
+	AslBase = OpenLibrary ("asl.library", 53);
+	if (AslBase) IAsl = (struct AslIFace *) GetInterface (AslBase, "main", 1, NULL);
+	if (!IAsl)  return FALSE;
+
+	WorkbenchBase = OpenLibrary ("workbench.library", 53);
+	if (WorkbenchBase) IWorkbench = (struct WorkbenchIFace *) GetInterface (WorkbenchBase, "main", 1, NULL);
+	if (!IWorkbench)  return FALSE;
+
+	libOpen(gfxconvert,1);
+	if (!Igfxconvert)  return FALSE;
+
+	IconBase = OpenLibrary ("icon.library", 53);
+	if (IconBase) IIcon = (struct IconIFace *) GetInterface (IconBase, "main", 1, NULL);
+	if (!IIcon)  return FALSE;
+
+	if(!ITimer || !IExpansion) return FALSE;
+
+	init_remap_keyboard();
+
+#endif
+
+	printf("all libs are loaded\n");
+
+	thread_triggered_sigbit = AllocSignal( -1 );
+	if ( !thread_triggered_sigbit ) return FALSE;
+
+	amiga_thread_safe_mx = AllocSysObjectTags( ASOT_MUTEX, TAG_END );
+	if ( ! amiga_thread_safe_mx ) return FALSE;
+
+	main_task = FindTask(NULL);
+
+	if (main_task)
+	{
+		main_thread.BaseClass.type = h_thread;
+		main_thread.BaseClass.index = MAIN_THREAD_INDEX;
+		main_thread.BaseClass.object = main_task;
+		main_thread.SocketBase = SocketBase;
+		main_thread.IS = ISocket;
+		main_task -> tc_UserData = (void *) MAIN_THREAD_INDEX;
+		hThreads[MAIN_THREAD_INDEX] = &main_thread;
+	}
+
+	return TRUE;
 }
 
 char remap_scancode[256];
@@ -144,69 +280,6 @@ static init_remap_keyboard()
 
 	remap_scancode[101]=0x67;	// Right AltGr to Right Amiga
 	remap_scancode[103]=0x64;	// Right Window to Right Alt.
-}
-
-static BOOL init_libs (void)
-{
-    atexit (free_libs);
-
-#ifndef __amigaos4__
-    TimerBase = (struct Device *) FindName(&SysBase->DeviceList, "timer.device");
-#endif
-
-#ifdef __amigaos4__
-
-	if (OpenDevice(TIMERNAME, UNIT_MICROHZ, (struct IORequest *) &timereq, 0))
-	{
-		return FALSE;
-	}
-
-	timer_device_open = TRUE;
-
-	TimerBase = (struct Library *) timereq.Request.io_Device;
-	ITimer = (struct TimerIFace *) GetInterface(TimerBase,"main",1L,NULL) ;
-
-	ExpansionBase = OpenLibrary ("expansion.library", 0);
-	if (ExpansionBase) IExpansion = (struct ExpansionIFace *) GetInterface(ExpansionBase, "main", 1, 0);
-
-  	IntuitionBase = (void*) OpenLibrary ("intuition.library", 0L);
-	if (IntuitionBase) IIntuition = (struct IntuitionIFace *) GetInterface ((struct Library *) IntuitionBase, "main", 1, NULL);
-	if (!IIntuition)  return FALSE;
-
-	LayersBase = OpenLibrary ("layers.library", 0L);
-	if (LayersBase) ILayers = (struct LayersIFace *) GetInterface (LayersBase, "main", 1, NULL);
-	if (!ILayers) return FALSE;
-
-	GraphicsBase = (void*) OpenLibrary ("graphics.library", 0L);
-	if (GraphicsBase) IGraphics = (struct GraphicsIFace *) GetInterface ((struct Library *) GraphicsBase, "main", 1, NULL);
-	if (!IGraphics) return FALSE;
-
-	CyberGfxBase = OpenLibrary ("cybergraphics.library", 40);
-	if (CyberGfxBase) ICyberGfx = (struct CyberGfxIFace *) GetInterface (CyberGfxBase, "main", 1, NULL);
-	if (!ICyberGfx)  return FALSE;
-
-	AslBase = OpenLibrary ("asl.library", 53);
-	if (AslBase) IAsl = (struct AslIFace *) GetInterface (AslBase, "main", 1, NULL);
-	if (!IAsl)  return FALSE;
-
-	WorkbenchBase = OpenLibrary ("workbench.library", 53);
-	if (WorkbenchBase) IWorkbench = (struct WorkbenchIFace *) GetInterface (WorkbenchBase, "main", 1, NULL);
-	if (!IWorkbench)  return FALSE;
-
-	IconBase = OpenLibrary ("icon.library", 53);
-	if (IconBase) IIcon = (struct IconIFace *) GetInterface (IconBase, "main", 1, NULL);
-	if (!IIcon)  return FALSE;
-
-	if(!ITimer || !IExpansion) return FALSE;
-
-	init_remap_keyboard();
-
-#endif
-
-	printf("all libs are loaded\n");
-
-
-	return TRUE;
 }
 
 static int fromWB;
