@@ -1396,12 +1396,8 @@ STATIC_INLINE void pfield_draw_line (int lineno, int gfx_ypos, int follow_ypos)
 			break;
 	}
 
-	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
-
 	dh = dh_line;
 	xlinebuffer = gfxvidinfo.linemem;
-
-	dprintf("%s:%d: gfxvidinfo.linemem %08x\n",__FUNCTION__,__LINE__, gfxvidinfo.linemem);
 
 	if (xlinebuffer == 0 && do_double && (border == 0 || (border != 1 && dip_for_drawing->nr_color_changes > 0)))
 	{
@@ -1414,6 +1410,12 @@ STATIC_INLINE void pfield_draw_line (int lineno, int gfx_ypos, int follow_ypos)
 	{
 		xlinebuffer = row_map[gfx_ypos]; 
 		dh = dh_buf;
+	}
+
+	if (xlinebuffer == NULL) 
+	{
+		printf("wtf!!! xlinebuffer == NULL\n");
+		return ;
 	}
 
 	xlinebuffer -= linetoscr_x_adjust_bytes;
@@ -1934,16 +1936,18 @@ static void draw_status_line (int line)
 
 void finish_drawing_frame (void)
 {
-    int i;
+	int i;
 
-	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+	if (row_map[0] != gfxvidinfo.bufmem)	// row_map out of sync!!
+	{
+		init_row_map ();
+	}
 
-    if (! lockscr ()) {
-	notice_screen_contents_lost ();
-	return;
-    }
-
-	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+	if (! lockscr ())
+	{
+		notice_screen_contents_lost ();
+		return;
+	}
 
 #ifndef SMART_UPDATE
     /* @@@ This isn't exactly right yet. FIXME */
@@ -1954,46 +1958,25 @@ void finish_drawing_frame (void)
     return;
 #endif
 
-	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
-
-	dprintf("%s:%d - linestate: %08x\n",__FUNCTION__,__LINE__, linestate);
-	dprintf("%s:%d - amiga2aspect_line_map: %08x\n",__FUNCTION__,__LINE__, amiga2aspect_line_map);
-	dprintf("%s:%d - max_ypos_thisframe: %08x\n",__FUNCTION__,__LINE__, max_ypos_thisframe);
-	dprintf("%s:%d - pfield_draw_line: %08x\n",__FUNCTION__,__LINE__, pfield_draw_line);
-	dprintf("%s:%d - linestate: %08x\n",__FUNCTION__,__LINE__, linestate);
-
 	for (i = 0; i < max_ypos_thisframe; i++) 
 	{
 		int where;
 		int i1;
 		int line = i + thisframe_y_adjust_real;
 
-		dprintf("%s:%d\n",__FUNCTION__,__LINE__);
-
 		if (linestate[line] == LINE_UNDECIDED)
 			    break;
 
 		i1 = i + min_ypos_for_screen;
 
-		dprintf("%s:%d\n",__FUNCTION__,__LINE__);
-
 		where = amiga2aspect_line_map[i1];
-
-		dprintf("%s:%d - where: %08x\n",__FUNCTION__,__LINE__, where);
 
 		if (where >= gfxvidinfo.height)	    break;
 
 		if (where == -1)    continue;
 
-		dprintf("%s:%d\n",__FUNCTION__,__LINE__);
-
 		pfield_draw_line (line, where, amiga2aspect_line_map[i1 + 1]);
-
-		dprintf("%s:%d\n",__FUNCTION__,__LINE__);
-    }
-
-
-	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+	}
 
     if (currprefs.leds_on_screen) {
 	int line = gfxvidinfo.height - TD_TOTAL_HEIGHT;
@@ -2012,6 +1995,12 @@ void finish_drawing_frame (void)
 void hardware_line_completed (int lineno)
 {
 #ifndef SMART_UPDATE
+
+	if (row_map[0] != gfxvidinfo.bufmem)
+	{
+		init_row_map (void);
+	}
+
     {
 	int i, where;
 	/* l is the line that has been finished for drawing. */
