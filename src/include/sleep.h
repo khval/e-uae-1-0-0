@@ -10,6 +10,7 @@
 # include <be/kernel/OS.h>
 #else
 # ifdef TARGET_AMIGAOS
+
 #  include <proto/dos.h>
 #  include <clib/alib_protos.h>
 # else
@@ -47,7 +48,9 @@
 #  define uae_msleep(msecs) Sleep (msecs)
 # else
 #  if defined TARGET_AMIGAOS
-#   if defined __amigaos4__ || defined __MORPHOS__ 
+#   if defined __amigaos4__
+#	define uae_msleep(msecs) 	MicroDelay(msecs*1000)
+#   elif defined __MORPHOS__ 
 #    define uae_msleep(msecs) TimeDelay (0, msecs / ONE_THOUSAND, (msecs % ONE_THOUSAND) * ONE_THOUSAND)
 #   else
 #    define uae_msleep(msecs) Delay (msecs <= 20 ? 1 : msecs/20);
