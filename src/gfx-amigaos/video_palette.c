@@ -190,9 +190,10 @@ void SetPalette_8bit_grayscreen (int start, int count)
 
 	for (i = start; i < start+count;  i++)
 	{
+		r = 255 - i;
+		load32_p96_table[ offset ++ ] = 0x01010101 * r;
 		load32_p96_table[ offset ++ ] = 0x01010101 * i;
-		load32_p96_table[ offset ++ ] = 0x01010101 * i;
-		load32_p96_table[ offset ++  ] = 0x01010101 * i;
+		load32_p96_table[ offset ++ ] = 0x01010101 * r;
 	}
 
 	LoadRGB32( &(S -> ViewPort) , load32_p96_table );

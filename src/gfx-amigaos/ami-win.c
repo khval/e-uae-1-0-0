@@ -88,12 +88,13 @@
 extern struct GraphicsIFace *IGraphics;
 
 #undef BitMap
+
+extern char remap_scancode[256];
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
 ULONG CFG_16bit_mode,CFG_32bit_mode;
-
-extern char remap_scancode[256];
 
 struct 
 {
@@ -121,6 +122,9 @@ void reset_count()
 	dx_pal_sync_count = 0;
 }
 
+uae_u8 *save_p96 (size_t *len, uae_u8 *dstptr);
+uae_u8 *restore_p96( uae_u8 * src );
+
 int screen_is_picasso = 0;
 static int screen_was_picasso = 0;
 static char *picasso_invalid_lines = NULL;
@@ -129,6 +133,9 @@ static int picasso_invalid_start, picasso_invalid_stop;
 static int picasso_maxw = 0, picasso_maxh = 0;
 static int mode_count;
 extern struct picasso_vidbuf_description picasso_vidinfo;
+
+void output_update_clut( void );
+void update_p96_format( void );
 
 static int bitdepth;
 static int current_width, current_height, current_depth;
@@ -141,7 +148,7 @@ static int palette_update_end   = 0;
 extern bool debug_crash;
 #define debug_crashed(fmt,...) if (debug_crash) DebugPrintF(fmt,#__VA_ARGS__)
 
-// extern bool output_clut_needs_update;
+extern bool output_clut_needs_update;
 
 void reset_p96_fn_pointers( void );
 
@@ -156,9 +163,12 @@ static int redshift, greenshift, blueshift;
 static int redmask,  greenmask,  bluemask;
 static int byte_swap_16bit = FALSE;
 
+// best if this are alias / unions...
 
+uint8 *vpal = NULL;
 uint32 *vpal32 = NULL;
 uint16 *vpal16 = NULL;
+
 void (*set_palette_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
 void (*set_palette_on_vbl_fn)(struct MyCLUTEntry *pal, uint32 num) = NULL;
 
@@ -172,7 +182,7 @@ void set_p96_output_R5G6B5( void );
 void set_p96_output_R5G6B5PC( void );
 void set_p96_output_A8R8G8B8( void );
 
- bool alloc_p96_draw_bitmap( int w, int h, int depth );
+ bool alloc_p96_draw_bitmap( struct BitMap *dest_bm, int w, int h, int depth );
 
  void set_vpal_8bit_to_16bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num);
  void set_vpal_8bit_to_16bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num);
@@ -180,8 +190,6 @@ void set_p96_output_A8R8G8B8( void );
  void set_vpal_8bit_to_32bit_be(struct MyCLUTEntry *pal, uint32 num1);
  void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num);
  void set_vpal_8bit_to_32bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num);
-
-static void set_window_for_picasso (void);
 
 struct screen_rect
 {
@@ -220,10 +228,10 @@ static bool is_uniconifyed(void);
 static bool enable_Iconify(void);
 static void dispose_Iconify(void);
 
-static int need_dither;			// well.. guess :-) //
-static int use_delta_buffer;		// this will redraw only needed places //
-static int output_is_true_color;			// this is for truecolor mode //
-static int use_approx_color;
+static int need_dither = 0;		// well.. guess :-) //
+static int use_delta_buffer = 0;		// this will redraw only needed places //
+static int output_is_true_color = 0;   // this is for truecolor mode //
+static int use_approx_color = 0;
 
 extern void write_log(const char *fmt, ... ) ;
 
@@ -233,10 +241,10 @@ static uae_u8 *oldpixbuf = NULL;
 
 /* Values for amiga_screen_type */
 enum {
-	UAESCREENTYPE_CUSTOM,
-	UAESCREENTYPE_PUBLIC,
-	UAESCREENTYPE_ASK,
-	UAESCREENTYPE_LAST
+    UAESCREENTYPE_CUSTOM,
+    UAESCREENTYPE_PUBLIC,
+    UAESCREENTYPE_ASK,
+    UAESCREENTYPE_LAST
 };
 
 //****************************************************************************//
@@ -244,13 +252,13 @@ enum {
 // prototypes & global vars
 //
 
-extern struct IntuitionBase	*IntuitionBase ;
-extern struct GfxBase		  *GfxBase ;
-extern struct Library		  *LayersBase ;
-extern struct Library		  *AslBase ;
-extern struct Library		  *CyberGfxBase ;
+extern struct IntuitionBase    *IntuitionBase ;
+extern struct GfxBase          *GfxBase ;
+extern struct Library          *LayersBase ;
+extern struct Library          *AslBase ;
+extern struct Library          *CyberGfxBase ;
 #ifdef USE_CGX_OVERLAY
-extern struct Library		  *CGXVideoBase;
+extern struct Library          *CGXVideoBase;
 #endif
 
 extern struct AslIFace *IAsl;
@@ -261,12 +269,12 @@ extern struct CyberGfxIFace *ICyberGfx;
 
 bool empty_msg_queue(struct MsgPort *port);
 
-unsigned long			frame_num; /* for arexx */
+unsigned long            frame_num; /* for arexx */
 
 struct RastPort  comp_aga_RP;
 struct RastPort *draw_aga_RP = &comp_aga_RP;
 struct RastPort  comp_p96_RP;
-// struct RastPort  conv_p96_RP ;
+struct RastPort  conv_p96_RP ;
 struct RastPort  *draw_p96_RP = &comp_p96_RP;	// draw direct to the output buffer.
 
 static UBYTE			*Line = NULL;
@@ -280,11 +288,12 @@ extern struct kIcon padlockicon;
 extern struct kIcon fullscreenicon;
 
 static uae_u8 *CybBuffer = NULL;
-static struct ColorMap  *CM = NULL;
-static int			  XOffset,YOffset;
 
-static int os39;		/* kick 39 present */
-static int usepub;	  /* use public screen */
+static struct ColorMap  *CM = NULL;
+static int              XOffset,YOffset;
+
+static int os39;        /* kick 39 present */
+static int usepub;      /* use public screen */
 static int is_halfbrite;
 static int is_ham;
 
@@ -431,43 +440,43 @@ static void dummy_flush_screen (struct vidbuf_description *gfxinfo, int first_li
  */
 STATIC_INLINE void flush_line_planar_nodither (struct vidbuf_description *gfxinfo, int line_no)
 {
-	int	 xs	  = 0;
-	int	 len	 = gfxinfo->width;
-	int	 yoffset = line_no * gfxinfo->rowbytes;
-	uae_u8 *src;
-	uae_u8 *dst;
-	uae_u8 *newp = gfxinfo->bufmem + yoffset;
-	uae_u8 *oldp = oldpixbuf + yoffset;
+    int     xs      = 0;
+    int     len     = gfxinfo->width;
+    int     yoffset = line_no * gfxinfo->rowbytes;
+    uae_u8 *src;
+    uae_u8 *dst;
+    uae_u8 *newp = gfxinfo->bufmem + yoffset;
+    uae_u8 *oldp = oldpixbuf + yoffset;
 
-	/* Find first pixel changed on this line */
-	while (*newp++ == *oldp++) {
+    /* Find first pixel changed on this line */
+    while (*newp++ == *oldp++) {
 	if (!--len)
 		return; /* line not changed - so don't draw it */
-	}
-	src   = --newp;
-	dst   = --oldp;
-	newp += len;
-	oldp += len;
+    }
+    src   = --newp;
+    dst   = --oldp;
+    newp += len;
+    oldp += len;
 
-	/* Find last pixel changed on this line */
-	while (*--newp == *--oldp)
+    /* Find last pixel changed on this line */
+    while (*--newp == *--oldp)
 	;
 
-	len = 1 + (oldp - dst);
-	xs  = src - (uae_u8 *)(gfxinfo->bufmem + yoffset);
+    len = 1 + (oldp - dst);
+    xs  = src - (uae_u8 *)(gfxinfo->bufmem + yoffset);
 
-	/* Copy changed pixels to delta buffer */
-	CopyMem (src, dst, len);
+    /* Copy changed pixels to delta buffer */
+    CopyMem (src, dst, len);
 
-	/* Blit changed pixels to the display */
-	WritePixelLine8 (draw_aga_RP, xs + XOffset, line_no + YOffset, len, dst, TempRPort);
+    /* Blit changed pixels to the display */
+    WritePixelLine8 (draw_aga_RP, xs + XOffset, line_no + YOffset, len, dst, TempRPort);
 }
 
 static void flush_block_planar_nodither (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
-	int line_no;
+    int line_no;
 
-	for (line_no = first_line; line_no <= last_line; line_no++)
+    for (line_no = first_line; line_no <= last_line; line_no++)
 	flush_line_planar_nodither (gfxinfo, line_no);
 }
 
@@ -479,46 +488,46 @@ static void flush_block_planar_nodither (struct vidbuf_description *gfxinfo, int
  */
 STATIC_INLINE void flush_line_planar_dither (struct vidbuf_description *gfxinfo, int line_no)
 {
-	int	  xs	  = 0;
-	int	  len	 = gfxinfo->width;
-	int	  yoffset = line_no * gfxinfo->rowbytes;
-	uae_u16 *src;
-	uae_u16 *dst;
-	uae_u16 *newp = (uae_u16 *)(gfxinfo->bufmem + yoffset);
-	uae_u16 *oldp = (uae_u16 *)(oldpixbuf + yoffset);
+    int      xs      = 0;
+    int      len     = gfxinfo->width;
+    int      yoffset = line_no * gfxinfo->rowbytes;
+    uae_u16 *src;
+    uae_u16 *dst;
+    uae_u16 *newp = (uae_u16 *)(gfxinfo->bufmem + yoffset);
+    uae_u16 *oldp = (uae_u16 *)(oldpixbuf + yoffset);
 
-	/* Find first pixel changed on this line */
-	while (*newp++ == *oldp++) {
+    /* Find first pixel changed on this line */
+    while (*newp++ == *oldp++) {
 	if (!--len)
 		return; /* line not changed - so don't draw it */
-	}
-	src   = --newp;
-	dst   = --oldp;
-	newp += len;
-	oldp += len;
+    }
+    src   = --newp;
+    dst   = --oldp;
+    newp += len;
+    oldp += len;
 
-	/* Find last pixel changed on this line */
-	while (*--newp == *--oldp)
+    /* Find last pixel changed on this line */
+    while (*--newp == *--oldp)
 	;
 
-	len = (1 + (oldp - dst));
-	xs  = src - (uae_u16 *)(gfxinfo->bufmem + yoffset);
+    len = (1 + (oldp - dst));
+    xs  = src - (uae_u16 *)(gfxinfo->bufmem + yoffset);
 
-	/* Copy changed pixels to delta buffer */
-	CopyMem (src, dst, len * 2);
+    /* Copy changed pixels to delta buffer */
+    CopyMem (src, dst, len * 2);
 
-	/* Dither changed pixels to Line buffer */
-	DitherLine (Line, src, xs, line_no, (len + 3) & ~3, 8);
+    /* Dither changed pixels to Line buffer */
+    DitherLine (Line, src, xs, line_no, (len + 3) & ~3, 8);
 
-	/* Blit dithered pixels from Line buffer to the display */
-	WritePixelLine8 ( draw_aga_RP, xs + XOffset, line_no + YOffset, len, Line, TempRPort);
+    /* Blit dithered pixels from Line buffer to the display */
+    WritePixelLine8 ( draw_aga_RP, xs + XOffset, line_no + YOffset, len, Line, TempRPort);
 }
 
 static void flush_block_planar_dither (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
-	int line_no;
+    int line_no;
 
-	for (line_no = first_line; line_no <= last_line; line_no++)
+    for (line_no = first_line; line_no <= last_line; line_no++)
 	flush_line_planar_dither (gfxinfo, line_no);
 }
 
@@ -527,19 +536,19 @@ static void flush_block_planar_dither (struct vidbuf_description *gfxinfo, int f
  */
 STATIC_INLINE void flush_line_ham (struct vidbuf_description *gfxinfo, int line_no)
 {
-	int	 len = gfxinfo->width;
-	uae_u8 *src = gfxinfo->bufmem + (line_no * gfxinfo->rowbytes);
+    int     len = gfxinfo->width;
+    uae_u8 *src = gfxinfo->bufmem + (line_no * gfxinfo->rowbytes);
 
-	ham_conv ((void*) src, Line, len);
-	WritePixelLine8 (draw_aga_RP, 0, line_no, len, Line, TempRPort);
+    ham_conv ((void*) src, Line, len);
+    WritePixelLine8 (draw_aga_RP, 0, line_no, len, Line, TempRPort);
 
-	return;
+    return;
 }
 
 static void flush_block_ham (struct vidbuf_description *gfxinfo, int first_line, int last_line)
 {
-	int line_no;
-	for (line_no = first_line; line_no <= last_line; line_no++) flush_line_ham (gfxinfo, line_no);
+    int line_no;
+    for (line_no = first_line; line_no <= last_line; line_no++) flush_line_ham (gfxinfo, line_no);
 }
 
 
@@ -585,9 +594,9 @@ static void flush_clear_screen_gfxlib (struct vidbuf_description *gfxinfo)
 		if (output_is_true_color)
 		{
 			RectFillColor (draw_aga_RP, W->BorderLeft, W->BorderTop,
-					W->Width - W->BorderLeft - W->BorderRight,
-					W->Height - W->BorderTop - W->BorderBottom,
-					0);
+				    W->Width - W->BorderLeft - W->BorderRight,
+				    W->Height - W->BorderTop - W->BorderBottom,
+				    0);
 		}
 		else
 		{
@@ -615,28 +624,28 @@ static int RPDepth (struct RastPort *RP)
 
 static int get_color (int r, int g, int b, xcolnr *cnp)
 {
-	int col;
+    int col;
 
-	if (currprefs.amiga_use_grey)
+    if (currprefs.amiga_use_grey)
 	r = g = b = (77 * r + 151 * g + 29 * b) / 16;
-	else {
+    else {
 	r *= 0x11;
 	g *= 0x11;
 	b *= 0x11;
-	}
+    }
 
-	r *= 0x01010101;
-	g *= 0x01010101;
-	b *= 0x01010101;
-	col = ObtainColor (r, g, b);
+    r *= 0x01010101;
+    g *= 0x01010101;
+    b *= 0x01010101;
+    col = ObtainColor (r, g, b);
 
-	if (col == -1) {
+    if (col == -1) {
 	get_color_failed = 1;
 	return 0;
-	}
+    }
 
-	*cnp = col;
-	return 1;
+    *cnp = col;
+    return 1;
 }
 
 /****************************************************************************/
@@ -646,37 +655,37 @@ static int get_color (int r, int g, int b, xcolnr *cnp)
  */
 static __inline__ void rgb2xyz (int r, int g, int b,	int *x, int *y, int *z)
 {
-	*x = r * 1024 - (g + b) * 512;
-	*y = 886 * (g - b);
-	*z = (r + g + b) * 341;
+    *x = r * 1024 - (g + b) * 512;
+    *y = 886 * (g - b);
+    *z = (r + g + b) * 341;
 }
 
 static __inline__ int calc_err (int r1, int g1, int b1, int r2, int g2, int b2)
 {
-	int x1, y1, z1, x2, y2, z2;
+    int x1, y1, z1, x2, y2, z2;
 
-	rgb2xyz (r1, g1, b1, &x1, &y1, &z1);
-	rgb2xyz (r2, g2, b2, &x2, &y2, &z2);
-	x1 -= x2; y1 -= y2; z1 -= z2;
-	return x1 * x1 + y1 * y1 + z1 * z1;
+    rgb2xyz (r1, g1, b1, &x1, &y1, &z1);
+    rgb2xyz (r2, g2, b2, &x2, &y2, &z2);
+    x1 -= x2; y1 -= y2; z1 -= z2;
+    return x1 * x1 + y1 * y1 + z1 * z1;
 }
 
 /****************************************************************************/
 
 static int get_nearest_color (int r, int g, int b)
 {
-	int i, best, err, besterr;
-	int colors;
-	int br=0,bg=0,bb=0;
+    int i, best, err, besterr;
+    int colors;
+    int br=0,bg=0,bb=0;
 
    if (currprefs.amiga_use_grey)
 	r = g = b = (77 * r + 151 * g + 29 * b) / 256;
 
-	best	= 0;
-	besterr = calc_err (0, 0, 0, 15, 15, 15);
-	colors  = is_halfbrite ? 32 :(1 << RPDepth (draw_aga_RP));
+    best    = 0;
+    besterr = calc_err (0, 0, 0, 15, 15, 15);
+    colors  = is_halfbrite ? 32 :(1 << RPDepth (draw_aga_RP));
 
-	for (i = 0; i < colors; i++) {
+    for (i = 0; i < colors; i++) {
 	long rgb;
 	int cr, cg, cb;
 
@@ -703,8 +712,8 @@ static int get_nearest_color (int r, int g, int b)
 		br = cr; bg = cg; bb = cb;
 		}
 	}
-	}
-	return best;
+    }
+    return best;
 }
 
 /****************************************************************************/
@@ -725,8 +734,6 @@ static int init_true_colors_output (const struct RastPort *rp)
 		printf("%s:%d: unexpected rp->BitMap=NULL, function failed\n");
 		return 0;
 	}
-
-	byte_swap_16bit = FALSE;
 
 	pixfmt = GetBitMapAttr (rp->BitMap, (LONG)BMA_PIXELFORMAT);
 
@@ -792,10 +799,9 @@ static int init_true_colors_output (const struct RastPort *rp)
 
 	if (found)
 	{
-
-		alloc_colors64k (redbits,  greenbits,  bluebits,
-				redshift, greenshift, blueshift,
-				0, 0, 0, byte_swap_16bit);
+    		alloc_colors64k (redbits,  greenbits,  bluebits,
+			 redshift, greenshift, blueshift,
+			 0, 0, 0, byte_swap_16bit);
 
 		write_log ("AMIGFX: Using a %d-bit true-colour display.\n", redbits + greenbits + bluebits);
 	}
@@ -940,8 +946,8 @@ static int init_colors (void)
 		success = init_true_colors_output ( draw_aga_RP );
 		break;
 
-	}
-	return success;
+    }
+    return success;
 }
 
 /****************************************************************************/
@@ -954,19 +960,19 @@ static APTR blank_pointer;
  */
 static void init_pointer (void)
 {
-	static struct BitMap bitmap;
-	static UWORD	 row[2] = {0, 0};
+    static struct BitMap bitmap;
+    static UWORD	 row[2] = {0, 0};
 
-	InitBitMap (&bitmap, 2, 16, 1);
-	bitmap.Planes[0] = (PLANEPTR) &row[0];
-	bitmap.Planes[1] = (PLANEPTR) &row[1];
+    InitBitMap (&bitmap, 2, 16, 1);
+    bitmap.Planes[0] = (PLANEPTR) &row[0];
+    bitmap.Planes[1] = (PLANEPTR) &row[1];
 
-	blank_pointer = NewObject (NULL, POINTERCLASS,
+    blank_pointer = NewObject (NULL, POINTERCLASS,
 				   POINTERA_BitMap,	(ULONG)&bitmap,
 				   POINTERA_WordWidth,	1,
 				   TAG_DONE);
 
-	if (!blank_pointer)
+    if (!blank_pointer)
 	write_log ("Warning: Unable to allocate blank mouse pointer.\n");
 }
 
@@ -1020,45 +1026,45 @@ static void grab_pointer (struct Window *w)
 /****************************************************************************/
 
 typedef enum {
-	DONT_KNOW = -1,
-	INSIDE_WINDOW,
-	OUTSIDE_WINDOW
+    DONT_KNOW = -1,
+    INSIDE_WINDOW,
+    OUTSIDE_WINDOW
 } POINTER_STATE;
 
 static POINTER_STATE pointer_state;
 
 static POINTER_STATE get_pointer_state (const struct Window *w, int mousex, int mousey)
 {
-	POINTER_STATE new_state = OUTSIDE_WINDOW;
+    POINTER_STATE new_state = OUTSIDE_WINDOW;
 
-	// Is pointer within the bounds of the inner window?
+    /*
+     * Is pointer within the bounds of the inner window?
+     */
+    if ((mousex >= w->BorderLeft)
+     && (mousey >= w->BorderTop)
+     && (mousex < (w->Width - w->BorderRight))
+     && (mousey < (w->Height - w->BorderBottom))) {
+	/*
+	 * Yes. Now check whetehr the window is obscured by
+	 * another window at the pointer position
+	 */
+	struct Screen *scr = w->WScreen;
+	struct Layer  *layer;
 
-	if ((mousex >= w->BorderLeft)
-		&& (mousey >= w->BorderTop)
-		&& (mousex < (w->Width - w->BorderRight))
-		&& (mousey < (w->Height - w->BorderBottom)))
-	{
-		 // Yes. Now check whetehr the window is obscured by
-		 // another window at the pointer position
+	/* Find which layer the pointer is in */
+	LockLayerInfo (&scr->LayerInfo);
+	layer = WhichLayer (&scr->LayerInfo, scr->MouseX, scr->MouseY);
+	UnlockLayerInfo (&scr->LayerInfo);
 
-		struct Screen *scr = w->WScreen;
-		struct Layer  *layer;
-
-		// Find which layer the pointer is in 
-
-		LockLayerInfo (&scr->LayerInfo);
-		layer = WhichLayer (&scr->LayerInfo, scr->MouseX, scr->MouseY);
-		UnlockLayerInfo (&scr->LayerInfo);
-
-		// Is this layer our window's layer? 
-
-		if (layer == w->WLayer)
-		{
-			// Yes. Therefore, pointer is inside the window.
-			new_state = INSIDE_WINDOW;
-		}
+	/* Is this layer our window's layer? */
+	if (layer == w->WLayer) {
+		/*
+		 * Yes. Therefore, pointer is inside the window.
+		 */
+		new_state = INSIDE_WINDOW;
 	}
-	return new_state;
+    }
+    return new_state;
 }
 
 /****************************************************************************/
@@ -1072,10 +1078,10 @@ static ULONG find_rtg_mode (ULONG *width, ULONG *height, ULONG depth)
 	struct DisplayInfo dispi;
 	struct DimensionInfo di;
 
-	ULONG ID		   = INVALID_ID;
-	ULONG best_mode	  = INVALID_ID;
-	ULONG best_width	 = (ULONG) -1L;
-	ULONG best_height	= (ULONG) -1L;
+	ULONG ID           = INVALID_ID;
+	ULONG best_mode      = INVALID_ID;
+	ULONG best_width     = (ULONG) -1L;
+	ULONG best_height    = (ULONG) -1L;
 
 	ULONG largest_mode   = INVALID_ID;
 	ULONG largest_width  = 0;
@@ -1123,7 +1129,7 @@ static ULONG find_rtg_mode (ULONG *width, ULONG *height, ULONG depth)
 	{
 		best_mode = largest_mode;
 		*height   = largest_height;
-		*width	= largest_width;
+		*width    = largest_width;
 	}
 
 	return best_mode;
@@ -1145,7 +1151,7 @@ static int setup_customscreen (void)
 	ULONG error;
 	ULONG width,height;
 
-	static struct NewWindow NewWindowStructure = {
+    static struct NewWindow NewWindowStructure = {
 	0, 0, 800, 600, 0, 1,
 	IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY | IDCMP_DISKINSERTED | IDCMP_DISKREMOVED
 		| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW | IDCMP_MOUSEMOVE
@@ -1154,7 +1160,7 @@ static int setup_customscreen (void)
 	 | WFLG_BORDERLESS | WFLG_ACTIVATE | WFLG_REPORTMOUSE,
 	NULL, NULL, NULL, NULL, NULL, 5, 5, 800, 600,
 	CUSTOMSCREEN
-	};
+    };
 
 	if (screen_is_picasso)
 	{
@@ -1168,8 +1174,8 @@ static int setup_customscreen (void)
 	}
 
 
-	/* First try to find an RTG screen that matches the requested size  */
-	{
+    /* First try to find an RTG screen that matches the requested size  */
+    {
 	unsigned int i;
 	const UBYTE preferred_depth[] = {15, 16, 32, 8}; /* Try depths in this order of preference */
 
@@ -1177,12 +1183,12 @@ static int setup_customscreen (void)
 		depth = preferred_depth[i];
 		mode = find_rtg_mode (&width, &height, depth);
 	}
-	}
+    }
 
-	if (mode != (ULONG) INVALID_ID) {
+    if (mode != (ULONG) INVALID_ID) {
 	if (depth > 8)
 		output_is_true_color = 1;
-	} else {
+    } else {
 
 	/* No (suitable) RTG screen available. Try a native mode */
 	depth = os39 ? 8 : (currprefs.gfx_lores ? 5 : 4);
@@ -1191,7 +1197,7 @@ static int setup_customscreen (void)
 		mode |= (gfxvidinfo.height > 256) ? LORESLACE_KEY : LORES_KEY;
 	else
 		mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
-	}
+    }
 
 
 	/* If the screen is larger than requested, centre UAE's display */
@@ -1201,13 +1207,13 @@ static int setup_customscreen (void)
 	do
 	{
 		screen = OpenScreenTags (NULL,
-				SA_Width,	 width,
-				SA_Height,	height,
-				SA_Depth,	 depth,
+				SA_Width,     width,
+				SA_Height,    height,
+				SA_Depth,     depth,
 				SA_DisplayID, mode,
-				SA_Behind,	TRUE,
+				SA_Behind,    TRUE,
 				SA_ShowTitle, FALSE,
-				SA_Quiet,	 TRUE,
+				SA_Quiet,     TRUE,
 				SA_ErrorCode, (ULONG)&error,
 				TAG_DONE);
 
@@ -1239,7 +1245,7 @@ static int setup_customscreen (void)
 
 	is_fullscreen_state = TRUE;
 
-	return 1;
+    return 1;
 }
 
 /****************************************************************************/
@@ -1247,7 +1253,7 @@ static int setup_customscreen (void)
 static void open_window_as_last(void)
 {
 	W = OpenWindowTags (NULL,
-			WA_Title,		(ULONG)PACKAGE_NAME,
+			WA_Title,        (ULONG)PACKAGE_NAME,
 			WA_AutoAdjust,   TRUE,
 
 			WA_Left, save_window.x,
@@ -1255,17 +1261,17 @@ static void open_window_as_last(void)
 			WA_InnerWidth, save_window.w - save_window.bw,
 			WA_InnerHeight, save_window.h - save_window.bh,
 
-			WA_PubScreen,	(ULONG)S,
+			WA_PubScreen,    (ULONG)S,
 
-			WA_IDCMP,		IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
+			WA_IDCMP,        IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
 					| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW
-					| IDCMP_MOUSEMOVE	| IDCMP_DELTAMOVE
+					| IDCMP_MOUSEMOVE    | IDCMP_DELTAMOVE
 					| IDCMP_CLOSEWINDOW  | IDCMP_REFRESHWINDOW
 					| IDCMP_NEWSIZE | IDCMP_INTUITICKS | IDCMP_GADGETUP,
 
-			WA_Flags,	 WFLG_DRAGBAR	 | WFLG_DEPTHGADGET
+			WA_Flags,	 WFLG_DRAGBAR     | WFLG_DEPTHGADGET
 					| WFLG_REPORTMOUSE | WFLG_RMBTRAP
-					| WFLG_ACTIVATE	| WFLG_CLOSEGADGET
+					| WFLG_ACTIVATE    | WFLG_CLOSEGADGET
 					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
 					| WFLG_SMART_REFRESH,
 
@@ -1288,21 +1294,21 @@ static void open_window_as_last(void)
 static void open_window(void)
 {
 	W = OpenWindowTags (NULL,
-			WA_Title,		(ULONG)PACKAGE_NAME,
+			WA_Title,        (ULONG)PACKAGE_NAME,
 			WA_AutoAdjust,   TRUE,
 			WA_InnerWidth,   gfxvidinfo.width,
 			WA_InnerHeight,  gfxvidinfo.height,
-			WA_PubScreen,	(ULONG)S,
+			WA_PubScreen,    (ULONG)S,
 
-			WA_IDCMP,		IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
+			WA_IDCMP,        IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
 					| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW
-					| IDCMP_MOUSEMOVE	| IDCMP_DELTAMOVE
+					| IDCMP_MOUSEMOVE    | IDCMP_DELTAMOVE
 					| IDCMP_CLOSEWINDOW  | IDCMP_REFRESHWINDOW
 					| IDCMP_NEWSIZE | IDCMP_INTUITICKS | IDCMP_GADGETUP,
 
-			WA_Flags,	 WFLG_DRAGBAR	 | WFLG_DEPTHGADGET
+			WA_Flags,	 WFLG_DRAGBAR     | WFLG_DEPTHGADGET
 					| WFLG_REPORTMOUSE | WFLG_RMBTRAP
-					| WFLG_ACTIVATE	| WFLG_CLOSEGADGET
+					| WFLG_ACTIVATE    | WFLG_CLOSEGADGET
 					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
 					| WFLG_SMART_REFRESH,
 
@@ -1318,11 +1324,51 @@ static void open_window(void)
 	}
 }
 
+char *conv_tmp_buffer = NULL;
+int conv_tmp_buffer_bpr = 0;
+
+bool alloc_p96_draw_bitmap( struct BitMap *dest_bm, int w, int h, int src_depth )
+{
+	APTR lock;
+	printf("draw bitmap is %d,%d,%d, 0x%08x\n",w,h,src_depth, DRAW_FMT_SRC);
+
+	if (!dest_bm)
+	{
+		printf("wTF: ????\n");
+		return false;
+	}
+
+	conv_p96_RP.BitMap = AllocBitMapTags( w, h+1, src_depth, 
+			BMATags_PixelFormat, DRAW_FMT_SRC,
+			BMATags_Displayable, FALSE,
+			BMATags_UserPrivate, TRUE,
+			BMATags_Alignment, 4,
+			TAG_END);
+
+	if (!conv_p96_RP.BitMap) return false;
+
+	lock = IGraphics -> LockBitMapTags( dest_bm, LBM_BytesPerRow, &conv_tmp_buffer_bpr, TAG_END	);
+	if ( lock)
+	{
+		IGraphics -> UnlockBitMap( lock );
+		conv_tmp_buffer = malloc( conv_tmp_buffer_bpr *  (h+1) );
+	}
+
+	if (!conv_tmp_buffer)
+	{
+		FreeBitMap(conv_p96_RP.BitMap);
+		conv_p96_RP.BitMap = NULL;
+		return false;
+	}
+
+	RectFillColor(&conv_p96_RP, 0, 0, w,h, 0xFF000000);
+
+	return true;
+}
+
 
 int init_comp_one( struct Window *W, ULONG output_depth, struct RastPort *rp, int w, int h )
 {
-	printf("comp output_depth: %d\n",output_depth);
-
 	rp -> BitMap = AllocBitMap( w,h, output_depth == 32 ? 24 :output_depth , BMF_DISPLAYABLE, W -> RPort -> BitMap);
 	
 	if (rp -> BitMap)
@@ -1442,17 +1488,11 @@ void set_p96_output_R5G6B5PC()
 		case PIXF_R5G5B5:	DRAW_FMT_SRC = PIXF_R5G5B5;
 				init_lookup_15bit_be_to_16bit_le();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit; 
-
-				printf("*** this one is expected!! ***\n");
-		
 				break;
 
 		case PIXF_R5G6B5:	DRAW_FMT_SRC = PIXF_R5G6B5;
 				init_lookup_16bit_swap();
 				p96_conv_fn = (conv_fn_cast) convert_16bit_lookup_to_16bit;
-
-				printf("*** this one is not expected!! ***\n");
-
 				break;
 
 		case PIXF_R5G6B5PC:	DRAW_FMT_SRC = PIXF_R5G6B5PC;
@@ -1611,14 +1651,22 @@ void init_comp( struct Window *W )
 
 			if (output_depth != 8)
 			{
-				printf("**** this is a true color output *** \n");
 				init_comp_one( W, output_depth, &comp_p96_RP, picasso_vidinfo.width, picasso_vidinfo.height );
 				draw_p96_RP = &comp_p96_RP;
 			}
 
 			if (p96_conv_fn)
 			{
-				draw_p96_RP = &comp_p96_RP;
+				if (alloc_p96_draw_bitmap( comp_p96_RP.BitMap, picasso_vidinfo.width, picasso_vidinfo.height, picasso_vidinfo.depth ))
+				{
+					draw_p96_RP = &conv_p96_RP;
+				}
+				else
+				{
+					printf("*** Failed to alloc p96 draw buffer ***\n");
+					p96_conv_fn = NULL;
+				}
+
 				free_picasso_invalid_lines();
 				alloc_picasso_invalid_lines();
 			}
@@ -1628,6 +1676,7 @@ void init_comp( struct Window *W )
 
 		if (W->BorderTop == 0) 	// in fullscreen mode.
 		{
+			// center only if 8 bit..
 			if (output_depth == 8) // if the screen is 8bit!		
 			{
 				p96_xoffset = (picasso_vidinfo.width<W -> Width) ?
@@ -1651,13 +1700,13 @@ void init_comp( struct Window *W )
 					picasso_vidinfo.height = W -> Height;
 				}
 			}
+			else // we picked a screen, so it should be same size????
+			{
+				p96_xoffset = 0;
+				p96_yoffset = 0;
+			}
 
-			RectFillColor(W -> RPort, 
-				0, 
-				0, 
-				W -> Width , 
-				W -> Height,
-				0xFF000000);
+			RectFillColor(W -> RPort, 0, 0, W -> Width, W -> Height, 0xFF000000);
 		}
 		else
 		{
@@ -1677,13 +1726,11 @@ void init_comp( struct Window *W )
 //		if (draw_p96_RP) if (draw_p96_RP -> BitMap) picasso_vidinfo.pixbytes = GetBitMapAttr( draw_p96_RP -> BitMap, BMA_BYTESPERPIXEL );
 		p96_update_format = true;
 	}
-	else
-	{
-		printf("*** this is a AGA screen, (using gfxvidinfo.width, gfxvidinfo.height)\n");
-	}
 
-	if (draw_p96_RP == W -> RPort) printf( "*** draw_p96_RP is Window RastPort\n" );
-	if (draw_p96_RP == &comp_p96_RP) printf( "*** draw_p96_RP is &comp_p96_RP\n" );
+	if ((draw_p96_RP != W -> RPort) && (draw_p96_RP != &conv_p96_RP) && (draw_p96_RP != &comp_p96_RP))
+	{
+		printf("*** ERROR *** draw_p96_RP is BAD !!!\n");
+	}
 }
 
 
@@ -1740,34 +1787,23 @@ static int setup_publicscreen(void)
 
 static char *get_num (char *s, int *n)
 {
-	int i=0;
-	while(isspace(*s)) ++s;
-	if(*s=='0')
-	{
-		++s;
-		if(*s=='x' || *s=='X')
-		{
-			do
-			{
-				char c=*++s;
-
-				if(c>='0' && c<='9') {i*=16; i+= c-'0';}
-				else if(c>='a' && c<='f') {i*=16; i+= c-'a'+10;}
-				else if(c>='A' && c<='F') {i*=16; i+= c-'A'+10;}
-				else break;
-
-			} while(1);
-
-		} else while(*s>='0' && *s<='7') {i*=8; i+= *s++ - '0';}
-	}
-	else
-	{
-		while(*s>='0' && *s<='9') {i*=10; i+= *s++ - '0';}
-	}
-
-	*n=i;
-	while(isspace(*s)) ++s;
-	return s;
+   int i=0;
+   while(isspace(*s)) ++s;
+   if(*s=='0') {
+     ++s;
+     if(*s=='x' || *s=='X') {
+       do {char c=*++s;
+           if(c>='0' && c<='9') {i*=16; i+= c-'0';}    else
+           if(c>='a' && c<='f') {i*=16; i+= c-'a'+10;} else
+           if(c>='A' && c<='F') {i*=16; i+= c-'A'+10;} else break;
+       } while(1);
+     } else while(*s>='0' && *s<='7') {i*=8; i+= *s++ - '0';}
+   } else {
+     while(*s>='0' && *s<='9') {i*=10; i+= *s++ - '0';}
+   }
+   *n=i;
+   while(isspace(*s)) ++s;
+   return s;
 }
 
 /****************************************************************************/
@@ -1790,13 +1826,13 @@ static void get_displayid (ULONG *DI, LONG *DE)
 
 static int setup_userscreen (void)
 {
-	struct ScreenModeRequester *ScreenRequest;
-	ULONG DisplayID;
+    struct ScreenModeRequester *ScreenRequest;
+    ULONG DisplayID;
 
-	LONG ScreenWidth = 0, ScreenHeight = 0, Depth = 0;
-	UWORD OverscanType = OSCAN_STANDARD;
-	BOOL AutoScroll = TRUE;
-	int release_asl = 0;
+    LONG ScreenWidth = 0, ScreenHeight = 0, Depth = 0;
+    UWORD OverscanType = OSCAN_STANDARD;
+    BOOL AutoScroll = TRUE;
+    int release_asl = 0;
 
 	ScreenRequest = AllocAslRequest (ASL_ScreenModeRequest, NULL);
 
@@ -1806,44 +1842,44 @@ static int setup_userscreen (void)
 		return 0;
 	}
 
-	get_displayid (&DisplayID, &Depth);
+    get_displayid (&DisplayID, &Depth);
 
-	if (DisplayID == (ULONG)INVALID_ID) {
+    if (DisplayID == (ULONG)INVALID_ID) {
 	if (AslRequestTags (ScreenRequest,
 			ASLSM_TitleText, (ULONG)"Select screen display mode",
-			ASLSM_InitialDisplayID,	0,
+			ASLSM_InitialDisplayID,    0,
 			ASLSM_InitialDisplayDepth, 8,
 			ASLSM_InitialDisplayWidth, gfxvidinfo.width,
 			ASLSM_InitialDisplayHeight,gfxvidinfo.height,
-			ASLSM_MinWidth,			320, //currprefs.gfx_width_win,
-			ASLSM_MinHeight,		   200, //currprefs.gfx_height_win,
-			ASLSM_DoWidth,			 TRUE,
-			ASLSM_DoHeight,			TRUE,
-			ASLSM_DoDepth,			 TRUE,
-			ASLSM_DoOverscanType,	  TRUE,
-			ASLSM_PropertyFlags,	   0,
-			ASLSM_PropertyMask,		DIPF_IS_DUALPF | DIPF_IS_PF2PRI,
+			ASLSM_MinWidth,            320, //currprefs.gfx_width_win,
+			ASLSM_MinHeight,           200, //currprefs.gfx_height_win,
+			ASLSM_DoWidth,             TRUE,
+			ASLSM_DoHeight,            TRUE,
+			ASLSM_DoDepth,             TRUE,
+			ASLSM_DoOverscanType,      TRUE,
+			ASLSM_PropertyFlags,       0,
+			ASLSM_PropertyMask,        DIPF_IS_DUALPF | DIPF_IS_PF2PRI,
 			TAG_DONE)) {
 		ScreenWidth  = ScreenRequest->sm_DisplayWidth;
 		ScreenHeight = ScreenRequest->sm_DisplayHeight;
-		Depth		= ScreenRequest->sm_DisplayDepth;
-		DisplayID	= ScreenRequest->sm_DisplayID;
+		Depth        = ScreenRequest->sm_DisplayDepth;
+		DisplayID    = ScreenRequest->sm_DisplayID;
 		OverscanType = ScreenRequest->sm_OverscanType;
 		AutoScroll   = ScreenRequest->sm_AutoScroll;
 	} else
 		DisplayID = INVALID_ID;
-	}
-	FreeAslRequest (ScreenRequest);
+    }
+    FreeAslRequest (ScreenRequest);
 
-	if (DisplayID == (ULONG)INVALID_ID)
+    if (DisplayID == (ULONG)INVALID_ID)
 	return 0;
 
-	output_is_true_color = (Depth > 8)  ? 1 : 0;
+    output_is_true_color = (Depth > 8)  ? 1 : 0;
 
-	if ((DisplayID & HAM_KEY) && !output_is_true_color ) Depth = 6; /* only ham6 for the moment */
+    if ((DisplayID & HAM_KEY) && !output_is_true_color ) Depth = 6; /* only ham6 for the moment */
 
 #if 0
-	if(DisplayID & DIPF_IS_HAM) Depth = 6; /* only ham6 for the moment */
+    if(DisplayID & DIPF_IS_HAM) Depth = 6; /* only ham6 for the moment */
 #endif
 
 	S = OpenScreenTags (NULL,
@@ -1869,9 +1905,9 @@ static int setup_userscreen (void)
 		return 0;
 	}
 
-	CM		   =  S->ViewPort.ColorMap;
+	CM           =  S->ViewPort.ColorMap;
 	is_halfbrite = (S->ViewPort.Modes & EXTRA_HALFBRITE);
-	is_ham	   = (S->ViewPort.Modes & HAM);
+	is_ham       = (S->ViewPort.Modes & HAM);
 
 	W = OpenWindowTags (NULL,
 			WA_Width,		S -> Width,
@@ -1956,10 +1992,10 @@ static void set_prWindowPtr (struct Window *w)
 
 static void restore_prWindowPtr (void)
 {
-	struct Process *self = (struct Process *) FindTask (NULL);
+   struct Process *self = (struct Process *) FindTask (NULL);
 
-	if (saved_prWindowPtr)
-		self->pr_WindowPtr = saved_prWindowPtr;
+   if (saved_prWindowPtr)
+	self->pr_WindowPtr = saved_prWindowPtr;
 }
 
 
@@ -1977,9 +2013,9 @@ static APTR setup_classic_buffer (struct vidbuf_description *gfxinfo, const stru
 	buffer = AllocVecTagList ( bytes_per_row  * gfxinfo->height , tags_any);
 	if (buffer)
 	{
-		gfxinfo->bufmem	  = buffer;
-		gfxinfo->rowbytes	= bytes_per_row;
-		gfxinfo->flush_line  = flush_line_cgx_v41;
+		gfxinfo->bufmem = buffer;
+		gfxinfo->rowbytes = bytes_per_row;
+		gfxinfo->flush_line = flush_line_cgx_v41;
 		gfxinfo->flush_block = flush_block_cgx_v41;
 	}
 
@@ -2006,7 +2042,7 @@ void alloc_picasso_invalid_lines()
 
 static int graphics_subinit_picasso(void)
 {
-	// Initialize structure for Picasso96 video modes
+	/* Initialize structure for Picasso96 video modes */
 
 	picasso_vidinfo.rowbytes	= 0;
 	picasso_vidinfo.extra_mem = 1;
@@ -2073,11 +2109,14 @@ static int graphics_subinit (void)
 	gfxvidinfo.emergmem = 0;
 	gfxvidinfo.linemem  = 0;
 
+
 	CybBuffer = setup_classic_buffer (&gfxvidinfo, draw_aga_RP);
 	if (!CybBuffer)
 	{
-		 // Failed to allocate bitmap - we need to fall back on gfx.lib rendering
 
+		/*
+		 * Failed to allocate bitmap - we need to fall back on gfx.lib rendering
+		 */
 		gfxvidinfo.bufmem = NULL;
 		output_is_true_color = 0;
 		if (bitdepth > 8)
@@ -2089,21 +2128,19 @@ static int graphics_subinit (void)
 
 	if (is_ham)
 	{
-		// ham 6
-
-		use_delta_buffer	   = 0; // needless as the line must be fully recomputed 
-		need_dither			= 0;
-		gfxvidinfo.pixbytes	= 2;
+		// ham 6 
+		use_delta_buffer       = 0; /* needless as the line must be fully recomputed */
+		need_dither            = 0;
+		gfxvidinfo.pixbytes    = 2;
 		gfxvidinfo.flush_line  = flush_line_ham;
 		gfxvidinfo.flush_block = flush_block_ham;
 	}
 	else if (bitdepth <= 8)
 	{
-		// chunk2planar is slow so we define use_delta_buffer for all modes
-
-		use_delta_buffer	   = 1;
-		need_dither			= currprefs.amiga_use_dither || (bitdepth <= 1);
-		gfxvidinfo.pixbytes	= need_dither ? 2 : 1;
+		// chunk2planar is slow so we define use_delta_buffer for all modes //
+		use_delta_buffer       = 1;
+		need_dither            = currprefs.amiga_use_dither || (bitdepth <= 1);
+		gfxvidinfo.pixbytes    = need_dither ? 2 : 1;
 		gfxvidinfo.flush_line  = need_dither ? flush_line_planar_dither  : flush_line_planar_nodither;
 		gfxvidinfo.flush_block = need_dither ? flush_block_planar_dither : flush_block_planar_nodither;
 	}
@@ -2115,8 +2152,10 @@ static int graphics_subinit (void)
 
 	if (!output_is_true_color)
 	{
+		//
 		// We're not using GGX/P96 for output, so allocate a dumb
 		// display buffer
+		//
 
 		gfxvidinfo.rowbytes = gfxvidinfo.pixbytes * gfxvidinfo.width;
 
@@ -2142,8 +2181,6 @@ static int graphics_subinit (void)
 
 	if (use_delta_buffer)
 	{
-		printf("*******  gfxvidinfo.rowbytes: %d\n",gfxvidinfo.rowbytes);
-
 		if (oldpixbuf)
 		{
 			free(oldpixbuf);
@@ -2180,7 +2217,7 @@ static int graphics_subinit (void)
 	pointer_state = DONT_KNOW;
 
 	if (set_palette_on_vbl_fn) set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
-	picasso_refresh (0);
+	if (p96_conv_fn)  p96_conv_all();
 
 	return 1;
 }
@@ -2197,16 +2234,27 @@ void update_gfxvidinfo_width_height()
 	gfxvidinfo.width &= ~7;
 }
 
+static int graphics_init_first_time = 1;
+
 int graphics_init (void)
 {
 	int i, bitdepth;
-	use_delta_buffer = 0;
-	need_dither = 0;
-	output_is_true_color = 0;
-	screen_is_picasso = 0;
+
+	if (graphics_init_first_time)
+	{
+		graphics_init_first_time = 0;		
+
+		use_delta_buffer = 0;
+		need_dither = 0;
+		output_is_true_color = 0;
+		screen_is_picasso = 0;
+	}
+
+	printf("%s:%d -- VARS IS RESET! \n",__FUNCTION__,__LINE__);
 
 	InitRastPort(&comp_aga_RP);
 	InitRastPort(&comp_p96_RP);
+	InitRastPort(&conv_p96_RP);
 
 	reset_p96_fn_pointers();
 	update_gfxvidinfo_width_height();
@@ -2218,7 +2266,7 @@ int graphics_init (void)
 			if (setup_userscreen ()) break;
 
 			write_log ("Trying on public screen...\n");
-			// fall trough 
+			/* fall trough */
 
 		case UAESCREENTYPE_PUBLIC:
 
@@ -2229,7 +2277,7 @@ int graphics_init (void)
 				break;
 			}
 			write_log ("Trying on custom screen...\n");
-			// fall trough 
+			/* fall trough */
 
 		case UAESCREENTYPE_CUSTOM:
 
@@ -2238,6 +2286,8 @@ int graphics_init (void)
 			return 0;
 			break;
 	}
+	
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
 
 	if (graphics_subinit () == 0) 
 	{
@@ -2280,6 +2330,8 @@ void close_window()
 
 static void graphics_subshutdown (void)
 {
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+
 	appw_exit ();
 
 	if (BitMap)
@@ -2307,6 +2359,18 @@ static void graphics_subshutdown (void)
 		CybBuffer = NULL;
 	}
 
+	if (conv_p96_RP.BitMap)	// to be converted..
+	{
+		FreeBitMap(conv_p96_RP.BitMap);
+		conv_p96_RP.BitMap = NULL;
+	}
+
+	if (conv_tmp_buffer)		// final version..
+	{
+		free(conv_tmp_buffer);
+		conv_tmp_buffer = NULL;
+	}
+
 	if (comp_p96_RP.BitMap)
 	{
 		FreeBitMap(comp_p96_RP.BitMap);
@@ -2332,10 +2396,14 @@ static void graphics_subshutdown (void)
 		FreeVec(vpal32);
 		vpal32 = NULL;
 	}
+
+	draw_p96_RP = NULL;
 }
 
 void graphics_leave (void)
 {
+	printf("%s:%d\n",__FUNCTION__,__LINE__);
+
 	if (oldpixbuf)
 	{
 		free(oldpixbuf);
@@ -2370,7 +2438,6 @@ void graphics_leave (void)
 		}
 		S = NULL;
 	}
-
 }
 
 /****************************************************************************/
@@ -2405,7 +2472,6 @@ struct AppIcon *appicon = NULL;
 bool empty_msg_queue(struct MsgPort *port)
 {
 	struct Message *msg;
-
 	// empty que.
 	while ((msg = (struct Message *) GetMsg( port ) ))
 	{
@@ -2431,8 +2497,9 @@ bool is_uniconifyed()
 
 bool enable_Iconify()
 {
-	const char *files[]={"progdir:uae","envarc:sys/def_tool",NULL};
 	int n;
+
+	const char *files[]={"progdir:uae","envarc:sys/def_tool",NULL};
 
 	for (n=0;files[n];n++)
 	{
@@ -2498,32 +2565,30 @@ void refresh_aga()
 	EndRefresh (W, TRUE);
 }
 
-int lcode ;
-
 void handle_events(void)
 {
 	struct IntuiMessage *msg;
 	int dmx, dmy, mx, my, class, code, qualifier;
 	UWORD GadgetID;
 
-	// this function is called at each frame, so: 
+   /* this function is called at each frame, so: */
 
-	++frame_num;	// increase frame counter
+    ++frame_num;       /* increase frame counter */
 
 #if 0
-	save_frame();	// possibly save frame
+    save_frame();      /* possibly save frame    */
 #endif
 
 #ifdef DEBUGGER
-
-	// This is a hack to simulate ^C as is seems that break_handler
-	// is lost when system() is called.
+    /*
+     * This is a hack to simulate ^C as is seems that break_handler
+     * is lost when system() is called.
+     */
 
 	if (SetSignal (0L, SIGBREAKF_CTRL_C | SIGBREAKF_CTRL_D) & (SIGBREAKF_CTRL_C|SIGBREAKF_CTRL_D)) 
 	{
 		activate_debugger ();
 	}
-
 #endif
 
 	if (iconifyPort)		// iconifyed mode..
@@ -2547,12 +2612,12 @@ void handle_events(void)
 
 	while ( (W) && (msg = (struct IntuiMessage*) GetMsg (W->UserPort)) )
 	{
-		class	 = msg->Class;
-		code	  = msg->Code;
-		dmx	   = msg->MouseX;
-		dmy	   = msg->MouseY;
-		mx		= msg->IDCMPWindow->MouseX; // Absolute pointer coordinates
-		my		= msg->IDCMPWindow->MouseY; // relative to the window
+		class     = msg->Class;
+		code      = msg->Code;
+		dmx       = msg->MouseX;
+		dmy       = msg->MouseY;
+		mx        = msg->IDCMPWindow->MouseX; // Absolute pointer coordinates
+		my        = msg->IDCMPWindow->MouseY; // relative to the window
 		qualifier = msg->Qualifier;
 	 	GadgetID = (msg -> IAddress) ? ((struct Gadget *) ( msg -> IAddress)) -> GadgetID : 0 ;
 
@@ -2570,6 +2635,7 @@ void handle_events(void)
 				break;
 
 			case IDCMP_GADGETUP:
+
 				switch (GadgetID)
 				{
 					case GID_ICONIFY: 
@@ -2594,138 +2660,115 @@ void handle_events(void)
 				break;
 
 			case IDCMP_CLOSEWINDOW:
+
 				uae_quit ();
 				break;
 
-			case IDCMP_RAWKEY:
+		case IDCMP_RAWKEY: 
+			{
+				int keycode;
+				int state   = code & 128 ? 0 : 1;
+				int ievent;
+
+				keycode = remap_scancode[code];
+
+				if ((qualifier & IEQUALIFIER_REPEAT) == 0)
 				{
-					int state   = code & 128 ? 0 : 1;
-					int ievent;
-#ifdef __amigaos4__
-					int keycode = remap_scancode[code & 127];
-#else
-					int keycode = code & 127;
-#endif
+					/* We just want key up/down events - not repeats */
 
-					if ((state)&&(keycode==110))
-					{
-						debug_crash = 1 - debug_crash;
-						printf("debug_crash: %s\n", debug_crash ? "on" : "off");
-					}
-
-#if 1
-					if (lcode != code & 127) 
-					{
-//						printf("code: %03d (%02X) ==> %d (%02X)\n",code & 127, code & 127, keycode, keycode);
-						lcode = code & 127;
-					}
-#endif
-
-					if ((qualifier & IEQUALIFIER_REPEAT) == 0)
-					{
-
-						// We just want key up/down events - not repeats 
-
-						if ((ievent = match_hotkey_sequence (keycode, state)))
-							handle_hotkey_event (ievent, state);
-						else
-							inputdevice_do_keyboard (keycode, state);
-					}
-					break;
+					if ((ievent = match_hotkey_sequence (keycode, state)))
+						handle_hotkey_event (ievent, state);
+					else
+						inputdevice_do_keyboard (keycode, state);
 				}
+			 }
+			break;
 
-			case IDCMP_MOUSEMOVE:
+		case IDCMP_MOUSEMOVE:
+		setmousestate (0, 0, dmx, 0);
+		setmousestate (0, 1, dmy, 0);
 
-				setmousestate (0, 0, dmx, 0);
-				setmousestate (0, 1, dmy, 0);
-
-				if (usepub)
-				{
-					POINTER_STATE new_state = get_pointer_state (W, mx, my);
-
-					if (new_state != pointer_state)
-					{
-						pointer_state = new_state;
-						if (pointer_state == INSIDE_WINDOW)
-							hide_pointer (W);
-						else
-							show_pointer (W);
-					}
-				}
-				break;
-
-			case IDCMP_MOUSEBUTTONS:
-				if (code == SELECTDOWN) setmousebuttonstate (0, 0, 1);
-				if (code == SELECTUP)   setmousebuttonstate (0, 0, 0);
-				if (code == MIDDLEDOWN) setmousebuttonstate (0, 2, 1);
-				if (code == MIDDLEUP)   setmousebuttonstate (0, 2, 0);
-				if (code == MENUDOWN)   setmousebuttonstate (0, 1, 1);
-				if (code == MENUUP)	 setmousebuttonstate (0, 1, 0);
-				break;
-
-				// Those 2 could be of some use later. 
-
-			case IDCMP_DISKINSERTED:
-
-				// printf("diskinserted(%d)\n",code);
-				break;
-
-			case IDCMP_DISKREMOVED:
-
-				// printf("diskremoved(%d)\n",code);
-				break;
-
-			case IDCMP_ACTIVEWINDOW:
-
-				// When window regains focus (presumably after losing focus at some
-				// point) UAE needs to know any keys that have changed state in between.
-				// A simple fix is just to tell UAE that all keys have been released.
-				// This avoids keys appearing to be "stuck" down.
-
-				inputdevice_acquire ();
-				inputdevice_release_all_keys ();
-				reset_hotkeys ();
-				break;
-
-			case IDCMP_INACTIVEWINDOW:
-				inputdevice_unacquire ();
-				break;
-
-			case IDCMP_INTUITICKS:
-
-#ifdef __amigaos4__
-				grabTicks--;
-				if (grabTicks < 0)
-				{
-					grabTicks = GRAB_TIMEOUT;
-
-					if (mouseGrabbed)
-						grab_pointer (W);
-				}
-#endif
-				break;
-
-			default:
-				write_log ("Unknown event class: %x\n", class);
-				break;
+		if (usepub)
+		{
+			POINTER_STATE new_state = get_pointer_state (W, mx, my);
+			if (new_state != pointer_state) {
+			pointer_state = new_state;
+			if (pointer_state == INSIDE_WINDOW)
+				hide_pointer (W);
+			else
+				show_pointer (W);
+			}
 		}
-	}
+		break;
 
-	appw_events();
+		case IDCMP_MOUSEBUTTONS:
+		if (code == SELECTDOWN) setmousebuttonstate (0, 0, 1);
+		if (code == SELECTUP)   setmousebuttonstate (0, 0, 0);
+		if (code == MIDDLEDOWN) setmousebuttonstate (0, 2, 1);
+		if (code == MIDDLEUP)   setmousebuttonstate (0, 2, 0);
+		if (code == MENUDOWN)   setmousebuttonstate (0, 1, 1);
+		if (code == MENUUP)     setmousebuttonstate (0, 1, 0);
+		break;
+
+		/* Those 2 could be of some use later. */
+		case IDCMP_DISKINSERTED:
+		/*printf("diskinserted(%d)\n",code);*/
+		break;
+
+		case IDCMP_DISKREMOVED:
+		/*printf("diskremoved(%d)\n",code);*/
+		break;
+
+		case IDCMP_ACTIVEWINDOW:
+		/* When window regains focus (presumably after losing focus at some
+		 * point) UAE needs to know any keys that have changed state in between.
+		 * A simple fix is just to tell UAE that all keys have been released.
+		 * This avoids keys appearing to be "stuck" down.
+		 */
+		inputdevice_acquire ();
+		inputdevice_release_all_keys ();
+		reset_hotkeys ();
+
+		break;
+
+		case IDCMP_INACTIVEWINDOW:
+		inputdevice_unacquire ();
+		break;
+
+		case IDCMP_INTUITICKS:
+#ifdef __amigaos4__
+		grabTicks--;
+		if (grabTicks < 0) {
+			grabTicks = GRAB_TIMEOUT;
+			#ifdef __amigaos4__
+			if (mouseGrabbed)
+				grab_pointer (W);
+			#endif
+		}
+#endif
+		break;
+
+		default:
+		write_log ("Unknown event class: %x\n", class);
+		break;
+        }
+    }
+
+    appw_events();
 }
 
 /***************************************************************************/
 
 int debuggable (void)
 {
-	return 1;
+    return 1;
 }
 
 /***************************************************************************/
 
 int mousehack_allowed (void)
 {
-	return 0;
+    return 0;
 }
 
 /***************************************************************************/
@@ -2736,11 +2779,13 @@ void LED (int on)
 
 /***************************************************************************/
 
-// sam: need to put all this in a separate module 
+/* sam: need to put all this in a separate module */
 
 #ifdef PICASSO96
 
-// Add a screenmode to the emulated P96 display database
+/*
+ * Add a screenmode to the emulated P96 display database
+ */
 
 static void add_p96_mode (int width, int height, int depth, int *count)
 {
@@ -2750,8 +2795,8 @@ static void add_p96_mode (int width, int height, int depth, int *count)
 	{
 		DisplayModes[*count].res.width  = width;
 		DisplayModes[*count].res.height = height;
-		DisplayModes[*count].depth	  = depth >> 3;
-		DisplayModes[*count].refresh	= 75;
+		DisplayModes[*count].depth      = depth >> 3;
+		DisplayModes[*count].refresh    = 75;
 		(*count)++;
 
 		write_log ("AMIGFX: Added P96 mode: %dx%dx%d\n", width, height, depth);
@@ -2893,7 +2938,7 @@ int DX_Fill (int dstx, int dsty, int width, int height, uae_u32 color, RGBFTYPE 
 
 void DX_Invalidate (int first, int last)
 {
-//	DEBUG_LOG ("Function: DX_Invalidate %d - %d\n", first, last);
+//    DEBUG_LOG ("Function: DX_Invalidate %d - %d\n", first, last);
 
 	if (!picasso_invalid_lines) return;
 	if (first > last) return;
@@ -2914,9 +2959,36 @@ int DX_BitsPerCannon (void)
 	return 8;
 }
 
+void output_update_clut()
+{
+	if (output_clut_needs_update == false) return;
+	output_clut_needs_update = false;
+	
+	int _start = 0;
+	int _count = 256;
 
+	if (picasso_vidinfo.pixbytes != 1)
+	{
+		while (_count-- > 0)
+		{
+			uint32 raw_data;
 
-void 	DX_SetPalette (int start, int count)
+			int r = picasso96_state.CLUT[_start].Red;
+			int g = picasso96_state.CLUT[_start].Green;
+			int b = picasso96_state.CLUT[_start].Blue;
+
+			raw_data = (((r & redmask) << redshift) >>(8-redbits)) | 
+					(((g & greenmask) << greenshift) >> (8-greenbits)) | 
+					(((b & bluemask) << blueshift) >> (8-bluebits));
+
+			if (byte_swap_16bit) raw_data = ((raw_data & 0xFF) << 8) | ((raw_data >> 8) & 0xFF);
+			picasso_vidinfo.clut[_start] = raw_data;
+			_start++;
+		}
+	}
+}
+
+void DX_SetPalette (int start, int count)
 {
 	DEBUG_LOG ("Function: DX_SetPalette\n");
 
@@ -2932,6 +3004,7 @@ void 	DX_SetPalette (int start, int count)
 	if (set_palette_fn)	// we need to convert !!
 	{
 		int n;
+
 		for (n = start ; n<(start+count); n++ ) set_palette_fn( picasso96_state.CLUT, n );
 	}
 	else if ((S)&&(W -> BorderTop == 0))
@@ -2988,10 +3061,10 @@ void add_native_modes( int depth, int *count )
 
 int DX_FillResolutions (uae_u16 *ppixel_format)
 {
-	int i;
-	int count = 0;
+    int i;
+    int count = 0;
 
-	DEBUG_LOG ("Function: DX_FillResolutions\n");
+    DEBUG_LOG ("Function: DX_FillResolutions\n");
 
 //	CFG_16bit_mode = RGBFB_R5G5B5;
 	CFG_16bit_mode = RGBFB_R5G6B5;
@@ -3004,7 +3077,7 @@ int DX_FillResolutions (uae_u16 *ppixel_format)
 	*ppixel_format |= 1 << CFG_16bit_mode;
 	*ppixel_format |= 1 << CFG_32bit_mode;
 
- // Check list of standard P96 screenmodes 
+    /* Check list of standard P96 screenmodes */
 
 	add_native_modes( 8, &count );
 	add_native_modes( 16, &count );
@@ -3024,8 +3097,7 @@ uae_u8 *gfx_lock_picasso (void)
 
 	if (draw_p96_RP -> BitMap)
 	{
-		p96_lock = IGraphics -> LockBitMapTags(
-			draw_p96_RP -> BitMap,
+		p96_lock = IGraphics -> LockBitMapTags(draw_p96_RP -> BitMap,
 			LBM_BaseAddress, (APTR *) &address,
 			LBM_PixelFormat, (APTR *) &format,
 			LBM_BytesPerRow, &picasso_vidinfo.rowbytes,
@@ -3068,10 +3140,12 @@ static void set_window_for_picasso (void)
 		&& current_depth == picasso_vidinfo.depth)
 		return;
 
+
 	printf("---------------------------------------\n");
 	printf("current_width %d,  current_height %d, current_depth %d \n",current_width,current_height,current_depth);
 	printf("new_width %d,  new_height %d, new_depth %d \n",picasso_vidinfo.width,picasso_vidinfo.height,picasso_vidinfo.depth);
 	printf("----------------------------------------\n");
+
 
 	p96_xoffset = 0;
 	p96_yoffset = 0;
@@ -3115,13 +3189,17 @@ void gfx_set_picasso_modeinfo (int w, int h, int depth, int rgbfmt)		// called f
 
 	update_p96_format();
 	set_window_for_picasso();
+
 }
 
 void gfx_set_picasso_state (int on)
 {
 	DEBUG_LOG ("Function: gfx_set_picasso_state: %d\n", on);
 
-	if (on == screen_is_picasso) return;
+	if (on == screen_is_picasso)
+	{
+		return;
+	}
 
 	// We can get called by drawing_init() when there's 
 	// no window opened yet...
@@ -3161,7 +3239,7 @@ void gfx_set_picasso_state (int on)
 
 static int led_state[5];
 
-#define WINDOW_TITLE PACKAGE_NAME " " PACKAGE_VERSION
+#define WINDOW_TITLE PACKAGE_STRING
 
 static void set_title (void)
 {
@@ -3182,7 +3260,7 @@ static void set_title (void)
 
 	sprintf (ScreenTitle,
 		"UAE-%d.%d.%d (%s%s%s)  by Bernd Schmidt & contributors, "
-				 "Amiga Port by Samuel Devulder.",
+                 "Amiga Port by Samuel Devulder.",
 		UAEMAJOR, UAEMINOR, UAESUBREV,
 		currprefs.cpu_level==0?"68000":
 		currprefs.cpu_level==1?"68010":
@@ -3190,7 +3268,7 @@ static void set_title (void)
 		currprefs.address_space_24?" 24bits":"",
 		currprefs.cpu_compatible?" compat":"");
 
-		SetWindowTitles(W, title, ScreenTitle);
+        SetWindowTitles(W, title, ScreenTitle);
 
 #else
 
@@ -3202,7 +3280,7 @@ static void set_title (void)
 
 /****************************************************************************/
 
-void main_window_led (int led, int on)				/* is used in amigui.c */
+void main_window_led (int led, int on)                /* is used in amigui.c */
 {
 
 #if 0
@@ -3272,10 +3350,10 @@ static LONG ObtainColor (ULONG r,ULONG g,ULONG b)
  */
 static void ReleaseColors(void)
 {
-	if (os39 && usepub && CM)
+    if (os39 && usepub && CM)
 	while (maxpen > 0)
 		ReleasePen (CM, pen[--maxpen]);
-	else
+    else
 	maxpen = 0;
 }
 
@@ -3294,17 +3372,17 @@ static void ReleaseColors(void)
 
 static int dist4 (LONG rgb1, LONG rgb2) /* computes distance very quickly */
 {
-	int d = 0, t;
-	t = (rgb1&0xF00)-(rgb2&0xF00); t>>=8; if (t<0) d -= t; else d += t;
-	t = (rgb1&0x0F0)-(rgb2&0x0F0); t>>=4; if (t<0) d -= t; else d += t;
-	t = (rgb1&0x00F)-(rgb2&0x00F); t>>=0; if (t<0) d -= t; else d += t;
+    int d = 0, t;
+    t = (rgb1&0xF00)-(rgb2&0xF00); t>>=8; if (t<0) d -= t; else d += t;
+    t = (rgb1&0x0F0)-(rgb2&0x0F0); t>>=4; if (t<0) d -= t; else d += t;
+    t = (rgb1&0x00F)-(rgb2&0x00F); t>>=0; if (t<0) d -= t; else d += t;
 #if 0
-	t = rgb1^rgb2;
-	if(t&15) ++d; t>>=4;
-	if(t&15) ++d; t>>=4;
-	if(t&15) ++d;
+    t = rgb1^rgb2;
+    if(t&15) ++d; t>>=4;
+    if(t&15) ++d; t>>=4;
+    if(t&15) ++d;
 #endif
-	return d;
+    return d;
 }
 
 #define d_dst (00000+(UBYTE*)cidx) /* let's use cidx as a buffer */
@@ -3313,44 +3391,36 @@ static int dist4 (LONG rgb1, LONG rgb2) /* computes distance very quickly */
 
 static int init_ham (void)
 {
-	int i,t,RGB;
+    int i,t,RGB;
 
-	// try direct color first
-
-	for (RGB = 0; RGB < 4096; ++RGB)
-	{
-		int c,d;
-		c = d = 50;
-		for (i = 0; i < 16; ++i)
-		{
-			t = dist4 (i*0x111, RGB);
-			if (t<d)
-			{
-				d = t;
-				c = i;
-			}
+    /* try direct color first */
+    for (RGB = 0; RGB < 4096; ++RGB) {
+	int c,d;
+	c = d = 50;
+	for (i = 0; i < 16; ++i) {
+		t = dist4 (i*0x111, RGB);
+		if (t<d) {
+		d = t;
+		c = i;
 		}
-		i = (RGB & 0x00F) | ((RGB & 0x0F0) << 1) | ((RGB & 0xF00) << 2);
-
-		d_dst[i] = (d << 2) | 3;	// the "|3" is a trick to speedup comparison
-		d_cmd[i] = c;			// in the conversion process
 	}
-
-	// then hold & modify
-
-	for (i = 0; i < 32768; ++i)
-	{
-		int dr, dg, db, d, c;
-		dr = (i>>10) & 0x1F; dr -= 0x10; if (dr < 0) dr = -dr;
-		dg = (i>>5)  & 0x1F; dg -= 0x10; if (dg < 0) dg = -dg;
-		db = (i>>0)  & 0x1F; db -= 0x10; if (db < 0) db = -db;
-		c  = 0; d = 50;
-		t = dist4 (0,  0*256 + dg*16 + db); if (t < d) {d = t; c = 0;}
-		t = dist4 (0, dr*256 +  0*16 + db); if (t < d) {d = t; c = 1;}
-		t = dist4 (0, dr*256 + dg*16 +  0); if (t < d) {d = t; c = 2;}
-		h_buf[i] = (d<<2) | c;
-	}
-	return 1;
+	i = (RGB & 0x00F) | ((RGB & 0x0F0) << 1) | ((RGB & 0xF00) << 2);
+	d_dst[i] = (d << 2) | 3; /* the "|3" is a trick to speedup comparison */
+	d_cmd[i] = c;		 /* in the conversion process */
+    }
+    /* then hold & modify */
+    for (i = 0; i < 32768; ++i) {
+	int dr, dg, db, d, c;
+	dr = (i>>10) & 0x1F; dr -= 0x10; if (dr < 0) dr = -dr;
+	dg = (i>>5)  & 0x1F; dg -= 0x10; if (dg < 0) dg = -dg;
+	db = (i>>0)  & 0x1F; db -= 0x10; if (db < 0) db = -db;
+	c  = 0; d = 50;
+	t = dist4 (0,  0*256 + dg*16 + db); if (t < d) {d = t; c = 0;}
+	t = dist4 (0, dr*256 +  0*16 + db); if (t < d) {d = t; c = 1;}
+	t = dist4 (0, dr*256 + dg*16 +  0); if (t < d) {d = t; c = 2;}
+	h_buf[i] = (d<<2) | c;
+    }
+    return 1;
 }
 
 /* great algorithm: convert trucolor into ham using precalc buffers */
@@ -3422,18 +3492,146 @@ int check_prefs_changed_gfx (void)
 void toggle_mousegrab (void)
 {
 #ifdef __amigaos4__
-	mouseGrabbed = 1 - mouseGrabbed;
-	grabTicks	= GRAB_TIMEOUT;
-	if (W)
-		grab_pointer (W);
+    mouseGrabbed = 1 - mouseGrabbed;
+    grabTicks    = GRAB_TIMEOUT;
+    if (W)
+	grab_pointer (W);
 #else
-	write_log ("Mouse grab not supported\n");
+    write_log ("Mouse grab not supported\n");
 #endif
 }
 
 int is_fullscreen (void)
 {
-	return is_fullscreen_state ? 1: 0;
+    return is_fullscreen_state ? 1: 0;
+}
+
+static inline void conv_WritePixelArray(uint8 *src_buffer_ptr, int src_BytesPerRow, int miny, int maxy, int dst_BytesPerRow, struct RastPort *rp)
+{
+	int yy;
+	for (yy=miny;yy<=maxy;yy++)
+	{				
+		p96_conv_fn(
+			src_buffer_ptr + (yy*src_BytesPerRow), 
+			conv_tmp_buffer + (yy*conv_tmp_buffer_bpr), 
+			picasso_vidinfo.width );
+	}
+
+	WritePixelArray( (void *) conv_tmp_buffer,0, miny,conv_tmp_buffer_bpr, 
+		COMP_FMT_SRC, rp, 0, miny, picasso_vidinfo.width, maxy-miny+1 );
+}
+
+static inline void conv_WritePixelArray_CLUT(uint8 *src_buffer_ptr, int src_BytesPerRow, int miny, int maxy, int dst_BytesPerRow, struct RastPort *rp )
+{
+	int yy;
+
+	for (yy=miny;yy<=maxy;yy++)
+	{				
+		p96_conv_fn(
+			src_buffer_ptr + (yy*src_BytesPerRow), 
+			conv_tmp_buffer + (yy*conv_tmp_buffer_bpr), 
+			picasso_vidinfo.width );
+	}
+
+	WritePixelArray( (void *) conv_tmp_buffer, 0, miny, conv_tmp_buffer_bpr, 
+		PIXF_CLUT, rp, p96_xoffset, p96_yoffset+miny, picasso_vidinfo.width,  maxy-miny+1 );
+}
+
+void p96_conv_all()
+{	
+	bool failed = false;
+	
+	APTR lock_src,lock_dest;
+	ULONG src_BytesPerRow,dest_BytesPerRow;
+	uint8 *src_buffer_ptr;
+	char *dest_buffer_ptr;
+
+//	char *dest_tmp_buffer_ptr;
+
+	int y;
+	int dest_bpr;
+
+	if (conv_p96_RP.BitMap != draw_p96_RP -> BitMap)
+		{ printf("conv bitmap is expected to be draw bitmap\n");return; }
+
+	if (draw_p96_RP -> BitMap == NULL)
+		{ printf("draw_p96_RP -> BitMap has no bitmap\n");return; }
+
+	if (picasso_invalid_lines == NULL )
+		{ printf("unexpcted NULL on picasso_invalid_lines\n"); return; }
+
+	if (conv_tmp_buffer == NULL)
+		{ printf("unexpcted NULL on conv_tmp_buffer\n"); return; }
+
+	dest_bpr = comp_p96_RP.BitMap ?
+		comp_p96_RP.BitMap -> BytesPerRow : 
+		picasso_vidinfo.width * 4;
+
+	src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;			/// <----- WHY THIS WORKS, BECOUSE ITS IN FAST MEM (I HOPE)...
+	src_BytesPerRow = draw_p96_RP -> BitMap -> BytesPerRow;
+
+	if (src_buffer_ptr) 
+	{
+		int miny = picasso_vidinfo.height;
+		int maxy = -1;
+
+		if ( COMP_FMT_SRC != PIXF_NONE )
+		{
+//			printf("using -- COMP_FMT_SRC != PIXF_NONE\n");
+
+			for (y=0;y<picasso_vidinfo.height;y++)
+			{
+				if (picasso_invalid_lines[y]) 
+				{
+					if (y<miny) miny = y;
+					if (y>maxy) maxy = y;
+					picasso_invalid_lines[y] = 0;
+				}
+				else
+				{
+					if (miny<=maxy)
+					{
+						conv_WritePixelArray(src_buffer_ptr,src_BytesPerRow, miny,  maxy,  dest_bpr,  &comp_p96_RP);
+						miny = picasso_vidinfo.height;
+						maxy = -1;
+					}
+				}
+			}
+
+			if (miny<=maxy)
+			{
+				conv_WritePixelArray(src_buffer_ptr,src_BytesPerRow, miny,  maxy, dest_bpr, &comp_p96_RP);
+			}
+		}
+		else
+		{
+//			printf("NOT using COMP_FMT_SRC != PIXF_NONE\n");
+
+			for (y=0;y<picasso_vidinfo.height;y++)
+			{
+				if (picasso_invalid_lines[y]) 
+				{
+					if (y<miny) miny = y;
+					if (y>maxy) maxy = y;
+					picasso_invalid_lines[y] = 0;
+				}
+				else
+				{
+					if (miny<=maxy)
+					{
+						conv_WritePixelArray_CLUT(src_buffer_ptr,src_BytesPerRow, miny,  maxy,  dest_bpr,  &comp_p96_RP);
+						miny = picasso_vidinfo.height;
+						maxy = -1;
+					}
+				}
+			}
+
+			if (miny<=maxy)
+			{
+				conv_WritePixelArray_CLUT(src_buffer_ptr,src_BytesPerRow, miny,  maxy,  dest_bpr,  &comp_p96_RP);
+			}
+		}
+	}
 }
 
 #define debug_vsync_time 0
@@ -3442,13 +3640,7 @@ int is_fullscreen (void)
 int every = 0;
 #endif
 
-int is_vsync (void)		// this one is for AGA mostly!!
-{
-	BackFill_Func(NULL, NULL);
-	return 0;
-}
-
-void ext_p96_vsync()
+int is_vsync (void)
 {
 
 #if debug_vsync_time
@@ -3457,10 +3649,23 @@ void ext_p96_vsync()
 	gettimeofday(&t1,NULL);
 #endif
 
+/*
+	printf("DRAW_FMT_SRC: %d:%d, COMP_FMT_SRC: %d\n", 
+			DRAW_FMT_SRC ,
+			draw_p96_RP ?
+				draw_p96_RP -> BitMap ? 
+					GetBitMapAttr( draw_p96_RP -> BitMap, BMA_PIXELFORMAT ) 
+					: 0
+			: 0,
+ 			COMP_FMT_SRC);
+*/
+
 	if (W)
 	{
 		if (screen_is_picasso)
 		{
+//			printf("picasso_vidinfo.rowbytes %d pixbytes: %d\n",picasso_vidinfo.rowbytes,picasso_vidinfo.pixbytes);
+
 			if (p96_update_format)
 			{
 				gfx_lock_picasso ();
@@ -3472,14 +3677,27 @@ void ext_p96_vsync()
 			{
 				if (set_palette_on_vbl_fn) 
 				{
-					set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
-				}
+					int y = 0;
 
+					set_palette_on_vbl_fn( picasso96_state.CLUT, 0);
+					p96_gfx_updated = true;
+					for (y=0;y<picasso_vidinfo.height;y++) picasso_invalid_lines[y] = 1;
+				}
 				p96_palette_updated = false;
 			}
-		}
 
-		picasso_refresh (0);
+			if (p96_gfx_updated)
+			{
+				if (p96_conv_fn) p96_conv_all();
+				p96_gfx_updated = false;
+			}
+
+			BackFill_Func(NULL, NULL);
+		}
+		else
+		{
+			BackFill_Func(NULL, NULL);
+		}
 	}
 
 
@@ -3527,6 +3745,7 @@ void toggle_fullscreen (void)
 	XOffset = 0;
 	YOffset = 0;
 	usepub = 0;
+
 	graphics_setup();
 	graphics_init ();
 	notice_new_xcolors();
@@ -3534,7 +3753,7 @@ void toggle_fullscreen (void)
 
 void screenshot (int type)
 {
-	write_log ("Screenshot not implemented yet\n");
+    write_log ("Screenshot not implemented yet\n");
 }
 
 /****************************************************************************
@@ -3542,87 +3761,87 @@ void screenshot (int type)
  * Mouse inputdevice functions
  */
 
-#define MAX_BUTTONS	 3
-#define MAX_AXES		3
-#define FIRST_AXIS	  0
-#define FIRST_BUTTON	MAX_AXES
+#define MAX_BUTTONS     3
+#define MAX_AXES        3
+#define FIRST_AXIS      0
+#define FIRST_BUTTON    MAX_AXES
 
 static int init_mouse (void)
 {
-	return 1;
+   return 1;
 }
 
 static void close_mouse (void)
 {
-	return;
+   return;
 }
 
 static int acquire_mouse (unsigned int num, int flags)
 {
-	return 1;
+   return 1;
 }
 
 static void unacquire_mouse (unsigned int num)
 {
-	return;
+   return;
 }
 
 static unsigned int get_mouse_num (void)
 {
-	return 1;
+    return 1;
 }
 
 static const char *get_mouse_name (unsigned int mouse)
 {
-	return "Default mouse";
+    return "Default mouse";
 }
 
 static unsigned int get_mouse_widget_num (unsigned int mouse)
 {
-	return MAX_AXES + MAX_BUTTONS;
+    return MAX_AXES + MAX_BUTTONS;
 }
 
 static int get_mouse_widget_first (unsigned int mouse, int type)
 {
-	switch (type) {
-		case IDEV_WIDGET_BUTTON:
-			return FIRST_BUTTON;
-		case IDEV_WIDGET_AXIS:
-			return FIRST_AXIS;
-	}
-	return -1;
+    switch (type) {
+        case IDEV_WIDGET_BUTTON:
+            return FIRST_BUTTON;
+        case IDEV_WIDGET_AXIS:
+            return FIRST_AXIS;
+    }
+    return -1;
 }
 
 static int get_mouse_widget_type (unsigned int mouse, unsigned int num, char *name, uae_u32 *code)
 {
-	if (num >= MAX_AXES && num < MAX_AXES + MAX_BUTTONS) {
-		if (name)
-			sprintf (name, "Button %d", num + 1 + MAX_AXES);
-		return IDEV_WIDGET_BUTTON;
-	} else if (num < MAX_AXES) {
-		if (name)
-			sprintf (name, "Axis %d", num + 1);
-		return IDEV_WIDGET_AXIS;
-	}
-	return IDEV_WIDGET_NONE;
+    if (num >= MAX_AXES && num < MAX_AXES + MAX_BUTTONS) {
+        if (name)
+            sprintf (name, "Button %d", num + 1 + MAX_AXES);
+        return IDEV_WIDGET_BUTTON;
+    } else if (num < MAX_AXES) {
+        if (name)
+            sprintf (name, "Axis %d", num + 1);
+        return IDEV_WIDGET_AXIS;
+    }
+    return IDEV_WIDGET_NONE;
 }
 
 static void read_mouse (void)
 {
-	/* We handle mouse input in handle_events() */
+    /* We handle mouse input in handle_events() */
 }
 
 struct inputdevice_functions inputdevicefunc_mouse = {
-	init_mouse,
-	close_mouse,
-	acquire_mouse,
-	unacquire_mouse,
-	read_mouse,
-	get_mouse_num,
-	get_mouse_name,
-	get_mouse_widget_num,
-	get_mouse_widget_type,
-	get_mouse_widget_first
+    init_mouse,
+    close_mouse,
+    acquire_mouse,
+    unacquire_mouse,
+    read_mouse,
+    get_mouse_num,
+    get_mouse_name,
+    get_mouse_widget_num,
+    get_mouse_widget_type,
+    get_mouse_widget_first
 };
 
 /*
@@ -3630,14 +3849,14 @@ struct inputdevice_functions inputdevicefunc_mouse = {
  */
 void input_get_default_mouse (struct uae_input_device *uid)
 {
-	/* Supports only one mouse for now */
-	uid[0].eventid[ID_AXIS_OFFSET + 0][0]   = INPUTEVENT_MOUSE1_HORIZ;
-	uid[0].eventid[ID_AXIS_OFFSET + 1][0]   = INPUTEVENT_MOUSE1_VERT;
-	uid[0].eventid[ID_AXIS_OFFSET + 2][0]   = INPUTEVENT_MOUSE1_WHEEL;
-	uid[0].eventid[ID_BUTTON_OFFSET + 0][0] = INPUTEVENT_JOY1_FIRE_BUTTON;
-	uid[0].eventid[ID_BUTTON_OFFSET + 1][0] = INPUTEVENT_JOY1_2ND_BUTTON;
-	uid[0].eventid[ID_BUTTON_OFFSET + 2][0] = INPUTEVENT_JOY1_3RD_BUTTON;
-	uid[0].enabled = 1;
+    /* Supports only one mouse for now */
+    uid[0].eventid[ID_AXIS_OFFSET + 0][0]   = INPUTEVENT_MOUSE1_HORIZ;
+    uid[0].eventid[ID_AXIS_OFFSET + 1][0]   = INPUTEVENT_MOUSE1_VERT;
+    uid[0].eventid[ID_AXIS_OFFSET + 2][0]   = INPUTEVENT_MOUSE1_WHEEL;
+    uid[0].eventid[ID_BUTTON_OFFSET + 0][0] = INPUTEVENT_JOY1_FIRE_BUTTON;
+    uid[0].eventid[ID_BUTTON_OFFSET + 1][0] = INPUTEVENT_JOY1_2ND_BUTTON;
+    uid[0].eventid[ID_BUTTON_OFFSET + 2][0] = INPUTEVENT_JOY1_3RD_BUTTON;
+    uid[0].enabled = 1;
 }
 
 /****************************************************************************
@@ -3646,34 +3865,34 @@ void input_get_default_mouse (struct uae_input_device *uid)
  */
 static unsigned int get_kb_num (void)
 {
-	return 1;
+    return 1;
 }
 
 static const char *get_kb_name (unsigned int kb)
 {
-	return "Default keyboard";
+    return "Default keyboard";
 }
 
 static unsigned int get_kb_widget_num (unsigned int kb)
 {
-	return 128;
+    return 128;
 }
 
 static int get_kb_widget_first (unsigned int kb, int type)
 {
-	return 0;
+    return 0;
 }
 
 static int get_kb_widget_type (unsigned int kb, unsigned int num, char *name, uae_u32 *code)
 {
-	// fix me
-	*code = num;
-	return IDEV_WIDGET_KEY;
+    // fix me
+    *code = num;
+    return IDEV_WIDGET_KEY;
 }
 
 static int keyhack (int scancode, int pressed, int num)
 {
-	return scancode;
+    return scancode;
 }
 
 static void read_kb (void)
@@ -3682,7 +3901,7 @@ static void read_kb (void)
 
 static int init_kb (void)
 {
-	return 1;
+    return 1;
 }
 
 static void close_kb (void)
@@ -3691,7 +3910,7 @@ static void close_kb (void)
 
 static int acquire_kb (unsigned int num, int flags)
 {
-	return 1;
+    return 1;
 }
 
 static void unacquire_kb (unsigned int num)
@@ -3700,21 +3919,21 @@ static void unacquire_kb (unsigned int num)
 
 struct inputdevice_functions inputdevicefunc_keyboard =
 {
-	init_kb,
-	close_kb,
-	acquire_kb,
-	unacquire_kb,
-	read_kb,
-	get_kb_num,
-	get_kb_name,
-	get_kb_widget_num,
-	get_kb_widget_type,
-	get_kb_widget_first
+    init_kb,
+    close_kb,
+    acquire_kb,
+    unacquire_kb,
+    read_kb,
+    get_kb_num,
+    get_kb_name,
+    get_kb_widget_num,
+    get_kb_widget_type,
+    get_kb_widget_first
 };
 
 int getcapslockstate (void)
 {
-	return 0;
+    return 0;
 }
 
 void setcapslockstate (int state)
@@ -3730,10 +3949,10 @@ static const char *screen_type[] = { "custom", "public", "ask", 0 };
 
 void gfx_default_options (struct uae_prefs *p)
 {
-	p->amiga_screen_type	 = UAESCREENTYPE_PUBLIC;
+	p->amiga_screen_type     = UAESCREENTYPE_PUBLIC;
 	p->amiga_publicscreen[0] = '\0';
-	p->amiga_use_dither	  = 1;
-	p->amiga_use_grey		= 0;
+	p->amiga_use_dither      = 1;
+	p->amiga_use_grey        = 0;
 }
 
 void gfx_save_options (FILE *f, const struct uae_prefs *p)
@@ -3741,7 +3960,7 @@ void gfx_save_options (FILE *f, const struct uae_prefs *p)
 	cfgfile_write (f, GFX_NAME ".screen_type=%s\n",  screen_type[p->amiga_screen_type]);
 	cfgfile_write (f, GFX_NAME ".publicscreen=%s\n", p->amiga_publicscreen);
 	cfgfile_write (f, GFX_NAME ".use_dither=%s\n",   p->amiga_use_dither ? "true" : "false");
-	cfgfile_write (f, GFX_NAME ".use_grey=%s\n",	 p->amiga_use_grey ? "true" : "false");
+	cfgfile_write (f, GFX_NAME ".use_grey=%s\n",     p->amiga_use_grey ? "true" : "false");
 }
 
 int gfx_parse_option (struct uae_prefs *p, const char *option, const char *value)
@@ -3753,3 +3972,22 @@ int gfx_parse_option (struct uae_prefs *p, const char *option, const char *value
 }
 
 /****************************************************************************/
+
+uae_u8 *save_p96 (size_t *len, uae_u8 *dstptr)
+{
+	uae_u8 *dstbak,*dst;
+
+	if (dstptr)
+		dstbak = dst = dstptr;
+	else
+		dstbak = dst = malloc ( 2 * 3 * 256 + 1000);
+
+	*len = dst - dstbak;
+	return dstbak;
+}
+
+uae_u8 *restore_p96( uae_u8 * src )
+{
+	return src;
+}
+

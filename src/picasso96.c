@@ -47,15 +47,6 @@
 #include "picasso96.h"
 #include "uae_endian.h"
 
-#ifdef __amigaos4__
-#include <proto/intuition.h>
-#include <proto/graphics.h>
-
-extern ULONG COMP_FMT_SRC,DRAW_FMT_SRC;
-extern struct RastPort  *draw_p96_RP;
-extern void (*p96_conv_fn) (void *src, void *dest, int size);
-#endif 
-
 bool debug_crash = false;
 #define debug_crashed(fmt,...) if (debug_crash) DebugPrintF(fmt, ##__VA_ARGS__)
 
@@ -120,15 +111,16 @@ static int set_panning_called = 0;
 
 static uae_u32 p2ctab[256][2];
 
+bool output_clut_needs_update = false;
+extern void output_update_clut(void);
+
 
 /*
  * Picasso96 seems to have a bug which screws the palette emulation in
  * ARGB32 modes. We work around this by using a BGRA32 framebuffer instead,
  * and byte-swapping each pixel when output to the real screen
  */
-
-
-//static int need_argb32_hack = 0;
+static int need_argb32_hack = 0;
 
 /* This stuff should probably be moved elsewhere */
 #if (defined __powerpc__ || defined __ppc__ || defined __POWERPC__ \
@@ -484,8 +476,95 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
      * sure we adjust for the pen values if we're doing 8-bit
      * display-emulation on a 16-bit or higher screen. */
 
+	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
+	{
+		if (DX_Fill (x, y, width, height, pen, rgbtype)) return;
+	}
+	else
+	{
+		output_update_clut();
 
-	if (DX_Fill (x, y, width, height, pen, rgbtype)) return;
+		if (DX_Fill (x, y, width, height, picasso_vidinfo.clut[src[0]], rgbtype))
+		return;
+	}
+
+	P96TRACE (("P96: WARNING - do_fillrect() using fall-back routine!\n"));
+
+	DX_Invalidate (y, y + height - 1);
+
+	if (!picasso_vidinfo.extra_mem) return;
+
+	width *= picasso96_state.BytesPerPixel;
+	dst = gfx_lock_picasso ();
+
+	if (!dst) goto out;
+
+	dst += y * picasso_vidinfo.rowbytes + x * picasso_vidinfo.pixbytes;
+
+	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
+	{
+		if (Bpp == 1)
+		{
+			while (height-- > 0)
+			{
+				memset (dst, pen, width);
+				dst += picasso_vidinfo.rowbytes;
+			}
+		}
+		else
+		{
+			while (height-- > 0)
+			{
+				memcpy (dst, src, width);
+				dst += picasso_vidinfo.rowbytes;
+			}
+		}
+	}
+	else
+	{
+		int psiz = GetBytesPerPixel (picasso_vidinfo.rgbformat);
+
+		if (picasso96_state.RGBFormat != RGBFB_CHUNKY)
+		{
+			gfx_unlock_picasso ();
+			return;
+		}
+
+		output_update_clut();
+
+		int i;
+		switch (psiz)
+		{
+			case 2:
+				while (height-- > 0)
+				{
+					for (i = 0; i < width; i++)				
+					{
+						*((uae_u16 *) dst + i) = picasso_vidinfo.clut[src[i]];
+					}
+		    			dst += picasso_vidinfo.rowbytes;					
+				}
+				break;
+
+			case 4:
+				while (height-- > 0)
+				{
+					for (i = 0; i < width; i++)
+					{
+						*((uae_u32 *) dst + i) = picasso_vidinfo.clut[src[i]];
+					}
+				    	dst += picasso_vidinfo.rowbytes;
+				}
+				break;
+
+			default:
+				gfx_unlock_picasso ();
+				return;
+		}
+	
+	}
+  out:
+	gfx_unlock_picasso ();
 }
 
 /*
@@ -495,17 +574,17 @@ static void do_fillrect (uae_u8 *src, int x, int y, int width, int height,
  * must do it by hand using the data in the save area, pointed to by
  * srcp.
  */
-
-int line_skip = 2;
-int off_skip ;
-
 static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 		     int dstx, int dsty, int width, int height,
 		     BLIT_OPCODE opcode, int can_do_blit)
 {
 	int xoff = picasso96_state.XOffset;
 	int yoff = picasso96_state.YOffset;
-	uae_u8 *srcp; 
+	uae_u8 *srcp, *dstp;
+
+debug_crashed("%s:%d\n",__FUNCTION__,__LINE__);
+
+	// Clipping. 
 
 	dstx -= xoff;
 	dsty -= yoff;
@@ -553,6 +632,9 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
 
 	if (!picasso_vidinfo.extra_mem) return;
 
+	dstp = gfx_lock_picasso ();
+	if (dstp == 0) goto out;
+
 	// Since the blit has already been performed in the framebuffer, we only need
 	// to blit the updated area to the screen. Therefore we use the destination
 	// coordinates for the source rectangle in the framebuffer - not the source
@@ -560,69 +642,72 @@ static void do_blit (struct RenderInfo *ri, int Bpp, int srcx, int srcy,
     
 	srcp = ri->Memory + (dstx + xoff) * Bpp + (dsty + yoff) * ri->BytesPerRow;
 
+	dstp += dsty * picasso_vidinfo.rowbytes + dstx * picasso_vidinfo.pixbytes;
+
 	P96TRACE (("P96: do_blit with srcp 0x%x, dstp 0x%x, dst_rowbytes %d, srcx"
 	       " %d, srcy %d, dstx %d, dsty %d, w %d, h %d, dst_pixbytes %d\n",
 	       srcp, dstp, picasso_vidinfo.rowbytes, srcx, srcy, dstx, dsty,
 	       width,height, picasso_vidinfo.pixbytes));
 	P96TRACE (("P96: gfxmem is at 0x%x\n", gfxmemory));
 
-	off_skip = (off_skip + 1) % line_skip;
-
-	if ((draw_p96_RP -> BitMap)&&(p96_conv_fn) &&(COMP_FMT_SRC != PIXF_NONE))
+	if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
 	{
-		int dest_bpr = width * 4;
-		char *dest_tmp_buffer_ptr = alloca( dest_bpr );		// becouse output is needs more space.
-
-		srcp += (ri->BytesPerRow * off_skip);
-		dsty += off_skip;
-
-		height /= line_skip;
+		width *= Bpp;
 
 		while (height-- > 0)
 		{
-			p96_conv_fn( srcp, dest_tmp_buffer_ptr, width );
-
-			WritePixelArray( (void *) dest_tmp_buffer_ptr,
-				0, 0,	dest_bpr,
-				COMP_FMT_SRC,
-				draw_p96_RP,
-				dstx, dsty,
-				width, 1 );
-
-			srcp += (ri->BytesPerRow * line_skip);
-			dsty +=line_skip;
+			memcpy (dstp, srcp, width);
+			srcp += ri->BytesPerRow;
+			dstp += picasso_vidinfo.rowbytes;
 		}
 	}
-	else
+	 else
 	{
-		if (line_skip)
+		int psiz = GetBytesPerPixel (picasso_vidinfo.rgbformat);
+
+		if (picasso96_state.RGBFormat != RGBFB_CHUNKY)
 		{
-			srcp += (ri->BytesPerRow * off_skip);
-			dsty += off_skip;
-
-			height /= line_skip;
-			while (height--)
-			{
-				WritePixelArray( (void *) srcp,
-				0, 0,	ri->BytesPerRow,
-				ri -> RGBFormat,
-				draw_p96_RP,
-				dstx, dsty +=line_skip,
-				width, 1 );
-
-				srcp += (ri->BytesPerRow * line_skip);
-			}
+			gfx_unlock_picasso ();
+			DebugPrintF("Error: picasso96_state.RGBFormat: %08x\npicasso_vidinfo.rgbformat: %08x\n\n",picasso96_state.RGBFormat,picasso_vidinfo.rgbformat);
+			return;
 		}
-		else
+
+		output_update_clut();
+
+		int i;
+		switch (psiz)
 		{
-			WritePixelArray( (void *) srcp,
-				0, 0,	ri->BytesPerRow,
-				ri -> RGBFormat,
-				draw_p96_RP,
-				dstx, dsty,
-				width, height );
+			case 2:
+
+				while (height-- > 0)
+				{
+					for (i = 0; i < width; i++)
+						*((uae_u16 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
+
+					srcp += ri->BytesPerRow;
+					dstp += picasso_vidinfo.rowbytes;
+				}
+				break;
+
+			case 4:
+
+				while (height-- > 0)
+				{
+					for (i = 0; i < width; i++)
+						*((uae_u32 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
+
+					srcp += ri->BytesPerRow;
+					dstp += picasso_vidinfo.rowbytes;
+				}
+				break;
+
+			default:
+				abort ();
 		}
 	}
+
+out:
+	gfx_unlock_picasso ();
 }
 
 /*
@@ -686,26 +771,52 @@ static int     currline_y;       /* row number of this line */
  * first_byte = Offset in bytes from start of line to first byte to write.
  * byte_count = Number of bytes to write from source line.
  */
-
-static void new_write_currline (uae_u8 *srcp, int line_no, int x, int byte_count, int fb_bpp)
+STATIC_INLINE void write_currline (uae_u8 *srcp, int line_no, int first_byte, int byte_count)
 {
 	uae_u8 *dstp;
 
-	int w = byte_count / fb_bpp;
-	int dest_bpr = w *4;
+	if ((dstp = gfx_lock_picasso ()) != 0)
+	{
+		int Bpp = GetBytesPerPixel (picasso_vidinfo.rgbformat);
 
-	char *dest_tmp_buffer_ptr = alloca( dest_bpr );		// becouse output is needs more space.
+		if (picasso_vidinfo.rgbformat == picasso96_state.RGBFormat)
+		{
+			dstp += line_no * picasso_vidinfo.rowbytes + first_byte;
 
-	p96_conv_fn( srcp, dest_tmp_buffer_ptr, w );
+			if (need_argb32_hack && Bpp == 4)
+				memcpy_bswap32 (dstp, srcp, byte_count);
+			else
+				memcpy (dstp, srcp, byte_count);
+		}
+		else
+		{
+			dstp += line_no * picasso_vidinfo.rowbytes + first_byte * Bpp;
 
-	WritePixelArray( (void *) dest_tmp_buffer_ptr,
-			0, 0,	dest_bpr,
-			COMP_FMT_SRC,
-			draw_p96_RP,
-			x, line_no, 
-			w, 1 );
+			output_update_clut();
+
+			switch (Bpp)
+			{
+				case 2:
+					{
+						int i;
+						uae_u16 *dstp16 = (uae_u16*) dstp;
+		   				for (i = 0; i < byte_count; i++)
+							*dstp16++ = picasso_vidinfo.clut[srcp[i]];
+					}
+					break;
+
+				case 4: 
+					{
+						int i;
+						for (i = 0; i < byte_count; i++)
+							*((uae_u32 *) dstp + i) = picasso_vidinfo.clut[srcp[i]];
+					}
+					break;
+			}
+		}
+		gfx_unlock_picasso ();
+	}
 }
-
 
 static void flush_currline (void)
 {
@@ -721,45 +832,23 @@ static void flush_currline (void)
 
 	/* If our graphics system uses a separate buffer, then
 	* that must be updated too */
-
-
-	if (picasso_vidinfo.extra_mem)
-	{
-		uae_u8 fb_bpp  = picasso96_state.BytesPerPixel;
-		int byte_count = (currline_max - currline_min);
-		int first_byte = currline_min - currline_start
+	if (picasso_vidinfo.extra_mem) {
+	    uae_u8 fb_bpp  = picasso96_state.BytesPerPixel;
+	    int byte_count = (currline_max - currline_min);
+	    int first_byte = currline_min - currline_start
 			     - (picasso96_state.XOffset * fb_bpp);
-		uae_u8 *srcp   = (currline_min - gfxmem_start) + gfxmemory;
+	    uae_u8 *srcp   = (currline_min - gfxmem_start) + gfxmemory;
 
-		if (first_byte < 0)
-		{
-			byte_count += first_byte;
-			srcp       += first_byte;
-			first_byte = 0;
-		}
+	    if (first_byte < 0) {
+		byte_count += first_byte;
+		srcp       += first_byte;
+		first_byte = 0;
+	    }
+	    if ((first_byte + byte_count) > (picasso96_state.Width * fb_bpp))
+		byte_count = picasso96_state.Width * fb_bpp - first_byte;
 
-		if ((first_byte + byte_count) > (picasso96_state.Width * fb_bpp))
-			byte_count = picasso96_state.Width * fb_bpp - first_byte;
-
-		if (byte_count > 0)
-		{
-			if ((picasso96_state.RGBFormat == DRAW_FMT_SRC) && (draw_p96_RP -> BitMap))
-			{
-				int x = first_byte / fb_bpp;
-				int w = byte_count / fb_bpp;
-
-				WritePixelArray( (void *) srcp,
-					0, 0,	byte_count,
-					picasso96_state.RGBFormat,
-					draw_p96_RP,
-					x, line_no, w, 1 );
-			}
-			else 	if ((draw_p96_RP -> BitMap)&&(p96_conv_fn) &&(COMP_FMT_SRC != PIXF_NONE))
-			{
-				new_write_currline (srcp, line_no, first_byte / fb_bpp, byte_count, fb_bpp);
-			}
-			else	printf("unexpected format!!!\n");
-		}
+	    if (byte_count > 0)
+		write_currline (srcp, line_no, first_byte, byte_count);
 	}
     }
     currline_start = 0xFFFFFFFF;
@@ -1352,39 +1441,22 @@ void picasso_enablescreen (int on)
 static int first_color_changed = 256;
 static int last_color_changed = -1;
 
-extern void ext_p96_vsync();
-
-static struct timeval t1, t2;
-
 void picasso_handle_vsync (void)
 {
-	double delta_ms;
-	gettimeofday(&t2,NULL);
+    if (first_color_changed < last_color_changed) {
+	DX_SetPalette (first_color_changed,
+		       last_color_changed - first_color_changed);
+	/* If we're emulating a CLUT mode, we need to redraw the entire
+	 * screen. */
+	if (picasso_vidinfo.rgbformat != picasso96_state.RGBFormat)
+	    picasso_refresh (1);
+    }
 
-	delta_ms = (t2.tv_sec - t1.tv_sec) * 1000.0f;		// s to ms
-	delta_ms += (t2.tv_usec - t1.tv_usec) / 1000.0f;	// us to ms
+    first_color_changed = 256;
+    last_color_changed = -1;
 
-	if (delta_ms>=33.0f)		// 1 / 30hz = 33 ms long delays...
-	{
-		t1 = t2;	
-
-//		printf("delta_ms: %f\n", delta_ms);
-
-		if (first_color_changed < last_color_changed)
-		{
-			DX_SetPalette (first_color_changed,   last_color_changed - first_color_changed);
-//			if (picasso_vidinfo.rgbformat != picasso96_state.RGBFormat) picasso_refresh (1);
-		}
-
-		first_color_changed = 256;
-		last_color_changed = -1;
-
-/*
-    // Flush any cached changes to the screen. 
+    /* Flush any cached changes to the screen. */
     wgfx_flushline ();
-*/
-		ext_p96_vsync();
-	}
 }
 
 void picasso_handle_hsync (void)
@@ -1483,6 +1555,8 @@ uae_u32 REGPARAM2 picasso_SetColorArray (struct regstruct *regs)
 
 	if (changed)
 	{
+		output_clut_needs_update = true;	// we can't wait for vsync!!
+
 		if (start < first_color_changed)
 			first_color_changed = start;
 
@@ -1704,15 +1778,12 @@ uae_u32 REGPARAM2 picasso_InvertRect (struct regstruct *regs)
 	for (lines = 0; lines < Height; lines++, uae_mem += ri.BytesPerRow)
 	    do_xor8 (uae_mem, width_in_bytes, xorval);
 
-/*
 	if (renderinfo_is_current_screen (&ri)) {
 	    if (mask == 0xFF)
 		do_invertrect (&ri, Bpp, X, Y, Width, Height);
 	    else
 		do_blit (&ri, Bpp, X, Y, X, Y, Width, Height, BLIT_SRC, 0);
 	}
-*/
-
 	result = 1;
     }
     return result;
@@ -1876,7 +1947,7 @@ uae_u32 REGPARAM2 picasso_FillRect (struct regstruct *regs)
 		    if (Y+Height > picasso96_state.Height)
 			Height = picasso96_state.Height - Y;
 
-//		    do_fillrect (src, X, Y, Width, Height, Pen, Bpp, RGBFormat);
+		    do_fillrect (src, X, Y, Width, Height, Pen, Bpp, RGBFormat);
 		}
 	    }
 	    result = 1;
@@ -1901,10 +1972,8 @@ uae_u32 REGPARAM2 picasso_FillRect (struct regstruct *regs)
 			}
 		    }
 		}
-/*
 		if (renderinfo_is_current_screen (&ri))
 		    do_blit (&ri, Bpp, X, Y, X, Y, Width, Height, BLIT_SRC, 0);
-*/
 		result = 1;
 	    }
 	}
@@ -1997,9 +2066,6 @@ STATIC_INLINE int BlitRectHelper (void)
 
 
     /* Now we do the on-screen display, if renderinfo points to it */
-
-#if 0
-
     if (renderinfo_is_current_screen (dstri)) {
 	if (mask == 0xFF || Bpp > 1) {
 	    if (can_do_visible_blit)
@@ -2013,8 +2079,6 @@ STATIC_INLINE int BlitRectHelper (void)
     } else {
 	P96TRACE (("P96: Did not do_blit 1 in BlitRect()\n"));
     }
-
-#endif
 
     return 1;
 }
@@ -2333,11 +2397,9 @@ uae_u32 REGPARAM picasso_BlitPattern (struct regstruct *regs)
 	    } /* for (rows) */
 
 	    /* If we need to update a second-buffer (extra_mem is set), then do it only if visible! */
-
-/*
 	    if (picasso_vidinfo.extra_mem && renderinfo_is_current_screen (&ri))
 		do_blit (&ri, Bpp, X, Y, X, Y, W, H, BLIT_SRC, 0);
-*/
+
 	    result = 1;
 	}
     }
@@ -2510,11 +2572,8 @@ uae_u32 REGPARAM2 picasso_BlitTemplate (struct regstruct *regs)
 	    } /* for (rows) */
 
 	    /* If we need to update a second-buffer (extra_mem is set), then do it only if visible! */
-
-/*
 	    if (picasso_vidinfo.extra_mem && renderinfo_is_current_screen (&ri))
 		do_blit (&ri, Bpp, X, Y, X, Y, W, H, BLIT_SRC, 0);
-*/
 	}
     }
     return 1;
@@ -2688,14 +2747,10 @@ uae_u32 REGPARAM2 picasso_BlitPlanar2Chunky (struct regstruct *regs)
 
     PlanarToChunky (&local_ri, &local_bm, srcx, srcy, dstx, dsty,
 		    width, height, mask);
-
-/*
     if (renderinfo_is_current_screen (&local_ri)) {
 	do_blit (&local_ri, GetBytesPerPixel (local_ri.RGBFormat), dstx, dsty,
 		 dstx, dsty, width, height, BLIT_SRC, 0);
     }
-*/
-
     return 1;
 }
 
@@ -2845,15 +2900,10 @@ uae_u32 REGPARAM2 picasso_BlitPlanar2Direct (struct regstruct *regs)
 	    PlanarToDirect (&local_ri, &local_bm, srcx, srcy, dstx, dsty,
 			    width, height, Mask, &local_cim);
 
-
-/*
 	    if (renderinfo_is_current_screen (&local_ri)) {
 		do_blit (&local_ri, GetBytesPerPixel (local_ri.RGBFormat),
 			 dstx, dsty, dstx, dsty, width, height, BLIT_SRC, 0);
 	    }
-*/
-
-
 	    result = 1;
 	} else {
 	    P96TRACE (("P96: WARNING - BlitPlanar2Direct() failed."
@@ -2971,8 +3021,8 @@ static void REGPARAM2 gfxmem_lput (uaecptr addr, uae_u32 l)
     m = (uae_u32 *)(((addr - gfxmem_start) & gfxmem_mask) + gfxmemory);
     do_put_mem_long (m, l);
 
-    // Flush long written to the display //
-//    flush_write (addr, 4);
+    /* Flush long written to the display */
+    flush_write (addr, 4);
 }
 
 static void REGPARAM2 gfxmem_wput (uaecptr addr, uae_u32 w)
@@ -2984,8 +3034,8 @@ static void REGPARAM2 gfxmem_wput (uaecptr addr, uae_u32 w)
     m = (uae_u16 *)(((addr - gfxmem_start) & gfxmem_mask) + gfxmemory);
     do_put_mem_word (m, (uae_u16)w);
 
-    // Flush word written to the display //
-//    flush_write (addr, 2);
+    /* Flush word written to the display */
+    flush_write (addr, 2);
 }
 
 static void REGPARAM2 gfxmem_bput (uaecptr addr, uae_u32 b)
@@ -2997,8 +3047,8 @@ static void REGPARAM2 gfxmem_bput (uaecptr addr, uae_u32 b)
     m = (uae_u8 *)(((addr - gfxmem_start) & gfxmem_mask) + gfxmemory);
     *m = (uae_u8) b;
 
-    // Flush byte written to the display //
-//    flush_write (addr, 1);
+    /* Flush byte written to the display */
+    flush_write (addr, 1);
 }
 
 static int REGPARAM2 gfxmem_check (uaecptr addr, uae_u32 size)
@@ -3139,7 +3189,7 @@ void InitPicasso96 (void)
 
 			default:
 
-				DebugPrintF("unexpected depth :-(\n");
+				printf("unexpected depth :-(\n");
 		}
 	}
 	ShowSupportedResolutions ();
