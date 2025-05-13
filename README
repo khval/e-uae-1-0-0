@@ -1,10 +1,50 @@
-E-UAE PowerPC JIT project v1.0.0
+E-UAE PowerPC JIT project v1.1.0
 ================================
 
-This project is a fork of the E-UAE Amiga emulation project. You can find the
-original project's pages here:
+This project is a fork of the E-UAE Amiga emulation project. 
 
-http://www.rcdrummond.net/uae
+Can you believe 10 years have passed, since the last release, it goes without
+saying it's time to release the changes that have been going on, officially
+people think this is abandoned you find this in the Wikipedia pages,
+this isn't quite true. Lots of minor bug fixes have been going on and there
+have been lots of smaller updates. 
+
+it's a shame the official webpage http://www.rcdrummond.net/uae has
+not been updated, sense 2007, not even after Álmos Rajnai excellent 
+work on the JIT compiler, it's a shame.
+
+Changes from late 2022 have not been merged into this release, 
+and the 1.0.1 TAG bug fix for Linux did not make it into this version. 
+I know people are itching for new release, so I'm not going to spend time
+merging all versions of EUAE from all corners of the world.
+
+Lastest source code you can find here:
+
+https://github.com/khval/e-uae-1-0-0
+https://github.com/salass00/e-uae
+
+
+Release v1.1.0 @ 2025
+=====================
+
+Changes by LiveForIt / Kjetil Hvalstrand 
+
+* Picasso96 support for AmiGFX output (2022/2023)
+* Drag and Drop support @ 2022
+* BSDSocket support @ 2025
+
+Changes by josefwegner / Josef Wegner
+
+* Caps library 4.2 support @ Jan 2023
+
+Changes by salass00 / Fredrik Wikstrom
+
+* Large hard filesupport (2017)
+
+(Only key changes listed.)
+
+Stable Release v1.0.0 @ 2015
+=====================
 
 Please also read the details of the original project in the included
 README_original file.
@@ -16,21 +56,11 @@ For further details please have a look on the project blog:
 
 http://euaejit.blogspot.com
 
-
 You can find the actual project sources in the SourceForge project:
 
 https://sourceforge.net/projects/euaeppcjit
 
 
-If you would like to support the project then please consider a small donation:
-
-http://amigabounty.net/index.php?function=viewproject&projectid=35
-
-Thank you!
-
-
-Stable Release v1.0.0
-=====================
 The most important features of the fifth beta version are:
 
  * Final bug fixes for the release.
@@ -77,6 +107,7 @@ Here are the differences between the original v0.8.29 and this version:
 
 * The PowerPC JIT compiling was implemented from scratch, some support 
   functions were reused from the x86 implementation.
+  (Created by Álmos Rajnai)
   
 * New configuration items are available for the new JIT implementation.
   (See docs/configuration.txt.)
