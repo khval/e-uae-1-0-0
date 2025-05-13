@@ -13,15 +13,33 @@ struct handle_s
 	uint32 index;
 };
 
-struct handle_thread_s
+struct handle_ptr
 {
-	struct handle_s BaseClass;
+	struct handle_s *ptr;
+	BOOL lock;
+};
+
+struct handle_thread_s;
+
+struct thread_s
+{
 	struct Library *SocketBase;
 	struct SocketIFace *IS;
 	void (*func) ( struct handle_thread_s *thread );
+	struct MsgPort *ProxyPort;
 	struct MsgPort *timerPort;
 	struct timerequest *timerIO;
-	ULONG timer;
+	BOOL timer_used;
+	ULONG timerOpenError;
+	BPTR  output ;
+    	BOOL running;	
+	BOOL lock;
+};
+
+struct handle_thread_s
+{
+	struct handle_s base;
+	struct thread_s t;
 };
 
 struct handle_event_s
@@ -32,9 +50,9 @@ struct handle_event_s
 	APTR mux;
 };
 
-typedef struct handle_s *HANDLE;
+typedef struct handle_ptr HANDLE;
 
 HANDLE new_handle(int type);
 
-void CloseHandle( HANDLE h );
+void CloseHandle( HANDLE *h_ptr );
 

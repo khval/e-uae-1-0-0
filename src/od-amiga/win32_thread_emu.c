@@ -1,10 +1,10 @@
 
-
 #include <exec/types.h>
 #include <exec/tasks.h>
 #include <exec/libraries.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,98 +19,91 @@ extern APTR amiga_thread_safe_mx;
 extern struct Task *main_task;
 extern int socket_thread_triggered_sigbit;
 
-HANDLE GetCurrentThread( void )
+struct handle_thread_s *GetCurrentThread( void )
 {
 	uint32 index = ((uint32) FindTask(NULL) -> tc_UserData);
-
-	Printf("%s: index = %d\n", __FUNCTION__, index);
-
-	if ( hThreads[ index ] ) return hThreads[ index ];
-
-	Printf("task: %s has no thread struct\n", FindTask(NULL) -> tc_Node.ln_Name);
-
-	return NULL;
+	return (struct handle_thread_s *) hThreads[ index ].ptr;
 }
 
-HANDLE new_thread( APTR func, int index)
+struct handle_thread_s *new_thread( APTR func, int index)
 {
+	struct handle_thread_s *thread ;
 	APTR new_task = NULL;
-	BPTR output;
 
 	MutexObtain(amiga_thread_safe_mx);
-	struct handle_thread_s *thread = (struct handle_thread_s *) new_handle( h_thread );
 
-	if (thread)
+	HANDLE h= new_handle( h_thread );
+
+	if (( thread = (struct handle_thread_s *) h.ptr ))
 	{
-		thread -> BaseClass.index = index;
-		thread -> func = func;
+		char buffer[100];
 
-		// must be set up by thread_start_func..
-		thread -> timerPort = NULL;
-		thread -> timerIO = NULL;
+		sprintf(buffer,"con:100/100/400/300/thread %d",index);
+
+		thread -> base.index = index;
+		bzero( &(thread -> t), sizeof(struct thread_s));		// make sure nothing in thread is set.
+
+		thread -> t.func = func;
+		thread -> t.output = Open(buffer,MODE_OLDFILE);
 
 		// so we can find it in thread_start_func...
-		hThreads[ index ] = (HANDLE) thread;
+		hThreads[ index ].ptr = (struct handle_s *) thread;
 
-		output = Open("CON:",MODE_OLDFILE);
-
-		new_task = thread -> BaseClass.object = CreateNewProcTags( 
+		new_task = thread -> base.object = CreateNewProcTags( 
 			NP_Start, thread_start_func, 
-			NP_Child, TRUE, 
-			NP_Output, output,
+			NP_Output, thread -> t.output,
+			NP_Child, FALSE, 
+			NP_CloseOutput, FALSE,
 			NP_UserData, (APTR) index, 
 			NP_FinalCode, thread_final_func,
-			NP_Name, "win32_thread_emu",
+			NP_Name, "socketbase_thread",
 			TAG_END );
 
-		if (!new_task)
+		if ( !new_task )
 		{
-			free( thread);
-			return NULL;
+			if (thread -> t.output)
+				Close(thread -> t.output);
+
+			thread -> t.output = 0;
+
+			free( thread );
+			return thread;
 		}
 	}
 
 	MutexRelease(amiga_thread_safe_mx);
 
-	Printf("%p = new_thread(func: %p,index: %d)\n", thread, func, index);
-
-	return (HANDLE) thread;
+	return thread;
 }
 
-void __thread_start_func__(HANDLE pHandel)
+void __thread_start_func__(struct handle_thread_s *thread)
 {
-	struct handle_thread_s *thread = (struct handle_thread_s *) pHandel;
-
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
-
 	if (thread)
 	{
-		thread -> SocketBase = OpenLibrary("bsdsocket.library", 4);
+		AllocSignal(SIGBREAKB_CTRL_D);
+		thread -> t.SocketBase = OpenLibrary("bsdsocket.library", 4);
 
 		// prepare thread local stuff.
-		if (thread -> SocketBase) thread -> IS = (struct SocketIFace *) GetInterface ( thread -> SocketBase, "main", 1, NULL);
+		if (thread -> t.SocketBase) thread -> t.IS = (struct SocketIFace *) GetInterface ( thread -> t.SocketBase, "main", 1, NULL);
 
-		thread -> timerPort = AllocSysObjectTags(ASOT_PORT,	TAG_END);
-
-		AllocSignal(SIGBREAKF_CTRL_D);
-
-		if (thread -> timerPort)
+		thread -> t.timerPort = AllocSysObjectTags(ASOT_PORT,	TAG_END);
+		if (thread -> t.timerPort)
 		{
-			thread -> timerIO = AllocSysObjectTags(ASOT_IOREQUEST,
-						ASOIOR_ReplyPort, thread -> timerPort,
+			thread -> t.timerIO = AllocSysObjectTags(ASOT_IOREQUEST,
+						ASOIOR_ReplyPort, thread -> t.timerPort,
 						ASOIOR_Size, sizeof(struct TimeRequest),
 						TAG_END);
 
-			if (thread -> timerIO)
+			if (thread -> t.timerIO)
 			{
-				thread -> timer = (OpenDevice("timer.device", UNIT_MICROHZ, (struct IORequest *)thread->timerIO, 0) == 0);
+				thread -> t.timerOpenError = OpenDevice("timer.device", UNIT_MICROHZ, (struct IORequest *) thread->t.timerIO, 0) ;
 			}
 		}
 
 		// Run the function..
-		if ((thread -> IS) && (thread -> timerPort) && (thread -> timerIO))
+		if ((thread -> t.IS) && (thread -> t.timerPort) && (thread -> t.timerIO))
 		{
-			if (thread -> func) thread -> func( thread -> BaseClass.index );
+			if (thread -> t.func) thread -> t.func( thread );
 		}
 		else
 		{
@@ -125,149 +118,137 @@ void __thread_start_func__(HANDLE pHandel)
 
 void thread_start_func()
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
-	HANDLE thread = GetCurrentThread();
+	struct handle_thread_s *thread = GetCurrentThread();
+	printf("thread: %p\n",thread);
+
 	__thread_start_func__(thread);
 }
 
 void thread_final_func()
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
-
-	Delay(20);
-
 	// makse sure hThreads[] only has valid pointers.
 
-	struct Task *task = FindTask(NULL);
-	struct handle_thread_s *thread = (struct handle_thread_s *) GetCurrentThread();
-
-//	MutexObtain(amiga_thread_safe_mx);
-	
-	if (thread)
-	{
-		FreeSignal(SIGBREAKF_CTRL_D);
-
-		if (thread->timerIO)
-		{
-			if (thread -> timer)
-			{
-	    			if (!CheckIO((struct IORequest *)thread->timerIO))
-   	 			{
-				        AbortIO((struct IORequest *)thread->timerIO);
-				        WaitIO((struct IORequest *)thread->timerIO);
-	   	 		}
-
-  	  			CloseDevice((struct IORequest *)thread->timerIO);
-				thread -> timer = 0;
-			}
-
-			FreeSysObject(ASOT_IOREQUEST,thread->timerIO);
-   	 		thread->timerIO = NULL;
-		}
-
-		if (thread->timerPort)
-		{
-			FreeSysObject(ASOT_PORT,thread->timerPort);
-			thread->timerPort = NULL;
-		}
-
-		if (thread-> IS)
-		{
-			DropInterface((struct Interface *) thread->IS );
-			thread->IS = NULL;
-		}
-
-		if (thread -> SocketBase)
-		{
-			CloseLibrary( thread -> SocketBase );
-			thread -> SocketBase = NULL;
-		}
-
-		thread->BaseClass.object = NULL;	// unassign task..
-
-		hThreads[((uint32) task -> tc_UserData)] = NULL;	 // unhook the thread struct.
-		free(thread); 	// free the thread struct..
-	}
-
-	// Send a death signal...
-	trigger_thread_event( (uint32) task -> tc_UserData );
-
-//	MutexRelease(amiga_thread_safe_mx);
-}
-
-
-void SetThreadPriority(HANDLE thread, int pri)
-{
-	 SetTaskPri(thread -> object, pri);
-}
-
-int GetHThread( struct Task *task )
-{
-	struct handle_thread_s *thread = NULL;
-
-	int i;
-
-	Printf("task: %p\n",task);
-	Printf("amiga_thread_safe_mx: %p\n", amiga_thread_safe_mx);
+	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	MutexObtain(amiga_thread_safe_mx);
 
-	for (i = 0; i<MAX_SELECT_THREADS;i++)
+	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+
+	struct Task *task = FindTask(NULL);
+	uint32 index = (uint32) task -> tc_UserData;
+
+	Printf("Closing task: %p\n", task);
+
+	struct handle_thread_s *thread = (struct handle_thread_s *) GetCurrentThread();
+
+
+
+	Printf("%s:%ld -- index: %ld\n",__FUNCTION__,__LINE__,index);
+
+	if (thread)
 	{
-		if (hThreads[i] == NULL)
+
+	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+
+		// lets unhook it early... maybe it helps..
+		hThreads[index].ptr = NULL;	 // unhook the thread struct.
+
+	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+
+		FreeSignal((BYTE) SIGBREAKB_CTRL_D);
+
+	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+
+		if (thread->t.timerIO)
 		{
-			Printf("found a empty index %d\n",i);
-
-			thread = (struct handle_thread_s *) new_handle( h_thread );
-
-			if (thread)
+			if (thread -> t.timerOpenError == 0 )
 			{
-				thread -> BaseClass.object = task;
-				thread -> func = NULL;
+				// I have noticed timer can crash if it was never used.
 
-				task -> tc_UserData = (void *) i;
-				hThreads[i] = (HANDLE) thread;
-				MutexRelease(amiga_thread_safe_mx);
+				if (thread->t.timer_used)
+				{
+	    				if (!CheckIO((struct IORequest *)thread->t.timerIO))
+   	 				{
+					        AbortIO((struct IORequest *)thread->t.timerIO);
+					        WaitIO((struct IORequest *)thread->t.timerIO);
+	   		 		}
+				}
 
-				Printf("run __thread_start_func__(hThreads[i])\n");
-
-				__thread_start_func__(hThreads[i]);
-				return i;
+  	  			CloseDevice((struct IORequest *)thread->t.timerIO);
 			}
-			else
-			{
-				Printf("DANGER: failed to allocated thread space\n");
-			}
+
+			FreeSysObject(ASOT_IOREQUEST,thread->t.timerIO);
 		}
+
+	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+
+		if (thread->t.timerPort)
+			FreeSysObject(ASOT_PORT,thread->t.timerPort);
+
+		if (thread->t.ProxyPort)
+			FreeSysObject(ASOT_PORT,thread->t.ProxyPort);
+
+		if (thread-> t.IS)
+			DropInterface((struct Interface *) thread->t.IS );
+
+		if (thread -> t.SocketBase)
+			CloseLibrary( thread -> t.SocketBase );
+
+	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+
+		if (thread -> t.output) 
+		{
+			Close( thread -> t.output );
+			thread -> t.output = NULL;
+		}
+
+		// clear memory, in one operation, faster.. maybe a bit more unsafe..
+		bzero( &(thread->t), sizeof(struct thread_s) );
+
+		FreeVec(thread); 	// free the thread struct..
 	}
 
 	MutexRelease(amiga_thread_safe_mx);
-
-	return -1;
+	hThreads[index].lock = 0;
 }
+
 
 BOOL is_in_hThreads( struct Task *task )
 {
-	HANDLE h;
+	struct handle_thread_s *t;
 	uint32 i;
 
+	MutexObtain(amiga_thread_safe_mx);
 	for (i = 0; i<MAX_SELECT_THREADS;i++)
 	{
-		if ((h = hThreads[i]))
-		{
-			Printf("index %ld has a thread\n", i);
+		t = (struct handle_thread_s *) hThreads[i].ptr;
 
-			if (h -> object == task) return TRUE;
-		}
+		if (t)	if (t -> base.object == task) 
+
+		MutexRelease(amiga_thread_safe_mx);
+		return TRUE;
 	}
+
+	MutexRelease(amiga_thread_safe_mx);
 	return FALSE;
 }
 
-void trigger_thread_event( uint32 bit )
+int find_new_thread_id()
 {
-Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	uint32 i,r=-1;
 
-	thread_signal_mask |= 1L << bit;	
-	Signal( main_task, 1L << socket_thread_triggered_sigbit  );
+	MutexObtain(amiga_thread_safe_mx);
+	for (i = 0; i<MAX_SELECT_THREADS;i++)
+	{
+		if ( (hThreads[i].ptr == NULL) && (hThreads[i].lock == 0) )
+		{
+			hThreads[i].lock = 1;
+			r = i;
+			break;
+		}
+	}
+	MutexRelease(amiga_thread_safe_mx);
+
+	return r;
 }
 

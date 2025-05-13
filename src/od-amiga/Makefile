@@ -116,7 +116,8 @@ am__v_AR_1 =
 libosdep_a_AR = $(AR) $(ARFLAGS)
 libosdep_a_LIBADD =
 am_libosdep_a_OBJECTS = main.$(OBJEXT) memory.$(OBJEXT) \
-	support.$(OBJEXT) ami-disk.$(OBJEXT) blkdev-amiga.$(OBJEXT)
+	support.$(OBJEXT) ami-disk.$(OBJEXT) blkdev-amiga.$(OBJEXT) \
+	win32_handle_emu.$(OBJEXT) win32_thread_emu.$(OBJEXT) bsdsock.$(OBJEXT)
 libosdep_a_OBJECTS = $(am_libosdep_a_OBJECTS)
 SCRIPTS = $(dist_noinst_SCRIPTS)
 AM_V_P = $(am__v_P_$(V))
@@ -196,9 +197,13 @@ CCASDEPMODE = depmode=gcc3
 CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CDOBJS = 
-CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=    
+CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W  -Wstrict-prototypes -DREGPARAM=    
+CFLAGS += -DBSDSOCKET -DPICASSO96_SUPPORTED
+
 CPP = gcc -E
 CPPFLAGS =     -DCPUEMU_0 -DCPUEMU_5 -DCPUEMU_6 -DFPUEMU -D__USE_INLINE__ -DJIT -DDRIVESOUND -DAGA -DAUTOCONFIG -DFILESYS -DSUPPORT_THREADS -DFDI2RAW -DDEBUGGER -DSAVESTATE -DENFORCER -DACTION_REPLAY -DXARCADE 
+CPPFLAGS += -DBSDSOCKET -DPICASSO96_SUPPORTED
+
 CPUOBJS = cpuemu_0.$(OBJEXT) cpuemu_5.$(OBJEXT) cpuemu_6.$(OBJEXT) fpp.$(OBJEXT)
 CXX = g++
 CXXDEPMODE = depmode=gcc3
@@ -270,7 +275,7 @@ SND_DEP = sd-amigaos
 STRIP = 
 TARGET = amiga
 THREADDEP = td-amigaos
-UAE_CFLAGS = -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=
+UAE_CFLAGS = -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W  -Wstrict-prototypes -DREGPARAM=
 UAE_CPPFLAGS = 
 UAE_CXXFLAGS =  -fomit-frame-pointer  
 UAE_LIBS = -lz 
@@ -343,7 +348,7 @@ top_builddir = ../..
 top_srcdir = ../..
 AM_CPPFLAGS =  -I$(top_srcdir)/src/include \
 	-I$(top_builddir)/src -I$(top_srcdir)/src
-AM_CFLAGS = -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=
+AM_CFLAGS = -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W  -Wstrict-prototypes -DREGPARAM=
 noinst_LIBRARIES = libosdep.a
 libosdep_a_SOURCES = main.c memory.c support.c ami-disk.c blkdev-amiga.c
 noinst_HEADERS = amiga-kludges.h memory.h hrtimer.h

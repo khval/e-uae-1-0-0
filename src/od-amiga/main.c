@@ -16,11 +16,21 @@
 
 #include "signal.h"
 #include "version.h"
-#include "win32_handle_emu.h"
-#include "win32_thread_emu.h"
+
+#include <stdbool.h>
 
 #define  __USE_BASETYPE__
 #include <proto/exec.h>
+#include <proto/dos.h>
+
+#include "custom.h"
+#include "newcpu.h"
+#include "autoconf.h"
+#include "traps.h"
+
+#include "win32_handle_emu.h"
+#include "win32_thread_emu.h"
+
 #undef   __USE_BASETYPE__
 #include <exec/execbase.h>
 
@@ -29,6 +39,8 @@
 #endif
 
 struct handle_thread_s main_thread;
+
+#define have_gfxconvert 0
 
 /* Get compiler/libc to enlarge stack to this size - if possible */
 #if defined __PPC__ || defined __ppc__ || defined POWERPC || defined __POWERPC__
@@ -56,9 +68,11 @@ char* AMIGAOS_VERSION_TAG = "$VER: " UAE_VERSION_STRING " (" __DATE__ ")";
 
 #ifdef __amigaos4__
 
-
 #include <intuition/imageclass.h>
+
+#if have_gfxconvert
 #include <proto/gfxconvert.h>
+#endif
 
 #include <proto/bsdsocket.h>
 
@@ -75,7 +89,11 @@ struct Library          *AslBase = NULL;
 struct Library          *CyberGfxBase = NULL;
 struct Library          *IconBase = NULL;
 struct Library          *WorkbenchBase = NULL;
+
+#if have_gfxconvert
 struct Library          *gfxconvertBase = NULL;
+struct gfxconvertIFace *Igfxconvert = NULL;
+#endif
 
 struct Library          *SocketBase = NULL;
 
@@ -86,16 +104,17 @@ struct IntuitionIFace *IIntuition = NULL;
 struct CyberGfxIFace *ICyberGfx = NULL;
 struct IconIFace *IIcon = NULL;
 struct WorkbenchIFace *IWorkbench = NULL;
-struct gfxconvertIFace *Igfxconvert = NULL;
-
 struct SocketIFace *ISocket = NULL;
 
 #include "../gfx-amigaos/window_icons.h"
 
 APTR amiga_thread_safe_mx = NULL;
-int thread_triggered_sigbit = 0;
+APTR sigqueue_mx = NULL;
 
-static init_remap_keyboard();
+//int thread_triggered_sigbit = 0;
+
+bool remap_initiated = FALSE;
+void init_remap_keyboard( void );
 
 struct kIcon iconifyIcon = { NULL, NULL };
 struct kIcon zoomIcon = { NULL, NULL };
@@ -139,6 +158,13 @@ static void free_libs (void)
 		amiga_thread_safe_mx = NULL;
 	}
 
+	if (sigqueue_mx)
+	{
+		FreeSysObject( ASOT_MUTEX, sigqueue_mx);
+		sigqueue_mx = NULL;
+	}
+
+
 #ifdef __amigaos4__
 	if (ITimer) DropInterface ((struct Interface *)ITimer);
 
@@ -158,7 +184,10 @@ static void free_libs (void)
 	libClose(CyberGfx);
 	libClose(Workbench);
 	libClose(Icon);
+
+#if have_gfxconvert
 	libClose(gfxconvert);
+#endif
 }
 
 static BOOL init_libs (void)
@@ -208,7 +237,6 @@ static BOOL init_libs (void)
 	if (SocketBase) ISocket = (struct SocketIFace *) GetInterface (SocketBase, "main", 1, NULL);
 	if (!ISocket)  return FALSE;
 
-
 	AslBase = OpenLibrary ("asl.library", 53);
 	if (AslBase) IAsl = (struct AslIFace *) GetInterface (AslBase, "main", 1, NULL);
 	if (!IAsl)  return FALSE;
@@ -217,8 +245,10 @@ static BOOL init_libs (void)
 	if (WorkbenchBase) IWorkbench = (struct WorkbenchIFace *) GetInterface (WorkbenchBase, "main", 1, NULL);
 	if (!IWorkbench)  return FALSE;
 
+#if have_gfxconvert
 	libOpen(gfxconvert,1);
 	if (!Igfxconvert)  return FALSE;
+#endif
 
 	IconBase = OpenLibrary ("icon.library", 53);
 	if (IconBase) IIcon = (struct IconIFace *) GetInterface (IconBase, "main", 1, NULL);
@@ -230,40 +260,31 @@ static BOOL init_libs (void)
 
 #endif
 
-	printf("all libs are loaded\n");
-
-	thread_triggered_sigbit = AllocSignal( -1 );
-	if ( !thread_triggered_sigbit ) return FALSE;
-
 	amiga_thread_safe_mx = AllocSysObjectTags( ASOT_MUTEX, TAG_END );
 	if ( ! amiga_thread_safe_mx ) return FALSE;
 
-	main_task = FindTask(NULL);
+	sigqueue_mx = AllocSysObjectTags( ASOT_MUTEX, TAG_END );
+	if ( ! sigqueue_mx ) return FALSE;
 
-	if (main_task)
-	{
-		main_thread.BaseClass.type = h_thread;
-		main_thread.BaseClass.index = MAIN_THREAD_INDEX;
-		main_thread.BaseClass.object = main_task;
-		main_thread.SocketBase = SocketBase;
-		main_thread.IS = ISocket;
-		main_task -> tc_UserData = (void *) MAIN_THREAD_INDEX;
-		hThreads[MAIN_THREAD_INDEX] = &main_thread;
-	}
+	main_task = FindTask(NULL);
 
 	return TRUE;
 }
 
 char remap_scancode[256];
 
-static init_remap_keyboard()
+void init_remap_keyboard( void )
 {
 	int sc;
 
-	for (sc=0;sc<256;sc++)
+	for (sc=0;sc<128;sc++)
+	{
 		remap_scancode[sc] = sc;
+	}
 	
-	remap_scancode[107]=11; // dead to MENU key
+	remap_scancode[58]=11; //  _- key
+	remap_scancode[107]=58; // dead to MENU key
+
 	remap_scancode[11]=12;
 	remap_scancode[12]=13;
 
@@ -280,6 +301,15 @@ static init_remap_keyboard()
 
 	remap_scancode[101]=0x67;	// Right AltGr to Right Amiga
 	remap_scancode[103]=0x64;	// Right Window to Right Alt.
+
+	// high bit is used for state...
+
+	for (sc=0;sc<128;sc++)
+	{
+		remap_scancode[128+sc] = remap_scancode[sc];
+	}
+
+	remap_initiated = TRUE;
 }
 
 static int fromWB;

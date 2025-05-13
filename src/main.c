@@ -646,7 +646,7 @@ static int do_init_machine (void)
 
 //	dogshit_install();
 
-	bsdsocket_os41_install();
+	bsdlib_install();
 
     if (custom_init ()) { /* Must come after memory_init */
 #ifdef SERIAL_PORT

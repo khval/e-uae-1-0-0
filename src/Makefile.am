@@ -1,4 +1,4 @@
-AM_CFLAGS    = @UAE_CFLAGS@
+AM_CFLAGS    = @UAE_CFLAGS@ -DPICASSO96_SUPPORTED 
 AM_CPPFLAGS  = @UAE_CPPFLAGS@
 AM_CPPFLAGS += -I$(top_srcdir)/src/include -I$(top_builddir)/src -I$(top_srcdir)/src -I$(top_srcdir)
 

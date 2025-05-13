@@ -19,7 +19,7 @@
 # define sync()
 #endif
 
-extern frame_time_t timebase;
+frame_time_t timebase;
 
 /*
  * Get PPC timebase frequency from OF device tree on Linux
