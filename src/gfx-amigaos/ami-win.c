@@ -440,36 +440,41 @@ static void dummy_flush_screen (struct vidbuf_description *gfxinfo, int first_li
  */
 STATIC_INLINE void flush_line_planar_nodither (struct vidbuf_description *gfxinfo, int line_no)
 {
-    int     xs      = 0;
-    int     len     = gfxinfo->width;
-    int     yoffset = line_no * gfxinfo->rowbytes;
-    uae_u8 *src;
-    uae_u8 *dst;
-    uae_u8 *newp = gfxinfo->bufmem + yoffset;
-    uae_u8 *oldp = oldpixbuf + yoffset;
+	int     xs      = 0;
+	int     len     = gfxinfo->width;
+	int     yoffset = line_no * gfxinfo->rowbytes;
 
-    /* Find first pixel changed on this line */
-    while (*newp++ == *oldp++) {
-	if (!--len)
-		return; /* line not changed - so don't draw it */
-    }
-    src   = --newp;
-    dst   = --oldp;
-    newp += len;
-    oldp += len;
+	uae_u8 *src;
+	uae_u8 *dst;
 
-    /* Find last pixel changed on this line */
-    while (*--newp == *--oldp)
-	;
+	uae_u32 *newp = (uae_u32 *) (gfxinfo->bufmem + yoffset);
+	uae_u32 *oldp = (uae_u32 *) oldpixbuf + yoffset;
 
-    len = 1 + (oldp - dst);
-    xs  = src - (uae_u8 *)(gfxinfo->bufmem + yoffset);
+	uae_u8 *src_end = newp + len;
+	uae_u8 *old_end = oldp + len;
 
-    /* Copy changed pixels to delta buffer */
-    CopyMem (src, dst, len);
+	/* Find first pixel changed on this line */
+	while ((*newp++ == *oldp++)&&(len)) len-=4;
 
-    /* Blit changed pixels to the display */
-    WritePixelLine8 (draw_aga_RP, xs + XOffset, line_no + YOffset, len, dst, TempRPort);
+	src   = (uae_u8 *) (--newp);
+	dst   = (uae_u8 *) (--oldp);
+
+	newp = src_end;
+	oldp = old_end;
+
+	/* Find last pixel changed on this line */
+
+	while ((*--newp == *--oldp)&&(len)) len -=4;
+
+	len = 4 + ( (uae_u8 *) oldp - dst) ;
+
+	xs  = src - (uae_u8 *)(gfxinfo->bufmem + yoffset);	//  start address - first address on the line.
+
+	/* Copy changed pixels to delta buffer */
+	CopyMem (src, dst, len);
+
+	/* Blit changed pixels to the display */
+	WritePixelLine8 (draw_aga_RP, xs + XOffset, line_no + YOffset, len, dst, TempRPort);
 }
 
 static void flush_block_planar_nodither (struct vidbuf_description *gfxinfo, int first_line, int last_line)
