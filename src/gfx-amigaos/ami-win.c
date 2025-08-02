@@ -1976,7 +1976,15 @@ static APTR setup_classic_buffer (struct vidbuf_description *gfxinfo, const stru
 {
 	APTR buffer;
 
-	gfxinfo->pixbytes= 4;
+	if ( (rp) && (rp -> BitMap) )
+	{
+		gfxinfo->pixbytes= GetBitMapAttr( rp -> BitMap, BMA_BYTESPERPIXEL);
+	}
+	else
+	{
+		printf("WTF!!! --- no rastport or bitmap, at %s:%d\n",__FUNCTION__,__LINE__);
+		gfxinfo->pixbytes= 4;
+	}
 
 	int bytes_per_row = gfxinfo->width * gfxinfo->pixbytes;
 
