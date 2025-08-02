@@ -137,6 +137,7 @@ uae_SOURCES = \
 	missing.c readcpu.c
 
 EXTRA_uae_SOURCES = \
+	uaeaccelerator.c \
 	bsdsocket.c bsdsocket-posix-new.c build68k.c catweasel.c cdrom.c \
 	fpp.c compemu_support.c compemu_macroblocks_ppc.c compemu_compiler_ppc.c \
 	debug.c identify.c filesys.c filesys_bootrom.c fsdb.c fsdb_unix.c fsusage.c genblitter.c \

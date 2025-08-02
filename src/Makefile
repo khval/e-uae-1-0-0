@@ -554,6 +554,7 @@ uae_SOURCES = \
 	missing.c readcpu.c
 
 EXTRA_uae_SOURCES = \
+	uaeaccelerator.c \
 	bsdsocket.c bsdsocket-posix-new.c build68k.c catweasel.c cdrom.c \
 	fpp.c compemu_support.c compemu_macroblocks_ppc.c compemu_compiler_ppc.c \
 	debug.c identify.c filesys.c filesys_bootrom.c fsdb.c fsdb_unix.c fsusage.c genblitter.c \
@@ -578,6 +579,7 @@ uae_DEPENDENCIES = \
 	libcpuemu.a			\
 	writelog.$(OBJEXT)			\
 	filesys.$(OBJEXT) fsdb.$(OBJEXT) fsusage.$(OBJEXT) hardfile.$(OBJEXT) filesys_unix.$(OBJEXT) fsdb_unix.$(OBJEXT) hardfile_unix.$(OBJEXT) 			\
+	uaeaccelerator.$(OBJEXT)			\
 	bsdsocket.$(OBJEXT)			\
 	scsi-none.$(OBJEXT)			\
 				\
@@ -590,7 +592,7 @@ uae_LDADD = md-ppc-gcc/libmachdep.a jd-amigainput/libjoydep.a \
 	sd-amigaos/libsnddep.a gfx-amigaos/libgfxdep.a \
 	gui-muirexx/libguidep.a keymap/libkeymap.a dms/libdms.a \
 	caps/libcaps.a blitfunc.o blittable.o cpustbl.o cpudefs.o \
-	libcpuemu.a writelog.$(OBJEXT) filesys.$(OBJEXT) fsdb.$(OBJEXT) fsusage.$(OBJEXT) hardfile.$(OBJEXT) filesys_unix.$(OBJEXT) fsdb_unix.$(OBJEXT) hardfile_unix.$(OBJEXT) bsdsocket.$(OBJEXT) scsi-none.$(OBJEXT) \
+	libcpuemu.a writelog.$(OBJEXT) filesys.$(OBJEXT) fsdb.$(OBJEXT) fsusage.$(OBJEXT) hardfile.$(OBJEXT) filesys_unix.$(OBJEXT) fsdb_unix.$(OBJEXT) hardfile_unix.$(OBJEXT) uaeaccelerator.$(OBJEXT) bsdsocket.$(OBJEXT) scsi-none.$(OBJEXT) \
 	 debug.$(OBJEXT) ppc_disasm.$(OBJEXT) identify.$(OBJEXT)  td-amigaos/libthreaddep.a \
 	od-amiga/libosdep.a -lz  -lm
 readdisk_SOURCES = \
@@ -726,6 +728,7 @@ include ./$(DEPDIR)/blkdev-libscg.Po # am--include-marker
 include ./$(DEPDIR)/blkdev.Po # am--include-marker
 include ./$(DEPDIR)/bsdsocket-posix-new.Po # am--include-marker
 include ./$(DEPDIR)/bsdsocket.Po # am--include-marker
+include ./$(DEPDIR)/uaeaccelerator.Po # am--include-marker
 include ./$(DEPDIR)/build68k.Po # am--include-marker
 include ./$(DEPDIR)/catweasel.Po # am--include-marker
 include ./$(DEPDIR)/cdrom.Po # am--include-marker
@@ -1025,8 +1028,10 @@ distclean: distclean-recursive
 	-rm -f ./$(DEPDIR)/blitter.Po
 	-rm -f ./$(DEPDIR)/blkdev-libscg.Po
 	-rm -f ./$(DEPDIR)/blkdev.Po
+	-rm -f ./$(DEPDIR)uaeaccelerator.Po
 	-rm -f ./$(DEPDIR)/bsdsocket-posix-new.Po
 	-rm -f ./$(DEPDIR)/bsdsocket.Po
+	-rm -f ./$(DEPDIR)/uaeaccelerator.Po
 	-rm -f ./$(DEPDIR)/build68k.Po
 	-rm -f ./$(DEPDIR)/catweasel.Po
 	-rm -f ./$(DEPDIR)/cdrom.Po
@@ -1142,6 +1147,7 @@ maintainer-clean: maintainer-clean-recursive
 	-rm -f ./$(DEPDIR)/blitter.Po
 	-rm -f ./$(DEPDIR)/blkdev-libscg.Po
 	-rm -f ./$(DEPDIR)/blkdev.Po
+	-rm -f ./$(DEPDIR)/uaeaccelerator.Po
 	-rm -f ./$(DEPDIR)/bsdsocket-posix-new.Po
 	-rm -f ./$(DEPDIR)/bsdsocket.Po
 	-rm -f ./$(DEPDIR)/build68k.Po

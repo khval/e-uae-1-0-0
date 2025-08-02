@@ -17,7 +17,6 @@
 
 
 
-
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -555,6 +554,7 @@ uae_SOURCES = \
 	missing.c readcpu.c
 
 EXTRA_uae_SOURCES = \
+	uaeaccelerator.c \
 	bsdsocket.c bsdsocket-posix-new.c build68k.c catweasel.c cdrom.c \
 	fpp.c compemu_support.c compemu_macroblocks_ppc.c compemu_compiler_ppc.c \
 	debug.c identify.c filesys.c filesys_bootrom.c fsdb.c fsdb_unix.c fsusage.c genblitter.c \
@@ -727,6 +727,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/blkdev.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bsdsocket-posix-new.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bsdsocket.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uaeaccelerator.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/build68k.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/catweasel.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cdrom.Po@am__quote@ # am--include-marker
@@ -1028,6 +1029,7 @@ distclean: distclean-recursive
 	-rm -f ./$(DEPDIR)/blkdev.Po
 	-rm -f ./$(DEPDIR)/bsdsocket-posix-new.Po
 	-rm -f ./$(DEPDIR)/bsdsocket.Po
+	-rm -f ./$(DEPDIR)/uaeaccelerator.Po
 	-rm -f ./$(DEPDIR)/build68k.Po
 	-rm -f ./$(DEPDIR)/catweasel.Po
 	-rm -f ./$(DEPDIR)/cdrom.Po
@@ -1143,6 +1145,7 @@ maintainer-clean: maintainer-clean-recursive
 	-rm -f ./$(DEPDIR)/blitter.Po
 	-rm -f ./$(DEPDIR)/blkdev-libscg.Po
 	-rm -f ./$(DEPDIR)/blkdev.Po
+	-rm -f ./$(DEPDIR)/uaeaccelerator.Po
 	-rm -f ./$(DEPDIR)/bsdsocket-posix-new.Po
 	-rm -f ./$(DEPDIR)/bsdsocket.Po
 	-rm -f ./$(DEPDIR)/build68k.Po

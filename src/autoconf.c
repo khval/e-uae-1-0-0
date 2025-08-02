@@ -131,6 +131,11 @@ void dl (uae_u32 data)
     rtarea[rt_addr++] = data;
 }
 
+void rt_add_struct (uae_u32 size)
+{
+	rt_addr+= size;
+ }
+
 /* store strings starting at the end of the rt area and working
  * backward.  store pointer at current address
  */

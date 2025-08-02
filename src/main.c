@@ -73,6 +73,9 @@ struct gui_info gui_data;
 
 extern void bsdsocket_os41_install(void);
 extern void bsdsocket_os41_reset (void);
+extern void accelerator_install (void);
+
+extern void accelerator_reset (void);
 
 
 /*
@@ -638,15 +641,12 @@ static int do_init_machine (void)
 #endif
 
 #ifdef AUTOCONFIG
-    bsdlib_install ();
-    emulib_install ();
-    uaeexe_install ();
-    native2amiga_install ();
+	bsdlib_install ();
+	emulib_install ();
+	uaeexe_install ();
+	native2amiga_install ();
+	accelerator_install();
 #endif
-
-//	dogshit_install();
-
-	bsdlib_install();
 
     if (custom_init ()) { /* Must come after memory_init */
 #ifdef SERIAL_PORT
@@ -693,14 +693,13 @@ static void reset_all_systems (void)
 
     memory_reset ();
 
-
 #ifdef BSDSOCKET
     bsdlib_reset ();
 #endif
 
-//	dogshit_reset();
-
-	bsdsocket_os41_reset();
+#ifdef __amigaos4__
+	accelerator_reset();
+#endif
 
 #ifdef FILESYS
     filesys_reset ();
