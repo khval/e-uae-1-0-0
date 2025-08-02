@@ -1287,40 +1287,18 @@ static void open_window_as_last(void)
 	 	open_icon( W, ICONIFYIMAGE, GID_ICONIFY, &iconifyIcon );
 	 	open_icon( W, POPUPIMAGE, GID_FULLSCREEN, &fullscreenicon );
 	 	open_icon( W, PADLOCKIMAGE, GID_PADLOCK, &padlockicon );
-	}
-}
 
+		if (save_window.bw == 0)
+		{
+			save_window.bw = W -> BorderLeft + W -> BorderRight;
+			save_window.bh = W -> BorderTop + W -> BorderBottom;
 
-static void open_window(void)
-{
-	W = OpenWindowTags (NULL,
-			WA_Title,        (ULONG)PACKAGE_NAME,
-			WA_AutoAdjust,   TRUE,
-			WA_InnerWidth,   gfxvidinfo.width,
-			WA_InnerHeight,  gfxvidinfo.height,
-			WA_PubScreen,    (ULONG)S,
+			save_window.w += save_window.bw;
+			save_window.h += save_window.bh;
 
-			WA_IDCMP,        IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY
-					| IDCMP_ACTIVEWINDOW | IDCMP_INACTIVEWINDOW
-					| IDCMP_MOUSEMOVE    | IDCMP_DELTAMOVE
-					| IDCMP_CLOSEWINDOW  | IDCMP_REFRESHWINDOW
-					| IDCMP_NEWSIZE | IDCMP_INTUITICKS | IDCMP_GADGETUP,
-
-			WA_Flags,	 WFLG_DRAGBAR     | WFLG_DEPTHGADGET
-					| WFLG_REPORTMOUSE | WFLG_RMBTRAP
-					| WFLG_ACTIVATE    | WFLG_CLOSEGADGET
-					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
-					| WFLG_SMART_REFRESH,
-
-			WA_MaxWidth, ~0,
-			WA_MaxHeight, ~0,
-			TAG_DONE);
-
-	if (W)
-	{
-	 	open_icon( W, ICONIFYIMAGE, GID_ICONIFY, &iconifyIcon );
-	 	open_icon( W, POPUPIMAGE, GID_FULLSCREEN, &fullscreenicon );
-	 	open_icon( W, PADLOCKIMAGE, GID_PADLOCK, &padlockicon );
+			Result = SetWindowAttr( W, WA_MinWidth, save_window.w, sizeof(LONG) );
+			Result = SetWindowAttr( W, WA_MinHeight, save_window.h , sizeof(LONG) );
+		}
 	}
 }
 
@@ -1757,14 +1735,7 @@ static int setup_publicscreen(void)
 		}
 	}
 
-	if (save_window.w)
-	{
-		open_window_as_last();
-	}
-	else
-	{
-		open_window();
-	}
+	open_window_as_last();
 
 	UnlockPubScreen (NULL, S);
 
@@ -2537,14 +2508,7 @@ void handle_events(void)
 	{
 		if (is_uniconifyed())
 		{
-			if (save_window.w)
-			{
-				open_window_as_last();
-			}
-			else
-			{
-				open_window();
-			}
+			open_window_as_last();
 			dispose_Iconify();
 		}
 
