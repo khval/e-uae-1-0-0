@@ -1275,8 +1275,8 @@ static void open_window_as_last(void)
 					| WFLG_SIZEGADGET | WFLG_SIZEBBOTTOM
 					| WFLG_SMART_REFRESH,
 
-			WA_MinWidth, gfxvidinfo.width + save_window.bw,
-			WA_MinHeight, gfxvidinfo.height + save_window.bh,
+			WA_MinWidth, save_window.w,
+			WA_MinHeight, save_window.h,
 
 			WA_MaxWidth, ~0,
 			WA_MaxHeight, ~0,
@@ -1284,6 +1284,8 @@ static void open_window_as_last(void)
 
 	if (W)
 	{
+		ULONG Result;
+
 	 	open_icon( W, ICONIFYIMAGE, GID_ICONIFY, &iconifyIcon );
 	 	open_icon( W, POPUPIMAGE, GID_FULLSCREEN, &fullscreenicon );
 	 	open_icon( W, PADLOCKIMAGE, GID_PADLOCK, &padlockicon );
@@ -2194,14 +2196,23 @@ static int graphics_subinit (void)
 
 void initialize_gfxvidinfo_width_height()
 {
-	gfxvidinfo.width  = currprefs.gfx_width_win;
-	gfxvidinfo.height = currprefs.gfx_height_win;
+	// 80 pixel overscan width, 40 pixel over scan height
+
+	gfxvidinfo.width  = (currprefs.gfx_width) ? currprefs.gfx_width : 640+80;
+	gfxvidinfo.height = (currprefs.gfx_height) ? currprefs.gfx_height : 512+40;
 
 	if (gfxvidinfo.width < 320) gfxvidinfo.width = 320;
+	if (gfxvidinfo.height < 200) gfxvidinfo.height = 200;
+
 	if (!currprefs.gfx_correct_aspect && (gfxvidinfo.width < 64)) gfxvidinfo.width = 200;
 
 	gfxvidinfo.width += 7;
 	gfxvidinfo.width &= ~7;
+
+	save_window.w = (currprefs.gfx_width_win) ? currprefs.gfx_width_win : gfxvidinfo.width;
+	save_window.h = (currprefs.gfx_height_win) ? currprefs.gfx_height_win : gfxvidinfo.height;
+	save_window.bh = 0;
+	save_window.bw = 0;
 }
 
 static int graphics_init_first_time = 1;
@@ -2281,8 +2292,8 @@ void close_window()
 		{
 			save_window.x = W -> LeftEdge;
 			save_window.y = W -> TopEdge;
-			save_window.bw = W -> BorderLeft - W -> BorderRight;
-			save_window.bh = W -> BorderTop - W -> BorderBottom;
+			save_window.bw = W -> BorderLeft + W -> BorderRight;
+			save_window.bh = W -> BorderTop + W -> BorderBottom;
 			save_window.w = W -> Width  ;
 			save_window.h = W -> Height  ;
 		}
