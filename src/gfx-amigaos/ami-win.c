@@ -769,7 +769,7 @@ static int init_true_colors_output (const struct RastPort *rp)
 			byte_swap_16bit = TRUE;
 		case PIXF_R5G5B5PC:
 			redbits  = 5;  greenbits  = 5;  bluebits  = 5;
-			redshift = 10; greenshift = 0;  blueshift = 0;
+			redshift = 10; greenshift = 5;  blueshift = 0;
 			break;
 		case PIXF_R5G6B5:
 			byte_swap_16bit = TRUE;
