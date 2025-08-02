@@ -18,7 +18,6 @@
 
 
 
-
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
     false; \
@@ -134,13 +133,6 @@ am_uae_OBJECTS = main.$(OBJEXT) newcpu.$(OBJEXT) memory.$(OBJEXT) \
 	traps.$(OBJEXT) ersatz.$(OBJEXT) keybuf.$(OBJEXT) \
 	expansion.$(OBJEXT) zfile.$(OBJEXT) cfgfile.$(OBJEXT) \
 	picasso96.$(OBJEXT) inputdevice.$(OBJEXT) gfxutil.$(OBJEXT) \
-	dogshit.$(OBJEXT) \
-	bsdsocket-amigaos.$(OBJEXT) \
-	od-amiga/win32_thread_emu.$(OBJEXT) \
-	od-amiga/win32_socket_emu.$(OBJEXT) \
-	od-amiga/win32_handle_emu.$(OBJEXT) \
-	od-amiga/win32_event_emu.$(OBJEXT) \
-	od-amiga/bsdsock.$(OBJEXT) \
 	audio.$(OBJEXT) sinctable.$(OBJEXT) drawing.$(OBJEXT) \
 	native2amiga.$(OBJEXT) disk.$(OBJEXT) crc32.$(OBJEXT) \
 	savestate.$(OBJEXT) unzip.$(OBJEXT) uaeexe.$(OBJEXT) \
@@ -304,13 +296,9 @@ CCASDEPMODE = depmode=gcc3
 CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CDOBJS = 
-
-#-Wfatal-errors
-
-CFLAGS = -g -O2 -Wfatal-errors  -Wno-empty-body -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=    
+CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=    
 CPP = gcc -E
 CPPFLAGS =     -DCPUEMU_0 -DCPUEMU_5 -DCPUEMU_6 -DFPUEMU -D__USE_INLINE__ -DJIT -DDRIVESOUND -DAGA -DAUTOCONFIG -DFILESYS -DSUPPORT_THREADS -DFDI2RAW -DDEBUGGER -DSAVESTATE -DENFORCER -DACTION_REPLAY -DXARCADE 
-CPPFLAGS += -DPICASSO96_SUPPORTED 
 CPUOBJS = cpuemu_0.$(OBJEXT) cpuemu_5.$(OBJEXT) cpuemu_6.$(OBJEXT) fpp.$(OBJEXT)
 CXX = g++
 CXXDEPMODE = depmode=gcc3
@@ -343,7 +331,7 @@ JITOBJS = compstbl.$(OBJEXT) compemu_macroblocks_ppc.$(OBJEXT) compemu_compiler_
 JOY_DEP = jd-amigainput
 LDFLAGS = 
 LIBOBJS =  ${LIBOBJDIR}fsusage$U.o
-LIBS =      -lz -lamiga
+LIBS =      -lz 
 LTLIBOBJS =  ${LIBOBJDIR}fsusage$U.lo
 MACHDEP = md-ppc-gcc
 MAKEDEPPRG = not-found

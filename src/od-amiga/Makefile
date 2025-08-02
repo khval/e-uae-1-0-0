@@ -117,7 +117,7 @@ libosdep_a_AR = $(AR) $(ARFLAGS)
 libosdep_a_LIBADD =
 am_libosdep_a_OBJECTS = main.$(OBJEXT) memory.$(OBJEXT) \
 	support.$(OBJEXT) ami-disk.$(OBJEXT) blkdev-amiga.$(OBJEXT) \
-	win32_handle_emu.$(OBJEXT) win32_thread_emu.$(OBJEXT) bsdsock.$(OBJEXT)
+	handle_emu.$(OBJEXT) thread_emu.$(OBJEXT) bsdsock.$(OBJEXT)
 libosdep_a_OBJECTS = $(am_libosdep_a_OBJECTS)
 SCRIPTS = $(dist_noinst_SCRIPTS)
 AM_V_P = $(am__v_P_$(V))
@@ -137,7 +137,9 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/ami-disk.Po \
 	./$(DEPDIR)/blkdev-amiga.Po ./$(DEPDIR)/main.Po \
-	./$(DEPDIR)/memory.Po ./$(DEPDIR)/support.Po
+	./$(DEPDIR)/memory.Po ./$(DEPDIR)/support.Po  \
+	/$(DEPDIR)/handle_emu.Po /$(DEPDIR)/thread_emu.Po \
+	./$(DEPDIR)/bsdsock.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -197,13 +199,9 @@ CCASDEPMODE = depmode=gcc3
 CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CDOBJS = 
-CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W  -Wstrict-prototypes -DREGPARAM=    
-CFLAGS += -DBSDSOCKET -DPICASSO96_SUPPORTED
-
+CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=    
 CPP = gcc -E
 CPPFLAGS =     -DCPUEMU_0 -DCPUEMU_5 -DCPUEMU_6 -DFPUEMU -D__USE_INLINE__ -DJIT -DDRIVESOUND -DAGA -DAUTOCONFIG -DFILESYS -DSUPPORT_THREADS -DFDI2RAW -DDEBUGGER -DSAVESTATE -DENFORCER -DACTION_REPLAY -DXARCADE 
-CPPFLAGS += -DBSDSOCKET -DPICASSO96_SUPPORTED
-
 CPUOBJS = cpuemu_0.$(OBJEXT) cpuemu_5.$(OBJEXT) cpuemu_6.$(OBJEXT) fpp.$(OBJEXT)
 CXX = g++
 CXXDEPMODE = depmode=gcc3
@@ -275,7 +273,7 @@ SND_DEP = sd-amigaos
 STRIP = 
 TARGET = amiga
 THREADDEP = td-amigaos
-UAE_CFLAGS = -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W  -Wstrict-prototypes -DREGPARAM=
+UAE_CFLAGS = -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=
 UAE_CPPFLAGS = 
 UAE_CXXFLAGS =  -fomit-frame-pointer  
 UAE_LIBS = -lz 
@@ -348,9 +346,9 @@ top_builddir = ../..
 top_srcdir = ../..
 AM_CPPFLAGS =  -I$(top_srcdir)/src/include \
 	-I$(top_builddir)/src -I$(top_srcdir)/src
-AM_CFLAGS = -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W  -Wstrict-prototypes -DREGPARAM=
+AM_CFLAGS = -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=
 noinst_LIBRARIES = libosdep.a
-libosdep_a_SOURCES = main.c memory.c support.c ami-disk.c blkdev-amiga.c
+libosdep_a_SOURCES = main.c memory.c support.c ami-disk.c blkdev-amiga.c handle_emu.c thread_emu.c bsdsock.c
 noinst_HEADERS = amiga-kludges.h memory.h hrtimer.h
 dist_noinst_SCRIPTS = scc
 all: all-am
@@ -406,6 +404,9 @@ include ./$(DEPDIR)/blkdev-amiga.Po # am--include-marker
 include ./$(DEPDIR)/main.Po # am--include-marker
 include ./$(DEPDIR)/memory.Po # am--include-marker
 include ./$(DEPDIR)/support.Po # am--include-marker
+include ./$(DEPDIR)/handle_emu.Po # am--include-marker
+include ./$(DEPDIR)/thread_emu.Po # am--include-marker
+include ./$(DEPDIR)/bsdsock.Po # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -556,6 +557,9 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/memory.Po
 	-rm -f ./$(DEPDIR)/support.Po
+	-rm -f ./$(DEPDIR)/handle_emu.Po
+	-rm -f ./$(DEPDIR)/thread_emu.Po
+	-rm -f ./$(DEPDIR)/bsdsock.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -606,6 +610,9 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/main.Po
 	-rm -f ./$(DEPDIR)/memory.Po
 	-rm -f ./$(DEPDIR)/support.Po
+	-rm -f ./$(DEPDIR)/handle_emu.Po
+	-rm -f ./$(DEPDIR)/thread_emu.Po
+	-rm -f ./$(DEPDIR)/bsdsock.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

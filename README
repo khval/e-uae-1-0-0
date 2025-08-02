@@ -1,4 +1,4 @@
-E-UAE PowerPC JIT project v1.1.0
+E-UAE PowerPC JIT project v1.1.1
 ================================
 
 This project is a fork of the E-UAE Amiga emulation project. 
@@ -20,9 +20,18 @@ merging all versions of EUAE from all corners of the world.
 
 Lastest source code you can find here:
 
-https://github.com/khval/e-uae-1-0-0
+https://github.com/khval/e-uae-1-0-0/tree/uae-1-1-0
 https://github.com/salass00/e-uae
 
+Release v1.1.1 @ 2025
+
+Changes by LiveForIt / Kjetil Hvalstrand 
+
+* Fixed two issues with bsdsocket.library
+
+* Fixed issue with stretching in 16bit AGA screens.
+
+* Created accelerator.library 
 
 Release v1.1.0 @ 2025
 =====================

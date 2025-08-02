@@ -101,7 +101,7 @@ void socket_proxy_thread(struct handle_thread_s *thread)
 
 	if (thread == NULL)
 	{
-		printf("wtf..\n");
+		Printf("wtf..\n");
 		return;
 	}
 

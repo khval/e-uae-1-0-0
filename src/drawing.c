@@ -417,7 +417,7 @@ STATIC_INLINE void fill_line (void)
 	nrem = nints & 7;
 	nints &= ~7;
 
-	dprintf("%s:%d xlinebuffer: %08x\n",xlinebuffer);
+	dprintf("%s:%d xlinebuffer: %08x\n",__FUNCTION__,__LINE__,xlinebuffer);
 
 	start = (int *)(((char *)xlinebuffer) + (visible_left_border << shift));
 #ifdef AGA
@@ -1345,7 +1345,7 @@ STATIC_INLINE void pfield_draw_line (int lineno, int gfx_ypos, int follow_ypos)
     int do_double = 0;
     enum double_how dh;
 
-	dprintf("%s:%d\n",__FUNCTION__,__LINE__);
+	dprintf("%s:%d -- pfield_draw_line (lineno: %d, gfx_ypos: %d, follow_ypos:%d)\n",__FUNCTION__,__LINE__ , lineno,  gfx_ypos, follow_ypos );
 
 	dp_for_drawing = line_decisions + lineno;
 	dip_for_drawing = curr_drawinfo + lineno;
@@ -1404,11 +1404,15 @@ STATIC_INLINE void pfield_draw_line (int lineno, int gfx_ypos, int follow_ypos)
 		xlinebuffer = gfxvidinfo.emergmem, dh = dh_emerg;
 	}
 
-	dprintf("%s:%d - row_map %08x\n",__FUNCTION__,__LINE__, row_map);
-
 	if (xlinebuffer == 0)
 	{
-		xlinebuffer = row_map[gfx_ypos]; 
+
+#if 1
+		xlinebuffer = row_map[gfx_ypos];
+#else
+		xlinebuffer = gfxvidinfo.bufmem + (gfx_ypos * gfxvidinfo.rowbytes);
+#endif
+
 		dh = dh_buf;
 	}
 
@@ -1774,8 +1778,8 @@ STATIC_INLINE void putpixel (int x, xcolnr c8)
 	break;
     case 2:
     {
-	uae_u16 *p = (uae_u16 *)xlinebuffer + x;
-	*p = (uae_u16)c8;
+//	uae_u16 *p = (uae_u16 *)xlinebuffer + x;
+//	*p = (uae_u16)c8;
 	break;
     }
     case 3:

@@ -22,6 +22,7 @@
 #define  __USE_BASETYPE__
 #include <proto/exec.h>
 #include <proto/dos.h>
+#include <proto/mpega.h>
 
 #include "custom.h"
 #include "newcpu.h"
@@ -90,6 +91,8 @@ struct Library          *CyberGfxBase = NULL;
 struct Library          *IconBase = NULL;
 struct Library          *WorkbenchBase = NULL;
 
+struct Library *MpegaBase = NULL;
+
 #if have_gfxconvert
 struct Library          *gfxconvertBase = NULL;
 struct gfxconvertIFace *Igfxconvert = NULL;
@@ -105,6 +108,8 @@ struct CyberGfxIFace *ICyberGfx = NULL;
 struct IconIFace *IIcon = NULL;
 struct WorkbenchIFace *IWorkbench = NULL;
 struct SocketIFace *ISocket = NULL;
+
+struct MpegaIFace *IMpega = NULL;
 
 #include "../gfx-amigaos/window_icons.h"
 
@@ -188,6 +193,8 @@ static void free_libs (void)
 #if have_gfxconvert
 	libClose(gfxconvert);
 #endif
+
+	libClose(Mpega);
 }
 
 static BOOL init_libs (void)
@@ -246,8 +253,10 @@ static BOOL init_libs (void)
 	if (!IWorkbench)  return FALSE;
 
 #if have_gfxconvert
+
 	libOpen(gfxconvert,1);
 	if (!Igfxconvert)  return FALSE;
+
 #endif
 
 	IconBase = OpenLibrary ("icon.library", 53);
@@ -267,6 +276,12 @@ static BOOL init_libs (void)
 	if ( ! sigqueue_mx ) return FALSE;
 
 	main_task = FindTask(NULL);
+
+	MpegaBase = OpenLibrary("mpega.library", 0);
+	if (MpegaBase)
+	{
+		IMpega = (struct MPEGAIFace *) GetInterface(MpegaBase, "main", 1, NULL);
+	}
 
 	return TRUE;
 }

@@ -43,23 +43,61 @@ static uae_u32 SockLibBase;
 #define SOCKPOOLSIZE 128
 #define UNIQUE_ID	(-1)
 
-/* ObtainSocket()/ReleaseSocket() public socket pool */
-/*
-long sockpoolids[SOCKPOOLSIZE];
-int sockpoolsocks[SOCKPOOLSIZE];
-uae_u32 sockpoolflags[SOCKPOOLSIZE];
-*/
 
 extern APTR amiga_thread_safe_mx;
 extern APTR sigqueue_mx;
 
 long curruniqid = 65536;
 
+#define SOCKDEBUG 0
 
+#if SOCKDEBUG
+#define DPrintf(fmd,...) Printf(fmd, ##__VA_ARGS__)
+#else
+#define DPrintf(fmd,...)
+#endif
 
 static void copyHostentToGuest (TrapContext *context, const struct hostent *hostent, SB );
 static void copyProtoentToGuest (TrapContext *context, const struct protoent *p, SB );
-// static int copysockaddr_a2n (struct sockaddr *addr, uae_u32 a_addr, unsigned int len);
+
+
+void msg_kill_thread_fn( TrapContext *context );
+void msg_socket_fn( TrapContext *context );
+void msg_bind_fn( TrapContext *context );
+void msg_listen_fn( TrapContext *context );
+void msg_accept_fn( TrapContext *context );
+void msg_connect_fn( TrapContext *context );
+void msg_sendto_fn( TrapContext *context );
+void msg_send_fn( TrapContext *context );
+void msg_recvfrom_fn( TrapContext *context );
+void msg_recv_fn( TrapContext *context );
+void msg_shutdown_fn( TrapContext *context );
+void msg_setsockopt_fn( TrapContext *context );
+void msg_getsockopt_fn( TrapContext *context );
+void msg_getsockname_fn( TrapContext *context );
+void msg_getpeername_fn( TrapContext *context );
+void msg_IoctlSocket_fn( TrapContext *context );
+void msg_CloseSocket_fn( TrapContext *context );
+void msg_WaitSelect_fn( TrapContext *context );
+void msg_ObtainSocket_fn( TrapContext *context );
+void msg_ReleaseSocket_fn( TrapContext *context );
+void msg_Errno_fn( TrapContext *context );
+void msg_SetErrnoPtr_fn( TrapContext *context );
+void msg_Inet_NtoA_fn( TrapContext *context );
+void msg_Inet_addr_fn( TrapContext *context );
+void msg_Inet_LnaOf_fn( TrapContext *context );
+void msg_Inet_NetOf_fn( TrapContext *context );
+void msg_Inet_MakeAddr_fn( TrapContext *context );
+void msg_inet_network_fn( TrapContext *context );
+void msg_gethostbyname_fn( TrapContext *context );
+void msg_gethostbyaddr_fn( TrapContext *context );
+void msg_getservbyname_fn( TrapContext *context );
+void msg_getservbyport_fn( TrapContext *context );
+void msg_getprotobyname_fn( TrapContext *context );
+void msg_getprotobynumber_fn( TrapContext *context );
+void msg_Dup2Socket_fn( TrapContext *context );
+void msg_gethostname_fn( TrapContext *context );
+void msg_SocketBaseTagList_fn(TrapContext *context);
 
 /* Memory-related helper functions */
 STATIC_INLINE void memcpyha (uae_u32 dst, const char *src, int size)
@@ -67,24 +105,6 @@ STATIC_INLINE void memcpyha (uae_u32 dst, const char *src, int size)
 	while (size--)
 	put_byte (dst++, *src++);
 }
-
-#if 0
-char *strncpyah (char *dst, uae_u32 src, int size)
-{
-
-
-	char *res = dst;
-	while (size-- && (*dst++ = get_byte (src++)));
-	return res;
-}
-
-char *strcpyah (char *dst, uae_u32 src)
-{
-	char *res = dst;
-	while ((*dst++ = get_byte (src++)) != 0);
-	return res;
-}
-#endif
 
 uae_u32 strcpyha (uae_u32 dst, const char *src)
 {
@@ -138,7 +158,7 @@ uae_u32 addmem (uae_u32 * dst, const char *src, int len)
 /* Get current task */
 static uae_u32 gettask (TrapContext *context)
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	uae_u32 currtask, a1 = m68k_areg (&context->regs, 1);
 
@@ -157,7 +177,7 @@ static uae_u32 gettask (TrapContext *context)
 
 void bsdsocklib_seterrno (SB, int sb_errno)
 {
-	Printf("%s:%s:%ld --- Legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld --- Legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
 
 	sb->sb_errno = sb_errno;
 
@@ -184,7 +204,7 @@ void bsdsocklib_seterrno (SB, int sb_errno)
 
 void bsdsocklib_setherrno (SB, int sb_herrno)
 {
-	Printf("%s:%s:%ld --- Legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld --- Legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
 
 	sb->sb_herrno = sb_herrno;
 
@@ -208,7 +228,7 @@ void bsdsocklib_setherrno (SB, int sb_herrno)
 
 BOOL checksd (SB, int sd)
 {
-	Printf("%s:%s:%ld --- Legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld --- Legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
 
 	 int iCounter;
 	 SOCKET s;
@@ -233,14 +253,14 @@ BOOL checksd (SB, int sd)
 
 void setsd (SB, int sd, int s)
 {
-	Printf("%s:%s:%ld --- Legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld --- Legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
 	sb->dtable[sd - 1] = s;
 }
 
 /* Socket descriptor/opaque socket handle management */
 int getsd (SB, int s)
 {
-	Printf("%s:%s:%ld --- Legacy !! \n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld --- Legacy !! \n",__FILE__,__FUNCTION__,__LINE__);
 
 	int i;
 	int *dt = sb->dtable;
@@ -265,7 +285,7 @@ int getsd (SB, int s)
 
 int getsock (SB, int sd)
 {
-	Printf("%s:%s:%ld -- legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld -- legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
 
 	if ((unsigned int) (sd - 1) >= (unsigned int) sb->dtablesize) {
 	TRACE (("Invalid Socket Descriptor (%d, %d)\n", sd - 1, sb->dtablesize));
@@ -278,7 +298,7 @@ int getsock (SB, int sd)
 
 void releasesock (SB, int sd)
 {
-	Printf("%s:%s:%ld -- legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld -- legacy !!\n",__FILE__,__FUNCTION__,__LINE__);
 
 	if ((unsigned int) (sd - 1) < (unsigned int) sb->dtablesize)
 	sb->dtable[sd - 1] = -1;
@@ -293,7 +313,7 @@ BOOL open_thread_per_library(struct MsgPort **retPort, int *retIndex )
 {
 	int index;
 
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	index = find_new_thread_id();
 	if (index>-1)
@@ -330,7 +350,7 @@ static struct socketbase *alloc_socketbase (TrapContext *context)
 	struct socketbase *sb;
 	int i;
 
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	if ((sb = calloc (sizeof (struct socketbase), 1)) != NULL)
 	{
@@ -400,7 +420,7 @@ static void free_socketbase (TrapContext *context)
 {
 	struct socketbase *sb, *nsb;
 
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	if ((sb = get_socketbase (context)) != NULL)
 	{
@@ -455,7 +475,7 @@ static void free_socketbase (TrapContext *context)
 
 static uae_u32 REGPARAM2 bsdsocklib_Expunge (TrapContext *context)
 {
-//	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+//	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 	TRACE (("Expunge() -> [ignored]\n"));
 	return 0;
 }
@@ -478,7 +498,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Open (TrapContext *context)
 
 	if ((sb = alloc_socketbase (context)) != NULL)
 	{
-		Printf("%s:%s:%ld - SockLibBase: %p\n",__FILE__,__FUNCTION__,__LINE__, SockLibBase);
+		DPrintf("%s:%s:%ld - SockLibBase: %p\n",__FILE__,__FUNCTION__,__LINE__, SockLibBase);
 
 		put_word (SockLibBase + 32, opencount = get_word (SockLibBase + 32) + 1);
 
@@ -488,8 +508,9 @@ static uae_u32 REGPARAM2 bsdsocklib_Open (TrapContext *context)
 		m68k_dreg (&context->regs, 0) = sizeof (struct UAEBSDBase);
 		m68k_dreg (&context->regs, 1) = 0;
 
-		result = CallLib (context, get_long (4), -0x54);
+		result = CallLib (context, get_long (4), -0x54); // MakeLibrary
 
+		// store socketbase in bsd base.
 		put_pointer (result + offsetof (struct UAEBSDBase, sb), sb);
 	}
 	else
@@ -502,7 +523,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Open (TrapContext *context)
 
 void msg_kill_thread_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 	struct handle_thread_s *thread = GetCurrentThread();
 	thread -> t.running = FALSE;
 }
@@ -517,7 +538,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Close (TrapContext *context)
 {
 	int opencount;
 
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	kill_thread (context);
 
@@ -548,7 +569,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Close (TrapContext *context)
 
 void msg_socket_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	int socket_id, guest_socket_id;
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -559,15 +580,15 @@ void msg_socket_fn( TrapContext *context )
 
 	if (guest_socket_id>-1)
 	{
-		Printf("tmp socket id: %ld\n",guest_socket_id);
+		DPrintf("tmp socket id: %ld\n",guest_socket_id);
 
-		Printf("D0: %08lx, D1: %08lx, D2: %08lx\n",DREG(0), DREG(1), DREG(2) );
+		DPrintf("D0: %08lx, D1: %08lx, D2: %08lx\n",DREG(0), DREG(1), DREG(2) );
 
 		socket_id = thread_socket ( DREG(0), DREG(1), DREG(2) );
 
 		if (socket_id>-1)
 		{
-			Printf("host socket id: %08lx\n",socket_id);
+			DPrintf("host socket id: %08lx\n",socket_id);
 
 			sockets[guest_socket_id].host_socket = socket_id;
 			sockets[guest_socket_id].ProxyPort = ((struct handle_thread_s *) hThreads[ sb -> thread_id].ptr) -> t.ProxyPort;
@@ -576,31 +597,31 @@ void msg_socket_fn( TrapContext *context )
 		}
 		else
 		{
-			Printf("Socket error\n");
+			DPrintf("Socket error\n");
 
 			switch( thread_Errno() )
 			{
 				case EPROTONOSUPPORT:
-					Printf("EPROTONOSUPPORT\n");
+					DPrintf("EPROTONOSUPPORT\n");
 					break;
 
 				case EMFILE:
-					Printf("EMFILE\n");
+					DPrintf("EMFILE\n");
 					break;
 
 				case EACCES:
-					Printf("EACCES\n");
+					DPrintf("EACCES\n");
 					break;
 
 				case ENOBUFS:
-					Printf("ENOBUFS\n");
+					DPrintf("ENOBUFS\n");
 					break;
 			}
 		}
 	}
 	else
 	{
-		Printf("Failed to find new guest socket\n");
+		DPrintf("Failed to find new guest socket\n");
 	}
 
 	DREG(0) = -1;
@@ -617,7 +638,7 @@ static uae_u32 REGPARAM2 bsdsocklib_socket (TrapContext *context)
 
 void msg_bind_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
@@ -635,7 +656,7 @@ static uae_u32 REGPARAM2 bsdsocklib_bind (TrapContext *context)
 
 void msg_listen_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -653,7 +674,7 @@ static uae_u32 REGPARAM2 bsdsocklib_listen (TrapContext *context)
 
 void msg_accept_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -678,7 +699,7 @@ static uae_u32 REGPARAM2 bsdsocklib_accept (TrapContext *context)
 
 void msg_connect_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -699,7 +720,7 @@ static uae_u32 REGPARAM2 bsdsocklib_connect (TrapContext *context)
 
 void msg_sendto_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -721,7 +742,7 @@ static uae_u32 REGPARAM2 bsdsocklib_sendto (TrapContext *context)
 
 void msg_send_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -742,7 +763,7 @@ static uae_u32 REGPARAM2 bsdsocklib_send (TrapContext *context)
 
 void msg_recvfrom_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -751,9 +772,9 @@ void msg_recvfrom_fn( TrapContext *context )
 	struct sockaddr *guest_sockaddr_from = (struct sockaddr *) guest_AREG(1);
 	socklen_t *guest_fromlen = (socklen_t *) guest_AREG(2);
 	
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
-	Printf("D0: %08lx, A0: %p, D1: len=%ld, D2: %08lx, A1: %p, A2: %p\n",
+	DPrintf("D0: %08lx, A0: %p, D1: len=%ld, D2: %08lx, A1: %p, A2: %p\n",
 			DREG(0),
 			guest_AREG(0),
 			DREG(1),
@@ -765,7 +786,7 @@ void msg_recvfrom_fn( TrapContext *context )
 			ptr_host_arg( struct sockaddr *, guest_sockaddr_from ),
 			ptr_host_arg( socklen_t *, guest_fromlen ));
 
-	Printf("recvfrom() = %ld, errno %ld\n", m68k_dreg (&context->regs, 0), thread_Errno() );
+	DPrintf("recvfrom() = %ld, errno %ld\n", m68k_dreg (&context->regs, 0), thread_Errno() );
 
 }
 
@@ -779,7 +800,7 @@ static uae_u32 REGPARAM2 bsdsocklib_recvfrom (TrapContext *context)
 
 void msg_recv_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -797,7 +818,7 @@ static uae_u32 REGPARAM2 bsdsocklib_recv (TrapContext *context)
 
 void msg_shutdown_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -811,7 +832,7 @@ static uae_u32 REGPARAM2 bsdsocklib_shutdown (TrapContext *context)
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct socketbase *sb = get_socketbase (context);
 
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 	send_thread_msg( sb, context, msg_shutdown_fn );
 
 	return m68k_dreg (&context->regs, 0);
@@ -819,7 +840,7 @@ static uae_u32 REGPARAM2 bsdsocklib_shutdown (TrapContext *context)
 
 void msg_setsockopt_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread();
@@ -836,7 +857,7 @@ static uae_u32 REGPARAM2 bsdsocklib_setsockopt (TrapContext *context)
 
 void msg_getsockopt_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread();
@@ -863,7 +884,7 @@ static uae_u32 REGPARAM2 bsdsocklib_getsockopt (TrapContext *context)
 
 void msg_getsockname_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread();
 	DREG(0) = thread_getsockname ( DREG(0), (struct sockaddr *) AREG(0), (socklen_t *) AREG(1) );
@@ -879,7 +900,7 @@ static uae_u32 REGPARAM2 bsdsocklib_getsockname (TrapContext *context)
 
 void msg_getpeername_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread();
 	DREG(0) = thread_getsockname ( DREG(0), (struct sockaddr *) AREG(0), (socklen_t *) AREG(1) );
@@ -898,12 +919,12 @@ void msg_IoctlSocket_fn( TrapContext *context )
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread();
 
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
-	Printf("D0: fd = %08lx , D1: flags = %08lx, A0: FIONBIO = %ld\n", DREG(0), DREG(1), guest_AREG(0) );
+	DPrintf("D0: fd = %08lx , D1: flags = %08lx, A0: FIONBIO = %ld\n", DREG(0), DREG(1), guest_AREG(0) );
 	DREG(0) = thread_IoctlSocket ( DREG(0), DREG(1), AREG(0) );
 
-	Printf("Result: %d\n", DREG(0) );
+	DPrintf("Result: %d\n", DREG(0) );
 }
 
 /* *------ generic system calls related to sockets */
@@ -917,7 +938,7 @@ static uae_u32 REGPARAM2 bsdsocklib_IoctlSocket (TrapContext *context)
 
 void msg_CloseSocket_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread();
@@ -937,7 +958,7 @@ static uae_u32 REGPARAM2 bsdsocklib_CloseSocket (TrapContext *context)
 
 void msg_WaitSelect_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 	ULONG ret;
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread();
@@ -1031,7 +1052,7 @@ static uae_u32 REGPARAM2 bsdsocklib_SetSocketSignals (TrapContext *context)
 {
 	struct socketbase *sb = get_socketbase (context);
 
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	TRACE (("SetSocketSignals(0x%08lx,0x%08lx,0x%08lx) -> ", m68k_dreg (&context->regs, 0), m68k_dreg (&context->regs, 1), m68k_dreg (&context->regs, 2)));
 	sb->eintrsigs = m68k_dreg (&context->regs, 0);
@@ -1046,7 +1067,7 @@ static uae_u32 bsdsocklib_SetDTableSize (SB, int newSize)
 	int *newftable;
 	int i;
 
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	if (newSize < sb->dtablesize)
 	{
@@ -1081,7 +1102,7 @@ static uae_u32 bsdsocklib_SetDTableSize (SB, int newSize)
 
 void msg_ObtainSocket_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -1116,7 +1137,7 @@ static uae_u32 REGPARAM2 bsdsocklib_ObtainSocket (TrapContext *context)
 
 void msg_ReleaseSocket_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -1158,7 +1179,7 @@ static uae_u32 REGPARAM2 bsdsocklib_ReleaseCopyOfSocket (TrapContext *context)
 
 void msg_Errno_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
 	DREG(0) =  thread_Errno ();
@@ -1175,7 +1196,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Errno (TrapContext *context)
 
 void msg_SetErrnoPtr_fn( TrapContext *context )
 {
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
 	thread_SetErrnoPtr ( AREG(0), DREG(0) );
@@ -1197,7 +1218,7 @@ void msg_Inet_NtoA_fn( TrapContext *context )
 	char *addr;
 	uae_u32 buf;
 
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	if (( addr  = (char *) thread_Inet_NtoA(DREG(0)) ))
 	{
@@ -1222,7 +1243,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Inet_NtoA (TrapContext *context)
 
 void msg_Inet_addr_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
 	DREG(0) =  thread_Inet_addr( (char *) AREG(0) );
@@ -1238,7 +1259,7 @@ static uae_u32 REGPARAM2 bsdsocklib_inet_addr (TrapContext *context)
 
 void msg_Inet_LnaOf_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
 	DREG(0) =  thread_Inet_LnaOf( DREG(0) );
@@ -1254,7 +1275,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Inet_LnaOf (TrapContext *context)
 
 void msg_Inet_NetOf_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
 	DREG(0) =  thread_Inet_NetOf( DREG(0) );
@@ -1270,7 +1291,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Inet_NetOf (TrapContext *context)
 
 void msg_Inet_MakeAddr_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
 	DREG(0) =  thread_inet_MakeAddr ( DREG(0), DREG(1) );
@@ -1286,7 +1307,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Inet_MakeAddr (TrapContext *context)
 
 void msg_inet_network_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
 	DREG(0) =  thread_inet_network ( (STRPTR) AREG(0) );
@@ -1300,7 +1321,7 @@ static uae_u32 REGPARAM2 bsdsocklib_inet_network (TrapContext *context)
 	return context -> regs.regs[0];
 }
 
-#define out(o) Printf("%s",o)
+#define out(o) DPrintf("%s",o)
 
 void print_hostent(struct hostent *hostent)
 {
@@ -1322,16 +1343,16 @@ void print_hostent(struct hostent *hostent)
 
 void dump_regs(ULONG *regs)
 {
-	Printf("\nD0: %08lx D1: %08lx D2: %08lx D3: %08lx D4: %08lx D5: %08lx D6: %08lx D7: %08lx\n",
+	DPrintf("\nD0: %08lx D1: %08lx D2: %08lx D3: %08lx D4: %08lx D5: %08lx D6: %08lx D7: %08lx\n",
 		regs[0],regs[1],regs[2],regs[3],regs[4],regs[5],regs[6],regs[7]);
 
-	Printf("A0: %08lx A1: %08lx A2: %08lx A3: %08lx A4: %08lx A5: %08lx A6: %08lx A7: %08lx\n\n",
+	DPrintf("A0: %08lx A1: %08lx A2: %08lx A3: %08lx A4: %08lx A5: %08lx A6: %08lx A7: %08lx\n\n",
 		regs[8],regs[9],regs[10],regs[11],regs[12],regs[13],regs[14],regs[15]);
 }
 
 void msg_gethostbyname_fn( TrapContext *context )
 {
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);
 	ULONG *regs = (ULONG *) context -> regs.regs;
@@ -1363,7 +1384,7 @@ static uae_u32 REGPARAM2 bsdsocklib_gethostbyname (TrapContext *context)
 
 void msg_gethostbyaddr_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
 	struct hostent *hostent;
@@ -1383,7 +1404,7 @@ static uae_u32 REGPARAM2 bsdsocklib_gethostbyaddr (TrapContext *context)
 /* getnetbyname(name)(a0) */
 static uae_u32 REGPARAM2 bsdsocklib_getnetbyname (TrapContext *context)
 {
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 	write_log ("bsdsocket: UNSUPPORTED: getnetbyname()\n");
 	return 0;
 }
@@ -1391,14 +1412,14 @@ static uae_u32 REGPARAM2 bsdsocklib_getnetbyname (TrapContext *context)
 /* getnetbyaddr(net, type)(d0/d1) */
 static uae_u32 REGPARAM2 bsdsocklib_getnetbyaddr (TrapContext *context)
 {
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 	write_log ("bsdsocket: UNSUPPORTED: getnetbyaddr()\n");
 	return 0;
 }
 
 void msg_getservbyname_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
@@ -1417,7 +1438,7 @@ static uae_u32 REGPARAM2 bsdsocklib_getservbyname (TrapContext *context)
 
 void msg_getservbyport_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
@@ -1437,7 +1458,7 @@ static uae_u32 REGPARAM2 bsdsocklib_getservbyport (TrapContext *context)
 
 void msg_getprotobyname_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
@@ -1459,7 +1480,7 @@ static uae_u32 REGPARAM2 bsdsocklib_getprotobyname (TrapContext *context)
 
 void msg_getprotobynumber_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
@@ -1490,7 +1511,7 @@ static uae_u32 REGPARAM2 bsdsocklib_vsyslog (TrapContext *context)
 
 void msg_Dup2Socket_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
@@ -1503,7 +1524,7 @@ static uae_u32 REGPARAM2 bsdsocklib_Dup2Socket (TrapContext *context)
 {
 	struct socketbase *sb = get_socketbase (context);
 
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 	send_thread_msg( sb, context, msg_Dup2Socket_fn );
 	return context -> regs.regs[0];
 }
@@ -1522,7 +1543,7 @@ static uae_u32 REGPARAM2 bsdsocklib_recvmsg (TrapContext *context)
 
 void msg_gethostname_fn( TrapContext *context )
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct handle_thread_s *thread = GetCurrentThread() ;
 	DREG(0) =  thread_gethostname ( (STRPTR) AREG(0), DREG(0) );
@@ -1530,7 +1551,7 @@ void msg_gethostname_fn( TrapContext *context )
 
 static uae_u32 REGPARAM2 bsdsocklib_gethostname (TrapContext *context)
 {
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);	
 	send_thread_msg( sb, context, msg_gethostname_fn );
@@ -1629,10 +1650,9 @@ uae_u32 strErrptr;
 #define SBTC_RELEASESTRPTR  29
 
 #endif
-
 static void tagcopy (uae_u32 currtag, uae_u32 currval, uae_u32 tagptr, uae_u32 * ptr)
 {
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	switch (currtag & 0x8001)
 	{
@@ -1653,15 +1673,17 @@ static void tagcopy (uae_u32 currtag, uae_u32 currval, uae_u32 tagptr, uae_u32 *
 	}
 }
 
+
 // New: Handle SocketBaseTagList trap
 void msg_SocketBaseTagList_fn(TrapContext *context)
 {
-	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct socketbase *sb = get_socketbase (context);
 	struct handle_thread_s *thread = (struct handle_thread_s *)GetCurrentThread();
-
 	struct TagItem *guest_tags = (struct TagItem *) guest_AREG(0);
+	struct TagItem *host_tags = NULL;
 
 	if (!guest_tags)
 	{
@@ -1673,18 +1695,29 @@ void msg_SocketBaseTagList_fn(TrapContext *context)
 		guest_tags = (struct TagItem *) get_real_address( (uae_u32) guest_tags );
 	}
 
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+
 	// Count tags
 	int count = 0;
 	for (struct TagItem *t = guest_tags; t->ti_Tag != TAG_DONE; t++)
 		count++;
 
-	// Allocate new tag list
-	struct TagItem *host_tags = AllocVecTags(sizeof(struct TagItem) * (count + 1), AVT_ClearWithValue, 0, TAG_END);
+	DPrintf("count: %ld\n",count);
+
+	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+
+	host_tags = AllocVecTags(
+					sizeof(struct TagItem) * (count + 1), 
+					AVT_ClearWithValue, 0, 
+					TAG_END);
+
 	if (!host_tags)
 	{
 		DREG(0) = 0;
 		return;
 	}
+
+DPrintf("SBTM_GETREF(SBTC_ERRNOSTRPTR) is: %08lx\n",SBTM_GETREF(SBTC_ERRNOSTRPTR));
 
 	for (int i = 0; i < count; i++)
 	{
@@ -1695,12 +1728,18 @@ void msg_SocketBaseTagList_fn(TrapContext *context)
 		switch (host_tags[i].ti_Tag)
 		{
 			case SBTM_SETVAL(SBTC_ERRNOPTR(4) ):
+
+				DPrintf("tag SBTM_SETVAL(SBTC_ERRNOPTR(4)) data %08lx\n", host_tags[i].ti_Data);
+
 				sb->errnoptr = (uae_u32) guest_tags[i].ti_Data;
 				host_tags[i].ti_Data = (ULONG)get_real_address(host_tags[i].ti_Data);
 				break;
 
 
 			case SBTM_SETVAL(SBTC_LOGTAGPTR):
+
+				DPrintf("tag SBTM_SETVAL(SBTC_LOGTAGPTR) data %08lx\n", host_tags[i].ti_Data);
+
 				sb->logtagptr = (uae_u32) guest_tags[i].ti_Data;
 				host_tags[i].ti_Data = (ULONG)get_real_address(host_tags[i].ti_Data);
 				break;
@@ -1714,6 +1753,9 @@ void msg_SocketBaseTagList_fn(TrapContext *context)
 */
 
 			case SBTM_GETVAL(SBTC_ERRNOPTR(4)):
+
+				DPrintf("tag SBTM_GETVAL(SBTC_ERRNOPTR(4)) data %08lx\n", host_tags[i].ti_Data);
+
 				host_tags[i].ti_Data = (ULONG)get_real_address(host_tags[i].ti_Data);
 				host_tags[i].ti_Tag = TAG_IGNORE; // should not be handled by native SocketBaseTagList
 
@@ -1722,9 +1764,22 @@ void msg_SocketBaseTagList_fn(TrapContext *context)
 				break;
 
 			case SBTM_GETVAL(SBTC_LOGTAGPTR):
+
+				DPrintf("tag SBTM_GETVAL(SBTC_LOGTAGPTR) data %08lx\n", host_tags[i].ti_Data);
+
 				host_tags[i].ti_Data = (ULONG)get_real_address(host_tags[i].ti_Data);
 				host_tags[i].ti_Tag = TAG_IGNORE; // should not be handled by native SocketBaseTagList
 				*( (uae_u32 *) host_tags[i].ti_Data) = sb->logtagptr;
+				break;
+
+			case SBTM_GETREF(SBTC_ERRNOSTRPTR):
+				DPrintf("tag SBTM_GETREF(SBTC_ERRNOSTRPTR) data %08lx\n", host_tags[i].ti_Data);
+				host_tags[i].ti_Data = (ULONG)get_real_address(host_tags[i].ti_Data);
+				break;
+
+			case SBTM_GETREF(SBTC_HAVE_ROADSHOWDATA_API):
+				DPrintf("tag SBTM_GETREF(SBTC_HAVE_ROADSHOWDATA_API) data %08lx\n", host_tags[i].ti_Data);
+				host_tags[i].ti_Data = (ULONG)get_real_address(host_tags[i].ti_Data);
 				break;
 
 /*
@@ -1734,13 +1789,18 @@ void msg_SocketBaseTagList_fn(TrapContext *context)
 				break;
 
 			case SBTM_GETVAL(SBTC_TASK):
-				Printf("[SocketBaseTagList] WARNING: skipping guest TASK ptr conversion\n");
+				DPrintf("[SocketBaseTagList] WARNING: skipping guest TASK ptr conversion\n");
 				host_tags[i].ti_Data = 0;
 				break;
 */
+
+			default:
+				DPrintf("tag %08lx data %08lx\n", host_tags[i].ti_Tag, host_tags[i].ti_Data);
+				break;
+
 		}
 
-		Printf("[SocketBaseTagList] tag %08lx data %08lx\n", host_tags[i].ti_Tag, host_tags[i].ti_Data);
+
 	}
 	
 	host_tags[count].ti_Tag = TAG_DONE;
@@ -1755,7 +1815,7 @@ void msg_SocketBaseTagList_fn(TrapContext *context)
 
 static uae_u32 REGPARAM2 bsdsocklib_SocketBaseTagList (TrapContext *context)
 {
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	struct socketbase *sb = get_socketbase (context);	
 	send_thread_msg( sb, context, msg_SocketBaseTagList_fn );
@@ -1764,7 +1824,7 @@ static uae_u32 REGPARAM2 bsdsocklib_SocketBaseTagList (TrapContext *context)
 
 static uae_u32 REGPARAM2 bsdsocklib_GetSocketEvents (TrapContext *context)
 {
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 #ifdef _WIN32
 	struct socketbase *sb = get_socketbase (context);
@@ -1795,14 +1855,14 @@ static uae_u32 REGPARAM2 bsdsocklib_GetSocketEvents (TrapContext *context)
 
 static uae_u32 REGPARAM2 bsdsocklib_getdtablesize (TrapContext *context)
 {
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	return get_socketbase (context)->dtablesize;
 }
 
 static uae_u32 REGPARAM2 bsdsocklib_null (TrapContext *context)
 {
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	return 0;
 }
@@ -1815,7 +1875,7 @@ static uae_u32 REGPARAM2 bsdsocklib_init (TrapContext *context)
 	if (SockLibBase)
 	bsdlib_reset ();
 
-	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	m68k_areg (&context->regs, 0) = functable;
 	m68k_areg (&context->regs, 1) = datatable;
@@ -1881,17 +1941,17 @@ static uae_u32 REGPARAM2 bsdsocklib_init (TrapContext *context)
 
 void 	bsdlib_reset ()
 {
-//	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+//	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 }
 
 void socketbase_cleanup(SB)
 {
-//	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+//	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 }
 
 void 	socketbase_reset (void)
 {
-//	Printf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
+//	DPrintf("%s:%s:%ld\n",__FILE__,__FUNCTION__,__LINE__);
 
 	struct socketbase sb;
 	int s;
@@ -1912,7 +1972,7 @@ void bsdsocket_os41_reset (void)
 	SB, *nsb;
 	int i;
 
-//	Printf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
+//	DPrintf("%p:%s:%s:%ld\n",FindTask(NULL),__FILE__,__FUNCTION__,__LINE__);
 
 	if (currprefs.socket_emu == 0)
 	return;
@@ -1981,6 +2041,7 @@ static uae_u32 sockfuncvecs[sizeof (sockfuncs) / sizeof (*sockfuncs)];
 
 void bsdlib_install (void)
 {
+	char buffer[100];
 	uae_u32 resname, resid;
 	uae_u32 begin, end;
 	uae_u32 func_place, data_place, init_place;
@@ -1988,7 +2049,7 @@ void bsdlib_install (void)
 
 	if (currprefs.socket_emu == 0)
 	{
-		printf("bsdsocket_emu is false, bsdsocket.library not loaded\n");
+		DPrintf("bsdsocket_emu is false, bsdsocket.library not loaded\n");
 		return;
 	}
 
@@ -2066,6 +2127,9 @@ void bsdlib_install (void)
 	org (init_place);
 	dl (*sockfuncvecs);
 
+	sprintf(buffer,"Install resident: bsdlib rom tag at %p to %p, size: %d bytes\n", begin, end, end - begin);
+	write_log(buffer);	
+
 	org (end);
 
 }
@@ -2100,7 +2164,7 @@ static void copyHostentToGuest (TrapContext *context, const struct hostent *host
 
 	if ( sb->hostent == 0 )
 	{
-		Printf("ERROR: Failed to allocated hostent mem\n");
+		DPrintf("ERROR: Failed to allocated hostent mem\n");
 		return;
 	}
 

@@ -19,6 +19,14 @@ extern APTR amiga_thread_safe_mx;
 extern struct Task *main_task;
 extern int socket_thread_triggered_sigbit;
 
+#define TDEBUG 0
+
+#if TDEBUG
+#define DPrintf(fmd,...) Printf(fmd, ##__VA_ARGS__)
+#else
+#define DPrintf(fmd,...)
+#endif
+
 struct handle_thread_s *GetCurrentThread( void )
 {
 	uint32 index = ((uint32) FindTask(NULL) -> tc_UserData);
@@ -38,14 +46,15 @@ struct handle_thread_s *new_thread( APTR func, int index)
 	{
 		char buffer[100];
 
-		sprintf(buffer,"con:100/100/400/300/thread %d",index);
+		sprintf(buffer,"con:100/100/600/300/thread %d",index);
 
 		thread -> base.index = index;
 		bzero( &(thread -> t), sizeof(struct thread_s));		// make sure nothing in thread is set.
 
 		thread -> t.func = func;
+#if TDEBUG
 		thread -> t.output = Open(buffer,MODE_OLDFILE);
-
+#endif
 		// so we can find it in thread_start_func...
 		hThreads[ index ].ptr = (struct handle_s *) thread;
 
@@ -107,19 +116,18 @@ void __thread_start_func__(struct handle_thread_s *thread)
 		}
 		else
 		{
-			Printf("new thread: something went wrong...\ndieing in shame.. (maybe...)\n");
+			DPrintf("new thread: something went wrong...\ndieing in shame.. (maybe...)\n");
 		}
 	}
 	else
 	{
-		Printf("%s() failed, has no thread\n",__FUNCTION__);
+		DPrintf("%s() failed, has no thread\n",__FUNCTION__);
 	}
 }
 
 void thread_start_func()
 {
 	struct handle_thread_s *thread = GetCurrentThread();
-	printf("thread: %p\n",thread);
 
 	__thread_start_func__(thread);
 }
@@ -128,36 +136,28 @@ void thread_final_func()
 {
 	// makse sure hThreads[] only has valid pointers.
 
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	MutexObtain(amiga_thread_safe_mx);
-
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 	struct Task *task = FindTask(NULL);
 	uint32 index = (uint32) task -> tc_UserData;
 
-	Printf("Closing task: %p\n", task);
+	DPrintf("Closing task: %p\n", task);
 
 	struct handle_thread_s *thread = (struct handle_thread_s *) GetCurrentThread();
 
-
-
-	Printf("%s:%ld -- index: %ld\n",__FUNCTION__,__LINE__,index);
+	DPrintf("%s:%ld -- index: %ld\n",__FUNCTION__,__LINE__,index);
 
 	if (thread)
 	{
 
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 		// lets unhook it early... maybe it helps..
 		hThreads[index].ptr = NULL;	 // unhook the thread struct.
 
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
-
 		FreeSignal((BYTE) SIGBREAKB_CTRL_D);
-
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 		if (thread->t.timerIO)
 		{
@@ -180,8 +180,6 @@ void thread_final_func()
 			FreeSysObject(ASOT_IOREQUEST,thread->t.timerIO);
 		}
 
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
-
 		if (thread->t.timerPort)
 			FreeSysObject(ASOT_PORT,thread->t.timerPort);
 
@@ -194,12 +192,12 @@ void thread_final_func()
 		if (thread -> t.SocketBase)
 			CloseLibrary( thread -> t.SocketBase );
 
-	Printf("%s:%ld\n",__FUNCTION__,__LINE__);
+	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 		if (thread -> t.output) 
 		{
 			Close( thread -> t.output );
-			thread -> t.output = NULL;
+			thread -> t.output = 0;
 		}
 
 		// clear memory, in one operation, faster.. maybe a bit more unsafe..

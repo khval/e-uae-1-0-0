@@ -2113,7 +2113,6 @@ static int graphics_subinit (void)
 	CybBuffer = setup_classic_buffer (&gfxvidinfo, draw_aga_RP);
 	if (!CybBuffer)
 	{
-
 		/*
 		 * Failed to allocate bitmap - we need to fall back on gfx.lib rendering
 		 */
@@ -2250,14 +2249,12 @@ int graphics_init (void)
 		screen_is_picasso = 0;
 	}
 
-	printf("%s:%d -- VARS IS RESET! \n",__FUNCTION__,__LINE__);
-
 	InitRastPort(&comp_aga_RP);
 	InitRastPort(&comp_p96_RP);
 	InitRastPort(&conv_p96_RP);
 
 	reset_p96_fn_pointers();
-	update_gfxvidinfo_width_height();
+	initialize_gfxvidinfo_width_height();
 
 	switch (currprefs.amiga_screen_type)
 	{
@@ -2287,8 +2284,6 @@ int graphics_init (void)
 			break;
 	}
 	
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
-
 	if (graphics_subinit () == 0) 
 	{
 		write_log ("AMIGFX: subsystem failed.\n");
@@ -2328,10 +2323,10 @@ void close_window()
 	free_pointer ();
 }
 
+#define sf(fn,var) if (var) { fn(var); var = NULL; }
+
 static void graphics_subshutdown (void)
 {
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
-
 	appw_exit ();
 
 	if (BitMap)
@@ -2341,80 +2336,27 @@ static void graphics_subshutdown (void)
 		BitMap = NULL;
 	}
 
-	if (TempRPort)
-	{
-		FreeVec (TempRPort);
-		TempRPort = NULL;
-	}
+	sf(free,conv_tmp_buffer);
 
-	if (Line)
-	{
-		FreeVec (Line);
-		Line = NULL;
-	}
-
-	if (CybBuffer)
-	{
-		FreeVec (CybBuffer);
-		CybBuffer = NULL;
-	}
-
-	if (conv_p96_RP.BitMap)	// to be converted..
-	{
-		FreeBitMap(conv_p96_RP.BitMap);
-		conv_p96_RP.BitMap = NULL;
-	}
-
-	if (conv_tmp_buffer)		// final version..
-	{
-		free(conv_tmp_buffer);
-		conv_tmp_buffer = NULL;
-	}
-
-	if (comp_p96_RP.BitMap)
-	{
-		FreeBitMap(comp_p96_RP.BitMap);
-		comp_p96_RP.BitMap = NULL;
-	}
+	sf(FreeVec,TempRPort);
+	sf(FreeVec,Line);
+	sf(FreeVec,CybBuffer);
+	sf(FreeVec,vpal16);
+	sf(FreeVec,vpal32);
 
 	free_picasso_invalid_lines();
 
-	if (comp_aga_RP.BitMap)
-	{
-		FreeBitMap(comp_aga_RP.BitMap);
-		comp_aga_RP.BitMap = NULL;
-	}
-
-	if (vpal16)
-	{
-		FreeVec(vpal16);
-		vpal16 = NULL;
-	}
-
-	if (vpal32) 
-	{
-		FreeVec(vpal32);
-		vpal32 = NULL;
-	}
+	sf(FreeBitMap,conv_p96_RP.BitMap);
+	sf(FreeBitMap,comp_p96_RP.BitMap);
+	sf(FreeBitMap,comp_aga_RP.BitMap);
 
 	draw_p96_RP = NULL;
 }
 
 void graphics_leave (void)
 {
-	printf("%s:%d\n",__FUNCTION__,__LINE__);
-
-	if (oldpixbuf)
-	{
-		free(oldpixbuf);
-		oldpixbuf = NULL;
-	}
-
-	if (classic_buffer)
-	{
-		free(classic_buffer);
-		classic_buffer = NULL;
-	}
+	sf(free,oldpixbuf);
+	sf(free,classic_buffer);
 
 	closepseudodevices ();
 
@@ -3546,8 +3488,6 @@ void p96_conv_all()
 	uint8 *src_buffer_ptr;
 	char *dest_buffer_ptr;
 
-//	char *dest_tmp_buffer_ptr;
-
 	int y;
 	int dest_bpr;
 
@@ -3567,7 +3507,7 @@ void p96_conv_all()
 		comp_p96_RP.BitMap -> BytesPerRow : 
 		picasso_vidinfo.width * 4;
 
-	src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;			/// <----- WHY THIS WORKS, BECOUSE ITS IN FAST MEM (I HOPE)...
+	src_buffer_ptr = draw_p96_RP -> BitMap -> Planes[0] ;			// <----- WHY THIS WORKS, BECOUSE ITS IN FAST MEM (I HOPE)...
 	src_BytesPerRow = draw_p96_RP -> BitMap -> BytesPerRow;
 
 	if (src_buffer_ptr) 
@@ -3575,9 +3515,9 @@ void p96_conv_all()
 		int miny = picasso_vidinfo.height;
 		int maxy = -1;
 
-		if ( COMP_FMT_SRC != PIXF_NONE )
+		if ( COMP_FMT_SRC != PIXF_NONE ) // for true color
 		{
-//			printf("using -- COMP_FMT_SRC != PIXF_NONE\n");
+			/* count the invalid lines that needs to be updated, and do it in a bulk */
 
 			for (y=0;y<picasso_vidinfo.height;y++)
 			{
@@ -3603,10 +3543,8 @@ void p96_conv_all()
 				conv_WritePixelArray(src_buffer_ptr,src_BytesPerRow, miny,  maxy, dest_bpr, &comp_p96_RP);
 			}
 		}
-		else
+		else		// for 8bit
 		{
-//			printf("NOT using COMP_FMT_SRC != PIXF_NONE\n");
-
 			for (y=0;y<picasso_vidinfo.height;y++)
 			{
 				if (picasso_invalid_lines[y]) 

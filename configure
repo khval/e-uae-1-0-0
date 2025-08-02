@@ -577,8 +577,8 @@ MAKEFLAGS=
 # Identity of this package.
 PACKAGE_NAME='E-UAE'
 PACKAGE_TARNAME='e-uae'
-PACKAGE_VERSION='1.0.0'
-PACKAGE_STRING='E-UAE 1.0.0'
+PACKAGE_VERSION='1.1.1'
+PACKAGE_STRING='E-UAE 1.1.1'
 PACKAGE_BUGREPORT=''
 PACKAGE_URL=''
 
@@ -14311,7 +14311,7 @@ cat >>$CONFIG_STATUS <<_ACEOF || ac_write_fail=1
 _ACAWK
 cat >>"\$ac_tmp/subs1.awk" <<_ACAWK &&
   for (key in S) S_is_set[key] = 1
-  FS = ""
+  FS = ""
 
 }
 {
@@ -14443,7 +14443,7 @@ s/'"$ac_delim"'/"\\\
 
 cat >>$CONFIG_STATUS <<_ACEOF || ac_write_fail=1
   for (key in D) D_is_set[key] = 1
-  FS = ""
+  FS = ""
 }
 /^[\t ]*#[\t ]*(define|undef)[\t ]+$ac_word_re([\t (]|\$)/ {
   line = \$ 0
