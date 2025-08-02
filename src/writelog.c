@@ -15,6 +15,8 @@
 #include "writelog.h"
 #include "options.h"
 
+#include <proto/exec.h>
+
 static FILE *logfile;
 
 /*
@@ -72,7 +74,16 @@ void write_log (const char *fmt, ...)
     va_list ap;
     va_start (ap, fmt);
 #ifdef HAVE_VFPRINTF
-    vfprintf (logfile ? logfile : stderr, fmt, ap);
+
+	#if 0
+	    vfprintf (logfile ? logfile : stderr, fmt, ap);
+	#else
+	{
+		char tmp[1000];
+		vsprintf(tmp, fmt, ap);
+		DebugPrintF(tmp);
+	}	
+	#endif
 #else
     /* Technique stolen from GCC.  */
     {
