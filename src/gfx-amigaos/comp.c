@@ -6,6 +6,7 @@
 #include <errno.h>
 
 #include <proto/exec.h>
+#include <proto/dos.h>
 #include <proto/intuition.h>
 #include <intuition/intuition.h>
 #include <proto/graphics.h>
@@ -114,64 +115,91 @@ void BackFill_Func(struct RastPort *ArgRP, struct BackFillArgs *MyArgs)
 
 void update_fullscreen_rect( int aspect )
 {
-	int SHeight = W -> WScreen -> Height; 
+	int SHeight = W ?  W -> WScreen -> Height : 0 ; 
+	int SWidth = W ?  W -> WScreen -> Width : 0 ; 
 	int Width;
 
 	if (screen_is_picasso)
 	{
-		Width = aspect ? picasso_vidinfo.width * SHeight / picasso_vidinfo.height  
-				:  W -> WScreen -> Width;
+		Width = aspect ? picasso_vidinfo.width * SHeight / picasso_vidinfo.height  :  SWidth;
 	}
 	else
 	{
-		Width = aspect ? gfxvidinfo.width * SHeight / gfxvidinfo.height 
-				: W -> WScreen -> Width;
+		Width = aspect ? gfxvidinfo.width * SHeight / gfxvidinfo.height : SWidth;
 	}
 
-	if (Width > W -> WScreen -> Width) Width = W -> WScreen -> Width;	// clamp it max width
+	if (Width > SWidth ) Width = SWidth;	// clamp it max width
 
 	fullscreen_rect.MinY = 0;
-	fullscreen_rect.MinX = (W -> WScreen -> Width -  Width) / 2;	// calulate edge, two edges.
-	fullscreen_rect.MaxX = fullscreen_rect.MinX + Width - 1;
-	fullscreen_rect.MaxY = W -> Height - 1;
+	fullscreen_rect.MinX = (SWidth - Width) / 2;	// calulate edge, two edges.
+//	fullscreen_rect.MaxX = fullscreen_rect.MinX + Width - 1;
+
+	fullscreen_rect.MaxX = SWidth - 1;
+	fullscreen_rect.MaxY = SHeight - 1;
+
+#if 0
+	Printf("** aspect: %ld, min x: %ld, y: %ld - max x: %ld, y: %ld **\n",
+		aspect,
+		fullscreen_rect.MinX,
+		fullscreen_rect.MinY,
+		fullscreen_rect.MaxX,
+		fullscreen_rect.MaxY );
+#endif
 }
+
+ 	float lscaleX,lscaleY;
 
 void set_target_hookData( void )
 {
  	float scaleX,scaleY;
-
+/*
 	if (W->BorderTop)	// this window, is a wb window.
 	{
+*/
 	 	rect.MinX = W->BorderLeft;
  		rect.MinY = W->BorderTop;
  		rect.MaxX = W->Width - W->BorderRight - 1;
  		rect.MaxY = W->Height - W->BorderBottom - 1;
 		rect_ptr = &rect;
+/*
 	}
 	else
 	{
+		update_fullscreen_rect( 0 );
 		rect_ptr = &fullscreen_rect;
 	}
-
+*/
  	float destWidth = rect_ptr -> MaxX - rect_ptr -> MinX + 1;
 	float destHeight = rect_ptr -> MaxY - rect_ptr -> MinY + 1;
 
 	if (screen_is_picasso)
 	{
-	 	scaleX = (destWidth + 0.5f) / picasso_vidinfo.width;
-	 	scaleY = (destHeight + 0.5f) / picasso_vidinfo.height;
 		hookData.srcWidth = picasso_vidinfo.width;
 		hookData.srcHeight = picasso_vidinfo.height;
 		hookData.srcBitMap = comp_p96_RP.BitMap;
 	}
 	else
 	{
-	 	scaleX = (destWidth + 0.5f) / gfxvidinfo.width;
-	 	scaleY = (destHeight + 0.5f) / gfxvidinfo.height;
 		hookData.srcWidth = gfxvidinfo.width;
 		hookData.srcHeight = gfxvidinfo.height;
 		hookData.srcBitMap = comp_aga_RP.BitMap;
 	}
+
+ 	scaleX = (destWidth + 0.5f) / hookData.srcWidth;
+ 	scaleY = (destHeight + 0.5f) / hookData.srcHeight;
+
+	uint32 depth = GetBitMapAttr( hookData.srcBitMap ,BMA_DEPTH );
+
+/*
+	if ((lscaleX != scaleX) && (lscaleY != scaleY))
+	{
+		printf("src: d: %d w: %d, h: %d\n", depth, hookData.srcWidth, hookData.srcHeight );
+		printf("dst: %0.2f, %0.2f\n", destWidth, destHeight );
+		printf("Scale %0.2f  - %0.2f\n", scaleX, scaleY);
+		lscaleX = scaleX;
+		lscaleY = scaleY;
+	}
+*/
 
 	hookData.offsetX = rect_ptr -> MinX ;
 	hookData.offsetY = rect_ptr -> MinY;
@@ -181,7 +209,6 @@ void set_target_hookData( void )
 
 	hook.h_Entry = (HOOKFUNC) compositeHookFunc;
 	hook.h_Data = &hookData;
-
 }
 
 
