@@ -336,7 +336,7 @@ extern void appw_events(void);
 BOOL has_p96_mode( uae_u32 width, uae_u32 height, int depth, int max_modes );
 
 void refresh_aga( void );
-void update_gfxvidinfo_width_height( void );
+void initialize_gfxvidinfo_width_height( void );
 void add_native_modes( int depth, int *count );
 void p96_conv_all( void );
 int init_comp_one( struct Window *W, ULONG output_depth, struct RastPort *rp, int w, int h );
@@ -2192,7 +2192,7 @@ static int graphics_subinit (void)
 	return 1;
 }
 
-void update_gfxvidinfo_width_height()
+void initialize_gfxvidinfo_width_height()
 {
 	gfxvidinfo.width  = currprefs.gfx_width_win;
 	gfxvidinfo.height = currprefs.gfx_height_win;
