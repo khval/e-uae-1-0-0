@@ -60,20 +60,19 @@ void set_vpal_8bit_to_16bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num1)
 
 	// pixel [0..0],[0..255]
 
-	for (num1=0;num1<256;num1++)
+	for (index=0;index<0x100;index++)
 	{
-		rgb = __pal_to_16bit(pal, num1);
-		vpal32[num1] = ((rgb & 0xFF00) >> 8) | ((rgb & 0xFF) <<8);		// to LE
+		rgb = __pal_to_16bit(pal, index);
+		vpal16[index] = (rgb >> 8) | (rgb <<8);		// to LE
 	}
 
 	// pixel [0..255],[0..255]
 
-	for (index=0;index<256*256;index++)
+	for (index=0;index<0x10000;index++)
 	{
-		num2 = (index & 0x00FF);
-		num1 = (index & 0xFF00) >> 8;
-
-		vpal32[index] =  ((vpal32[num1] & 0xFFFF) << 16) | (vpal32[num2] & 0xFFFF) ;
+		num2 = index & 255;
+		num1 = (index >> 8) & 255;
+		vpal32[index] =  (((uint32) vpal16[num1]) << 16) |  ((uint32) vpal16[num2])  ;
 	}
 }
 
@@ -89,7 +88,7 @@ void set_vpal_8bit_to_16bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1)
 
 	for (num1=0;num1<256;num1++)
 	{
-		vpal32[num1] = __pal_to_16bit(pal, num1);
+		vpal16[num1] = __pal_to_16bit(pal, num1);
 	}
 
 	// pixel [0,256],[0..256]		// because color 0 is not always black... (we need to redo the first 256 colors also)
@@ -98,8 +97,7 @@ void set_vpal_8bit_to_16bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num1)
 	{
 		num2 = index & 255;
 		num1 = (index >> 8) & 255;
-
-		vpal32[index] =  vpal32[num1] << 16 | vpal32[num2];
+		vpal32[index] =  (((uint32) vpal16[num1]) << 16) |  ((uint32) vpal16[num2])  ;
 	}
 }
 

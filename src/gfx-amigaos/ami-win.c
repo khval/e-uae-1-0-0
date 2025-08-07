@@ -1150,7 +1150,7 @@ STATIC_INLINE int min(int a, int b)
 
 static int setup_customscreen (void)
 {
-	ULONG depth  = 0; // FIXME: Need to add some way of letting user specify preferred depth
+	ULONG Depth  = 0; // FIXME: Need to add some way of letting user specify preferred depth
 	ULONG mode   = INVALID_ID;
 	struct Screen *screen;
 	ULONG error;
@@ -1185,25 +1185,21 @@ static int setup_customscreen (void)
 	const UBYTE preferred_depth[] = {15, 16, 32, 8}; /* Try depths in this order of preference */
 
 	for (i = 0; i < sizeof preferred_depth && mode == (ULONG) INVALID_ID; i++) {
-		depth = preferred_depth[i];
-		mode = find_rtg_mode (&width, &height, depth);
+		Depth = preferred_depth[i];
+		mode = find_rtg_mode (&width, &height, Depth);
 	}
     }
 
-    if (mode != (ULONG) INVALID_ID) {
-	if (depth > 8)
-		output_is_true_color = 1;
-    } else {
-
-	/* No (suitable) RTG screen available. Try a native mode */
-	depth = os39 ? 8 : (currprefs.gfx_lores ? 5 : 4);
-	mode = PAL_MONITOR_ID; // FIXME: should check whether to use PAL or NTSC.
-	if (currprefs.gfx_lores)
-		mode |= (gfxvidinfo.height > 256) ? LORESLACE_KEY : LORES_KEY;
-	else
-		mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
-    }
-
+	if (mode == (ULONG) INVALID_ID)
+	{
+		/* No (suitable) RTG screen available. Try a native mode */
+		Depth = os39 ? 8 : (currprefs.gfx_lores ? 5 : 4);
+		mode = PAL_MONITOR_ID; // FIXME: should check whether to use PAL or NTSC.
+		if (currprefs.gfx_lores)
+			mode |= (gfxvidinfo.height > 256) ? LORESLACE_KEY : LORES_KEY;
+		else
+			mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
+	}
 
 	/* If the screen is larger than requested, centre UAE's display */
 	if (width > (ULONG) gfxvidinfo.width)	XOffset = (width - gfxvidinfo.width) / 2;
@@ -1214,7 +1210,7 @@ static int setup_customscreen (void)
 		screen = OpenScreenTags (NULL,
 				SA_Width,     width,
 				SA_Height,    height,
-				SA_Depth,     depth,
+				SA_Depth,     Depth,
 				SA_DisplayID, mode,
 				SA_Behind,    TRUE,
 				SA_ShowTitle, FALSE,
@@ -1222,7 +1218,9 @@ static int setup_customscreen (void)
 				SA_ErrorCode, (ULONG)&error,
 				TAG_DONE);
 
-	} while (!screen && error == OSERR_TOODEEP && --depth > 1); /* Keep trying until we find a supported depth */
+		output_is_true_color = (Depth > 8)  ? 1 : 0;
+
+	} while (!screen && error == OSERR_TOODEEP && --Depth > 1); /* Keep trying until we find a supported depth */
 
 	if (!screen) 
 	{
@@ -1376,6 +1374,20 @@ extern void update_fullscreen_rect( int aspect );
 
 struct vidbuf_description p96_buffer;
 
+
+const char *rgb_format_to_name( ULONG rgbformat )
+{
+	switch ( rgbformat )
+	{
+		case PIXF_CLUT:	return "PIX_CLUT";
+		case PIXF_R5G5B5:	return "PIXF_R5G6B5PC";
+		case PIXF_R5G6B5:	return "PIXF_R5G6B5";	
+		case PIXF_R5G6B5PC:	return "PIXF_R5G6B5PC";	
+		case PIXF_A8R8G8B8:	return "PIXF_A8R8G8B8";	
+	}
+	return "Unknown";
+}
+
 void set_p96_output_CLUT()
 {
 	p96_output_bpr = picasso_vidinfo.width * 1;
@@ -1429,7 +1441,13 @@ void set_p96_output_R5G6B5()
 	switch ( picasso_vidinfo.rgbformat )
 	{
 		case PIXF_CLUT:	DRAW_FMT_SRC = PIXF_CLUT;
-				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+
+				// create LE table
+				vpal16 = (uint16 *) AllocVecTagList ( 2 * 256 , tags_public  );	// 1 input pixel , 256 colors,  1 x 16bit output pixel. (0.5Mb)
+
+				// create 32bit table				
+				vpal32 = (uint32 *) AllocVecTagList ( 4 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 16bit output pixel. (0.5Mb)
+
 				set_palette_fn = palette_notify;
 				set_palette_on_vbl_fn = set_vpal_8bit_to_16bit_be_2pixels;
 				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_16bit_2pixels; 
@@ -1464,7 +1482,13 @@ void set_p96_output_R5G6B5PC()
 	switch ( picasso_vidinfo.rgbformat )
 	{
 		case PIXF_CLUT:	DRAW_FMT_SRC = PIXF_CLUT;
-				vpal32 = (uint32 *) AllocVecTagList ( 8 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 32bit output pixel. (0.5Mb)
+
+				// create LE table
+				vpal16 = (uint16 *) AllocVecTagList ( 2 * 256 , tags_public  );	// 1 input pixel , 256 colors,  1 x 16bit output pixel. (0.5Mb)
+
+				// create 32bit table				
+				vpal32 = (uint32 *) AllocVecTagList ( 4 * 256 * 256 , tags_public  );	// 2 input pixel , 256 colors,  2 x 16bit output pixel. (0.5Mb)
+
 				set_palette_fn = palette_notify;
 				set_palette_on_vbl_fn = set_vpal_8bit_to_16bit_le_2pixels;
 				p96_conv_fn = (conv_fn_cast) convert_8bit_lookup_to_16bit_2pixels; 
@@ -1619,9 +1643,15 @@ void init_comp( struct Window *W )
 			init_aga_comp(output_depth);
 		}
 
+		printf("screen_is_picasso: %s\n", screen_is_picasso ? "Yes" : "No");
+
 		if (screen_is_picasso) 
 		{
-			printf("output_depth: %d output format: %d \n", output_depth, output_format);
+			printf("Picasso96 format %d (%s)\n", picasso_vidinfo.rgbformat, 
+				rgb_format_to_name( picasso_vidinfo.rgbformat) );
+
+			printf("output_depth: %d output format: %d (%s)\n", output_depth, output_format,
+				rgb_format_to_name( output_format ) );
 
 			COMP_FMT_SRC = output_format;
 
@@ -3070,10 +3100,9 @@ static void set_window_for_picasso (void)
 		&& current_depth == picasso_vidinfo.depth)
 		return;
 
-
 	printf("---------------------------------------\n");
-	printf("current_width %d,  current_height %d, current_depth %d \n",current_width,current_height,current_depth);
-	printf("new_width %d,  new_height %d, new_depth %d \n",picasso_vidinfo.width,picasso_vidinfo.height,picasso_vidinfo.depth);
+	printf("current_width %d,  current_height %d, current_depth %d\n",current_width,current_height,current_depth );
+	printf("new_width %d,  new_height %d, new_p96_depth %d \n",picasso_vidinfo.width,picasso_vidinfo.height,picasso_vidinfo.depth);
 	printf("----------------------------------------\n");
 
 
