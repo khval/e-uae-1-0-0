@@ -37,10 +37,26 @@
 
 #ifdef AcceleratorLib
 
+extern int main_task_wakeup_sigbit;
+
 void accelerator_install (void);
 void accelerator_reset (void);
 
 #define TRACE printf
+
+#define PAT_LoopbackVolume 1
+
+enum
+{
+	TT_PlayTask = 1000,
+	TT_PlaySignal,
+	TT_RawInt,
+	TT_Mode,
+	TT_Frequency,
+	TT_RawBuffer,
+	TT_BufferSize,
+	TT_RawIrqSize
+};
 
 #pragma pack(push, 2)
 
@@ -64,6 +80,20 @@ struct rt_init
 } *rt_init_HA; // host_address;
 
 #pragma pack (pop)
+
+struct rawplayback
+{
+	ULONG playTask ;
+	ULONG playSignal ;
+	ULONG mode ;
+	ULONG frequency ;
+	ULONG rawbuffer[2];
+	ULONG buffer_size;
+};
+
+struct rawplayback rp;
+struct Process *ahi_playback_process = NULL;
+
 
 void dump_jmp_table( uae_u32 addr );
 void show_lib_info( uae_u32 libBase );
@@ -90,11 +120,6 @@ static uae_u32 gettask (TrapContext *context)
 
 	TRACE (("[%s] ", (APTR) get_real_address (get_long (currtask + 10))));
 	return currtask;
-}
-
-static uae_u32 REGPARAM2 accelerator_int_handler (TrapContext *context)
-{
-	return 0;
 }
 
 static uae_u32 REGPARAM2 acceleratorlib_Expunge (TrapContext *context)
@@ -171,46 +196,54 @@ static uae_u32 REGPARAM2 acceleratorlib_Close (TrapContext *context)
 	return 0L;
 }
 
-#if 0
+void ahi_playback_func( void );
+struct MsgPort *playback_msg_port = NULL;
+struct Message *playback_msg = NULL;
 
-static uae_u32 REGPARAM2 acceleratorlib_init (TrapContext *context)
+extern struct Task *main_task;
+
+void ahi_playback_func()
 {
-	char buffer[60];
-	uae_u32 d0 = m68k_dreg (&context->regs, 0);
-	uae_u32 a6 = m68k_areg (&context->regs, 6);
-	struct AcceleratorBase *host_base_addr;
+	char buf[100];
+	ULONG rsigs,sigs;
+	struct Message *msg;
 
-	write_log ("acceleratorlib_init\n") ;
+	write_log("%s: --started\n", __FUNCTION__);
 
-	sprintf(buffer,"LibBase (d0): %p, SysBase (a6): %p\n", (void *) d0, (void *) a6);
-	write_log(buffer);
+	playback_msg_port = AllocSysObjectTags( ASOT_PORT, TAG_END);
 
-	host_base_addr = (struct AcceleratorBase*) get_real_address (d0);
-
-	if ( host_base_addr ->  lib.lib_Flags & LIBF_CHANGED)
+	if (playback_msg_port)
 	{
-		write_log("lib was changed?...\n");
+		sigs = SIGBREAKF_CTRL_C;
+		sigs |= 1L << playback_msg_port -> mp_SigBit;
+
+		for(;;)
+		{
+			rsigs = Wait( sigs );
+			if (rsigs & SIGBREAKF_CTRL_C) break;
+	
+			if (rsigs & (1L << playback_msg_port -> mp_SigBit))
+			{
+				write_log("%s: --got message\n", __FUNCTION__);
+
+				while ((msg = GetMsg(playback_msg_port)))
+				{
+					ReplyMsg(msg);
+				}
+
+				Delay(50);
+
+				uae_Signal (rp.playTask, ((uae_u32) 1) << rp.playSignal); 
+			}
+		}
+
+		FreeSysObject( ASOT_PORT, playback_msg_port ); 
+		playback_msg_port=NULL;
 	}
 
-	if ( host_base_addr ->  lib.lib_Flags & LIBF_SUMUSED)
-	{
-		write_log("Trying to fix library sum...\n");
-
-		SumLibrary(host_base_addr);
-		host_base_addr ->  lib.lib_Flags & ~LIBF_CHANGED;	// clear LIBF_CHANGED flag
-		host_base_addr ->  lib.lib_Flags & ~LIBF_SUMUSED;	// clear LIBF_SUMUSED flag
-	}
-
-	sprintf(buffer,"Base %p, NegSize: %d, PosSize: %d\n", d0, host_base_addr -> lib.lib_NegSize, host_base_addr -> lib.lib_PosSize );
-	write_log(buffer);
-
-	host_base_addr ->  lib.lib_OpenCnt = 1;	// Used by System, prevent Expurge!!!
-
-	m68k_dreg (&context->regs, 0) = d0;
-	return d0;
+	write_log("%s: --stoped\n", __FUNCTION__);
+	Signal(main_task, 1L << main_task_wakeup_sigbit );
 }
-
-#else 
 
 static uae_u32 REGPARAM2 acceleratorlib_init (TrapContext *context)
 {
@@ -242,19 +275,32 @@ static uae_u32 REGPARAM2 acceleratorlib_init (TrapContext *context)
 		return 0;
 	}
 
-	dump_jmp_table( tmp1 );
-	show_lib_info( tmp1 );
+//	dump_jmp_table( tmp1 );
+//	show_lib_info( tmp1 );
 
 	m68k_areg (&context->regs, 1) = tmp1;
 	CallLib (context, sysBase, -0x18c); // AddLibrary
 
-	write_log ("AddLibrary: accelerator.library, done.\n");
+	if (playback_msg == NULL)
+	{
+		playback_msg = AllocSysObjectTags( ASOT_MESSAGE, 
+			ASOMSG_Size, sizeof(struct Message),
+			TAG_END);
+	}
+
+	if (ahi_playback_process == NULL)
+	{
+		ahi_playback_process = CreateNewProcTags( 
+			NP_Start, ahi_playback_func, 
+			NP_UserData, (APTR) 0, 
+			NP_Child, FALSE, 
+			NP_Name, "uae ahi sound playback",
+			TAG_END );
+	}
 
 	m68k_dreg (&context->regs, 0) = 1;
 	return 0;
 }
-
-#endif
 
 /**************************** DEBUG ***********************************/
 
@@ -268,23 +314,139 @@ static uae_u32 REGPARAM2 accelerator_hostPutStr (TrapContext *context)
 
 /***************************** AUDIO *****************************************/
 
+// A6 library, A0 taglist
+
 static uae_u32 REGPARAM2 accelerator_SetPartTagList (TrapContext *context)
 {
 	ULONG *regs = (ULONG *) context -> regs.regs;
+	struct TagItem *tag,*tags = (struct TagItem *) AREG(0);
+	char buff[100];
 
 	write_log ( __FUNCTION__ ) ;
 	write_log ( "\n" ) ;
+
+	if (tags != NULL)
+	{
+		for (tag = tags; tag -> ti_Tag != TAG_END; tag ++)
+		{
+			sprintf(buff,"Tag: 0x%08X, Data: 0x%08X\n", tag -> ti_Tag, tag -> ti_Data );
+			write_log ( buff ) ;
+		}
+	}
 
 	m68k_dreg (&context->regs, 0) = 0;
 	return 0;
 }
 
+// A6 library, A0 taglist
+
+
+
+int sndout_cnt = 0;
+
+static void dump_pcm_from_quest( ULONG current_buffer,ULONG guest_ptr, int length )
+{
+	char filename[100];
+	FILE *fd;
+
+	if ((guest_ptr)&&(length>0))
+	{
+		APTR host_addr = get_real_address(guest_ptr);
+
+		snprintf(filename, sizeof(filename)-1, "ram:sndout-buf-%d-cnt-%ld.raw", current_buffer, sndout_cnt++ );
+		write_log("filename: %s, guest_addr: 0x%x, host_addr: 0x%x, length: %d\n", filename, guest_ptr, host_addr, length );
+
+		if (( fd = fopen(filename,"wb") ))
+		{
+			fwrite( host_addr, 1, length, fd );
+			fclose(fd);
+
+			write_log ( "dumped %d bytes to %s\n", length, filename ) ;
+		}
+	}
+}
+
 static uae_u32 REGPARAM2 accelerator_RawPlaybackTagList (TrapContext *context)
 {
 	ULONG *regs = (ULONG *) context -> regs.regs;
+	struct TagItem *tag, *tags = (struct TagItem *) AREG(0);
+	char buff[100];
+	int n;
 
-	write_log ( __FUNCTION__ ) ;
-	write_log ( "\n" ) ;
+	write_log ( "%s\n",__FUNCTION__ ) ;
+
+	/* I think we need a task / process... to handle iorequest or mixing into paula audio,
+	once one iorequest are done.. singal for more data? */
+
+	if (tags != NULL)
+	{
+		for (tag = tags; tag -> ti_Tag != TAG_END; tag ++)
+		{
+			switch (tag -> ti_Tag)
+			{
+				case TT_PlayTask:
+					rp.playTask = tag -> ti_Data;
+					sprintf(buff,"TT_PlayTask: 0x%08X\n", tag -> ti_Data );
+					break;
+
+				case TT_PlaySignal: 
+					rp.playSignal = tag -> ti_Data;
+					sprintf(buff,"TT_PlaySignal: 0x%08X\n", tag -> ti_Data );
+					break;
+
+				case TT_Mode: 
+					rp.mode = tag -> ti_Data;
+					sprintf(buff,"TT_Mode: %ld\n", tag -> ti_Data );
+					break;
+
+				case TT_Frequency: 
+					rp.frequency = tag -> ti_Data;
+					sprintf(buff,"TT_Frequency: %ld\n", tag -> ti_Data );
+					break;
+
+				case TT_RawBuffer: 
+					rp.rawbuffer[0] = tag -> ti_Data;
+					sprintf(buff,"TT_RawBuffer: 0x%08X\n", tag -> ti_Data );
+					break;
+
+				case TT_BufferSize: 
+					rp.buffer_size = tag -> ti_Data;
+					sprintf(buff,"TT_BufferSize: %ld\n", tag -> ti_Data );
+					break;
+
+				default:
+					sprintf(buff,"Tag: 0x%08X, Data: 0x%08X\n", tag -> ti_Tag, tag -> ti_Data );
+					break;
+			}
+
+			if (buff[0]) write_log ( buff ) ;
+		}
+	}
+
+	/* this code is more or less a hack... just dump buffer thats has data.. */
+
+	for(n=0;n<2;n++)
+	{
+		if (rp.rawbuffer[n])
+		{
+			write_log ( "%s - idx: %d - sending msg\n",__FUNCTION__, n ) ;
+			dump_pcm_from_quest( n, rp.rawbuffer[n], rp.buffer_size );
+		}
+	}
+
+	if ((playback_msg_port)&&(playback_msg))
+	{
+		write_log ( "%s - sending msg\n",__FUNCTION__ ) ;
+		PutMsg( playback_msg_port , playback_msg );
+	}
+	else
+	{
+		if (playback_msg_port == NULL)
+			write_log ( "%s - playback_msg_port is NULL\n",__FUNCTION__ ) ;
+
+		if (playback_msg == NULL)
+			write_log ( "%s - playback_msg is NULL\n",__FUNCTION__ ) ;
+	}
 
 	m68k_dreg (&context->regs, 0) = 0;
 	return 0;
@@ -296,7 +458,9 @@ static uae_u32 REGPARAM2 accelerator_RawPlaybackTagList (TrapContext *context)
 #define TOHOSTPTR( type, arg ) if (arg) arg = (type) get_real_address( (uaecptr) arg );
 
 MPEGA_STREAM *stream_to_host( MPEGA_STREAM *guest_mpega_stream, MPEGA_STREAM *host_mpega_stream);
-
+MPEGA_ACCESS *access_to_host( MPEGA_ACCESS *guest_mpega_access, MPEGA_ACCESS *host_mpega_access);
+MPEGA_CTRL *ctrl_to_host( MPEGA_CTRL *guest_mpega_ctrl, MPEGA_CTRL *host_mpega_ctrl );
+static uae_u32 REGPARAM2 trap_MPEGA_decode_frame(TrapContext *ctx);
 				       
 MPEGA_STREAM *stream_to_host( MPEGA_STREAM *guest_mpega_stream, MPEGA_STREAM *host_mpega_stream)
 {
@@ -438,6 +602,10 @@ static const char * const funcnames[] = {
 	"accelerator_CopyMem", 
 	"accelerator_CopyMemQuick",
 	"accelerator_hostPutStr",
+
+	"accelerator_SetPartTagList",
+	"accelerator_RawPlaybackTagList",
+
 	"MPEGA_decode_frame",
 	"MPEGA_time",
 	"MPEGA_find_sync",
@@ -563,10 +731,29 @@ void accelerator_install (void)
 
 	sprintf(buffer,"Install resident: accelerator rom tag at %p to %p, size: %d bytes\n", begin, end, end - begin);
 	write_log(buffer);	
+
 }
 
 void accelerator_reset (void)
 {
+	if (playback_msg)
+	{
+		FreeSysObject(ASOT_MESSAGE, playback_msg);
+		playback_msg = NULL;
+	}
+
+	if (ahi_playback_process)
+	{
+		Signal( (struct Task *) ahi_playback_process, SIGBREAKF_CTRL_C );
+		Wait( 1L << main_task_wakeup_sigbit );
+	}
+
+	/* I think we can store first aduio into one buffer 0, 
+	if buffer 1 is empty singal for 1 more data or somehing like that...
+	the playback can empty buffer. or maybe just counter that toggels input */
+
+	rp.rawbuffer[0] = 0;
+	rp.rawbuffer[1] = 0;
 }
 
 #else /* ! dogshit */
