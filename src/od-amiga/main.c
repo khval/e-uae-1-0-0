@@ -141,20 +141,17 @@ struct kIcon fullscreenicon = { NULL, NULL };
 
 #endif
 
-
-
+int main_task_wakeup_sigbit = -1;
+struct Task *main_task = NULL;
 
 #define safe(metod,ptr) if (ptr) { metod(ptr); *ptr = NULL; }
 
-int socket_thread_triggered_sigbit = -1;
-struct Task *main_task = NULL;
-
 static void free_libs (void)
 {
-	if (socket_thread_triggered_sigbit != -1 )
+	if (main_task_wakeup_sigbit != -1 )
 	{
-		FreeSignal(socket_thread_triggered_sigbit);
-		socket_thread_triggered_sigbit = -1;
+		FreeSignal(main_task_wakeup_sigbit);
+		main_task_wakeup_sigbit = -1;
 	}
 
 	if (amiga_thread_safe_mx)
@@ -276,6 +273,7 @@ static BOOL init_libs (void)
 	if ( ! sigqueue_mx ) return FALSE;
 
 	main_task = FindTask(NULL);
+	main_task_wakeup_sigbit = AllocSignal(-1);
 
 	MpegaBase = OpenLibrary("mpega.library", 0);
 	if (MpegaBase)

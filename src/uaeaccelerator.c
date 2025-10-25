@@ -10,6 +10,7 @@
 
 #ifdef __amigaos4__
 
+#include <stdbool.h>
 
 #include "sysconfig.h"
 #include "sysdeps.h"
@@ -27,11 +28,14 @@
 
 #include <proto/exec.h>
 #include <proto/dos.h>
+#include <devices/ahi.h>
 
 #include <exec/resident.h>
 
 #include <libraries/mpega.h>
 #include <proto/mpega.h>
+
+#include "include/native2amiga.h"
 
 #define AcceleratorLib
 
@@ -45,6 +49,19 @@ void accelerator_reset (void);
 #define TRACE printf
 
 #define PAT_LoopbackVolume 1
+
+#include "elsewhere.h"
+
+#ifdef __amigaos4__
+#undef CreateMsgPort
+#undef DeleteMsgPort
+#undef CreateIORequest
+#undef DeleteIORequest
+#define CreateIORequest(mp,size) AllocSysObjectTags(ASOT_IOREQUEST,ASOIOR_ReplyPort, mp, ASOIOR_Size,size,TAG_END)
+#define DeleteIORequest(io) FreeSysObject(ASOT_IOREQUEST,io)
+#define CreateMsgPort() AllocSysObjectTags(ASOT_PORT,TAG_END)
+#define DeleteMsgPort(p) FreeSysObject(ASOT_PORT,p)
+#endif
 
 enum
 {
@@ -87,16 +104,29 @@ struct rawplayback
 	ULONG playSignal ;
 	ULONG mode ;
 	ULONG frequency ;
-	ULONG rawbuffer[2];
+	ULONG rawbuffer;
 	ULONG buffer_size;
 };
 
-struct rawplayback rp;
-struct Process *ahi_playback_process = NULL;
+struct UAEAHIMessage
+{
+	struct Message msg;
+	struct rawplayback rpb;
+};
 
+int rpb_idx = 0;
+int filled = 0;		// number of unprocessed ahi messages being sendt..
+
+extern struct Task *main_task;
+
+void ahi_playback_func( void );
+struct MsgPort *playback_msg_port = NULL;
+struct UAEAHIMessage *playback_msg[] = { NULL, NULL, NULL };
+struct Process *ahi_playback_process = NULL;
 
 void dump_jmp_table( uae_u32 addr );
 void show_lib_info( uae_u32 libBase );
+static void dump_pcm_from_quest( ULONG current_buffer,ULONG guest_ptr, int length );
 
 #define DREG(n) regs[n]
 #define AREG(n) (APTR *) get_real_address (regs[n+8])
@@ -151,7 +181,6 @@ void show_lib_info( uae_u32 libBase )
 	}
 }
 
-
 static uae_u32 REGPARAM2 acceleratorlib_Open (TrapContext *context)
 {
 	char buffer[100];
@@ -196,19 +225,134 @@ static uae_u32 REGPARAM2 acceleratorlib_Close (TrapContext *context)
 	return 0L;
 }
 
-void ahi_playback_func( void );
-struct MsgPort *playback_msg_port = NULL;
-struct Message *playback_msg = NULL;
+bool has_data( char *data, int size)
+{
+	int n;
+	char crc=0;
 
-extern struct Task *main_task;
+	for (n=0;n<size;n++)
+	{
+		crc |= *data++;		
+	}
+
+	return crc ? true : false ;
+}
+
+struct MsgPort *alib_AHImp = NULL;
+struct AHIRequest *alib_linkio = NULL, *alib_AHIio[2] = {NULL,NULL};
+BOOL alib_ahiopen = FALSE;
+int alib_bufidx=0;
+
+void ahi_feed_pcm( char * rawbuffer, uint32 buffer_size, uint32 frequency )
+{
+	struct AHIRequest *io = alib_AHIio[alib_bufidx];
+
+	io->ahir_Std.io_Message.mn_Node.ln_Pri = 0;
+	io->ahir_Std.io_Command = CMD_WRITE;
+	io->ahir_Std.io_Data = rawbuffer;
+	io->ahir_Std.io_Length = buffer_size;
+	io->ahir_Std.io_Offset = 0;
+	io->ahir_Frequency = frequency;
+	io->ahir_Type = AHIST_S16S;
+	io->ahir_Volume = 0x10000;          /* Full volume */
+	io->ahir_Position = 0x8000;           /* Centered */
+	io->ahir_Link = alib_linkio;
+	SendIO( (struct IORequest *) io );
+
+	if (alib_linkio)
+	    WaitIO ((struct IORequest *) alib_linkio);
+	alib_linkio = io;
+	/* double buffering */
+
+	alib_bufidx = 1 - alib_bufidx;
+}
+
+BOOL alib_open_AHI (void)
+{
+	if ((alib_AHImp = CreateMsgPort())) 
+	{
+		DebugPrintF("alib_AHImp created\n");
+
+		if ((alib_AHIio[0] = (struct AHIRequest *) CreateIORequest (alib_AHImp, sizeof (struct AHIRequest))))
+		{
+			alib_AHIio[0]->ahir_Version = 4;
+
+			DebugPrintF("alib_AHIio[0] created\n");
+
+			if (!OpenDevice (AHINAME, 0, (struct IORequest *)alib_AHIio[0], 0))
+			{
+				DebugPrintF("alib :: OpenDevice no errors\n");
+
+				if ((alib_AHIio[1] = malloc (sizeof(struct AHIRequest))))
+				{
+					memcpy (alib_AHIio[1], alib_AHIio[0], sizeof(struct AHIRequest));
+					alib_ahiopen = TRUE;
+					return TRUE;
+				}
+			}
+		}
+	}
+	else
+	{
+		DebugPrintF("can't create alib_AHImp\n");
+	}
+
+	alib_ahiopen = FALSE;
+	return FALSE;
+}
+
+void alib_close_AHI (void)
+{
+	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
+
+	if ( (alib_AHIio[0]) && (alib_ahiopen) )
+	{
+    		if (!CheckIO ((struct IORequest *) alib_AHIio[0]))
+			WaitIO ((struct IORequest *) alib_AHIio[0]);
+	}
+
+	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
+
+	if (alib_linkio) /* Only if the second request was started */
+	{
+		if (!CheckIO ((struct IORequest *) alib_AHIio[1]))
+		WaitIO ((struct IORequest *) alib_AHIio[1]);
+	}
+
+	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
+
+	if (alib_ahiopen) CloseDevice ((struct IORequest *) alib_AHIio[0]);
+
+	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
+
+   	if (alib_AHIio[0]) DeleteIORequest ((void*) alib_AHIio[0]);
+	if (alib_AHIio[1]) free (alib_AHIio[1]);
+	
+	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
+
+	if (alib_AHImp) DeleteMsgPort ((void*)alib_AHImp);
+	alib_AHIio[0] = NULL;
+	alib_AHIio[1] = NULL;
+	alib_linkio   = NULL;
+	alib_ahiopen = FALSE;
+}
+
 
 void ahi_playback_func()
 {
 	char buf[100];
 	ULONG rsigs,sigs;
-	struct Message *msg;
+	struct UAEAHIMessage *msg;
+	int time;
 
-	write_log("%s: --started\n", __FUNCTION__);
+	// not sure pointers are good idea.. 
+	struct rawplayback *rpb = NULL;
+
+	if ( alib_open_AHI () == FALSE )
+	{
+		DebugPrintF("failed to open ahi for ahi wrapper\n");
+		alib_close_AHI ();
+	}
 
 	playback_msg_port = AllocSysObjectTags( ASOT_PORT, TAG_END);
 
@@ -226,20 +370,29 @@ void ahi_playback_func()
 			{
 				write_log("%s: --got message\n", __FUNCTION__);
 
-				while ((msg = GetMsg(playback_msg_port)))
+				while (( msg = (struct UAEAHIMessage *) GetMsg(playback_msg_port) ))
 				{
-					ReplyMsg(msg);
+					rpb = &(msg -> rpb);
+					ReplyMsg( (struct Message *) msg );
+
+					ahi_feed_pcm( get_real_address( rpb -> rawbuffer ), rpb -> buffer_size, rpb -> frequency );
+
+					// signal for more data..
+					uae_Signal ( rpb -> playTask, ((uae_u32) 1) << rpb -> playSignal); 	
+					filled --;
 				}
-
-				Delay(50);
-
-				uae_Signal (rp.playTask, ((uae_u32) 1) << rp.playSignal); 
 			}
 		}
 
 		FreeSysObject( ASOT_PORT, playback_msg_port ); 
 		playback_msg_port=NULL;
 	}
+	else
+	{
+		DebugPrintF("ahi wrapper, can't create a msgport\n");
+	}
+
+	alib_close_AHI ();
 
 	write_log("%s: --stoped\n", __FUNCTION__);
 	Signal(main_task, 1L << main_task_wakeup_sigbit );
@@ -253,6 +406,7 @@ static uae_u32 REGPARAM2 acceleratorlib_init (TrapContext *context)
 	uae_u32 d0 = m68k_dreg (&context->regs, 0);
 	uae_u32 a1 = m68k_areg (&context->regs, 0);
 	uae_u32 sysBase = m68k_areg (&context->regs, 6);
+	int n;
 
 	write_log ("libBase from D0\n");
 
@@ -281,11 +435,14 @@ static uae_u32 REGPARAM2 acceleratorlib_init (TrapContext *context)
 	m68k_areg (&context->regs, 1) = tmp1;
 	CallLib (context, sysBase, -0x18c); // AddLibrary
 
-	if (playback_msg == NULL)
+	for (n=0;n<3;n++)
 	{
-		playback_msg = AllocSysObjectTags( ASOT_MESSAGE, 
-			ASOMSG_Size, sizeof(struct Message),
-			TAG_END);
+		if (playback_msg[n] == NULL)
+		{
+			playback_msg[n] = AllocSysObjectTags( ASOT_MESSAGE, 
+				ASOMSG_Size, sizeof(struct UAEAHIMessage),
+				TAG_END);
+		}
 	}
 
 	if (ahi_playback_process == NULL)
@@ -371,12 +528,15 @@ static uae_u32 REGPARAM2 accelerator_RawPlaybackTagList (TrapContext *context)
 	ULONG *regs = (ULONG *) context -> regs.regs;
 	struct TagItem *tag, *tags = (struct TagItem *) AREG(0);
 	char buff[100];
+	struct rawplayback *set_rpb;
 	int n;
 
 	write_log ( "%s\n",__FUNCTION__ ) ;
 
 	/* I think we need a task / process... to handle iorequest or mixing into paula audio,
 	once one iorequest are done.. singal for more data? */
+
+	set_rpb = &(playback_msg[rpb_idx] -> rpb);
 
 	if (tags != NULL)
 	{
@@ -385,32 +545,32 @@ static uae_u32 REGPARAM2 accelerator_RawPlaybackTagList (TrapContext *context)
 			switch (tag -> ti_Tag)
 			{
 				case TT_PlayTask:
-					rp.playTask = tag -> ti_Data;
+					set_rpb -> playTask = tag -> ti_Data;
 					sprintf(buff,"TT_PlayTask: 0x%08X\n", tag -> ti_Data );
 					break;
 
 				case TT_PlaySignal: 
-					rp.playSignal = tag -> ti_Data;
+					set_rpb -> playSignal = tag -> ti_Data;
 					sprintf(buff,"TT_PlaySignal: 0x%08X\n", tag -> ti_Data );
 					break;
 
 				case TT_Mode: 
-					rp.mode = tag -> ti_Data;
+					set_rpb -> mode = tag -> ti_Data;
 					sprintf(buff,"TT_Mode: %ld\n", tag -> ti_Data );
 					break;
 
 				case TT_Frequency: 
-					rp.frequency = tag -> ti_Data;
+					set_rpb -> frequency = tag -> ti_Data;
 					sprintf(buff,"TT_Frequency: %ld\n", tag -> ti_Data );
 					break;
 
 				case TT_RawBuffer: 
-					rp.rawbuffer[0] = tag -> ti_Data;
+					set_rpb -> rawbuffer = tag -> ti_Data;
 					sprintf(buff,"TT_RawBuffer: 0x%08X\n", tag -> ti_Data );
 					break;
 
 				case TT_BufferSize: 
-					rp.buffer_size = tag -> ti_Data;
+					set_rpb -> buffer_size = tag -> ti_Data;
 					sprintf(buff,"TT_BufferSize: %ld\n", tag -> ti_Data );
 					break;
 
@@ -425,27 +585,18 @@ static uae_u32 REGPARAM2 accelerator_RawPlaybackTagList (TrapContext *context)
 
 	/* this code is more or less a hack... just dump buffer thats has data.. */
 
-	for(n=0;n<2;n++)
-	{
-		if (rp.rawbuffer[n])
-		{
-			write_log ( "%s - idx: %d - sending msg\n",__FUNCTION__, n ) ;
-			dump_pcm_from_quest( n, rp.rawbuffer[n], rp.buffer_size );
-		}
-	}
-
-	if ((playback_msg_port)&&(playback_msg))
+	if ((playback_msg_port)&&(playback_msg[0])&&(playback_msg[1]))
 	{
 		write_log ( "%s - sending msg\n",__FUNCTION__ ) ;
-		PutMsg( playback_msg_port , playback_msg );
+		PutMsg( playback_msg_port , (struct Message *) playback_msg[ rpb_idx] );
+		filled ++;
 	}
-	else
-	{
-		if (playback_msg_port == NULL)
-			write_log ( "%s - playback_msg_port is NULL\n",__FUNCTION__ ) ;
 
-		if (playback_msg == NULL)
-			write_log ( "%s - playback_msg is NULL\n",__FUNCTION__ ) ;
+	rpb_idx= (rpb_idx+1) % 3;
+
+	if (filled <2)	/* buffer is low... ask for one more */
+	{
+		uae_Signal ( set_rpb -> playTask, ((uae_u32) 1) << set_rpb -> playSignal); 
 	}
 
 	m68k_dreg (&context->regs, 0) = 0;
@@ -736,10 +887,15 @@ void accelerator_install (void)
 
 void accelerator_reset (void)
 {
-	if (playback_msg)
+	int n;
+
+	for (n=0;n<3;n++)
 	{
-		FreeSysObject(ASOT_MESSAGE, playback_msg);
-		playback_msg = NULL;
+		if (playback_msg[n])
+		{
+			FreeSysObject(ASOT_MESSAGE, playback_msg[n]);
+			playback_msg[n] = NULL;
+		}
 	}
 
 	if (ahi_playback_process)
@@ -752,8 +908,6 @@ void accelerator_reset (void)
 	if buffer 1 is empty singal for 1 more data or somehing like that...
 	the playback can empty buffer. or maybe just counter that toggels input */
 
-	rp.rawbuffer[0] = 0;
-	rp.rawbuffer[1] = 0;
 }
 
 #else /* ! dogshit */
