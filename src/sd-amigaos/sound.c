@@ -17,6 +17,17 @@
 # include "driveclick.h"
 #endif
 
+#ifdef __amigaos4__
+#undef CreateMsgPort
+#undef DeleteMsgPort
+#undef CreateIORequest
+#undef DeleteIORequest
+#define CreateIORequest(io,size) AllocSysObjectTags(ASOT_IOREQUEST,io, ASOIOR_Size,size,TAG_END)
+#define DeleteIORequest(io) FreeSysObject(ASOT_IOREQUEST,io)
+#define CreateMsgPort() AllocSysObjectTags(ASOT_PORT,TAG_END)
+#define DeleteMsgPort(p) FreeSysObject(ASOT_PORT,p)
+#endif
+
 #include "sounddep/sound.h"
 
 #include <exec/memory.h>
@@ -36,8 +47,6 @@ int bufidx, ahiopen = FALSE;
 int have_sound;
 int clockval;
 int period;
-
-
 
 int setup_sound (void)
 {

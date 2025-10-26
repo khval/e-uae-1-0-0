@@ -23,7 +23,7 @@
 #undef DeleteMsgPort
 #undef CreateIORequest
 #undef DeleteIORequest
-#define CreateIORequest(io,size) AllocSysObjectTags(ASOT_IOREQUEST,io, ASOIOR_Size,size,TAG_END)
+#define CreateIORequest(mp,size) AllocSysObjectTags(ASOT_IOREQUEST,ASOIOR_ReplyPort, mp, ASOIOR_Size,size,TAG_END)
 #define DeleteIORequest(io) FreeSysObject(ASOT_IOREQUEST,io)
 #define CreateMsgPort() AllocSysObjectTags(ASOT_PORT,TAG_END)
 #define DeleteMsgPort(p) FreeSysObject(ASOT_PORT,p)
