@@ -34,6 +34,7 @@
 
 #undef   __USE_BASETYPE__
 #include <exec/execbase.h>
+#include <workbench/startup.h>
 
 #ifdef USE_SDL
 # include <SDL.h>
@@ -331,12 +332,11 @@ static FILE *logfile;
 /*
  * Amiga-specific main entry
  */
+
+
 int main (int argc, char *argv[])
 {
     fromWB = argc == 0;
-
-    if (fromWB)
-	set_logfile ("T:E-UAE.log");
 
     init_libs ();
 
@@ -344,7 +344,33 @@ int main (int argc, char *argv[])
     init_sdl ();
 #endif
 
-    real_main (argc, argv);
+	if ((argc == 0) && (argv))
+	{
+		struct WBStartup *wbmsg = (struct WBStartup *) argv;
+		struct WBArg	*wargs = wbmsg->sm_ArgList;
+		char *newargs[3];
+		BPTR	prevlock;
+
+		fromWB = true;
+		set_logfile ("T:E-UAE.log");
+
+		if (wbmsg->sm_NumArgs == 2)
+		{
+			prevlock	= SetCurrentDir(wargs[1].wa_Lock);
+			if (prevlock)
+			{
+				newargs[0] = "euae";
+				newargs[1] = "-f";
+				newargs[2] = wargs[1].wa_Name;
+				real_main (3, newargs);
+				SetCurrentDir(prevlock);	// retsore path.
+			}
+		}
+	}
+	else
+	{
+		real_main (argc, argv);
+	} 
 
     if (fromWB)
 	set_logfile (0);
