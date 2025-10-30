@@ -345,6 +345,8 @@ static APTR setup_p96_buffer (struct vidbuf_description *gfxinfo);
 
 extern int ievent_alive;
 
+#define max(a,b) ((a)>(b)?(a):(b))
+
 /***************************************************************************
  *
  * Default hotkeys
@@ -1178,17 +1180,21 @@ static int setup_customscreen (void)
 		height = gfxvidinfo.height;
 	}
 
+	// just a nasty fix, should re open screen when switching between rtg and aga
+	width = max( picasso_vidinfo.width,max( currprefs.gfx_width_win, gfxvidinfo.width));
+	height = max( picasso_vidinfo.height,max( currprefs.gfx_height_win, gfxvidinfo.height));
 
-    /* First try to find an RTG screen that matches the requested size  */
-    {
-	unsigned int i;
-	const UBYTE preferred_depth[] = {15, 16, 32, 8}; /* Try depths in this order of preference */
+	/* First try to find an RTG screen that matches the requested size  */
+	{
+		unsigned int i;
+		const UBYTE preferred_depth[] = {15, 16, 32, 8}; /* Try depths in this order of preference */
 
-	for (i = 0; i < sizeof preferred_depth && mode == (ULONG) INVALID_ID; i++) {
-		Depth = preferred_depth[i];
-		mode = find_rtg_mode (&width, &height, Depth);
+		for (i = 0; i < sizeof( preferred_depth ) && mode == (ULONG) INVALID_ID; i++)
+		{
+			Depth = preferred_depth[i];
+			mode = find_rtg_mode (&width, &height, Depth);
+		}
 	}
-    }
 
 	if (mode == (ULONG) INVALID_ID)
 	{
@@ -1200,10 +1206,6 @@ static int setup_customscreen (void)
 		else
 			mode |= (gfxvidinfo.height > 256) ? HIRESLACE_KEY : HIRES_KEY;
 	}
-
-	/* If the screen is larger than requested, centre UAE's display */
-	if (width > (ULONG) gfxvidinfo.width)	XOffset = (width - gfxvidinfo.width) / 2;
-	if (height > (ULONG) gfxvidinfo.height)	YOffset = (height - gfxvidinfo.height) / 2;
 
 	do
 	{
@@ -1229,6 +1231,21 @@ static int setup_customscreen (void)
 		gui_message ("Cannot open custom screen for UAE.\n");
 		return 0;
 	}
+
+#if 0
+	/* If the screen is larger than requested, centre UAE's display */
+	XOffset = max( (screen -> Width - gfxvidinfo.width) /2, 0) ;
+	YOffset = max( (screen -> Height - gfxvidinfo.height)/2 , 0);
+#else
+	// don't think its in use actually...
+	XOffset = 0 ;
+	YOffset = 0;
+#endif
+
+	printf("gfxvidinfo w: %d, h: %d\n",gfxvidinfo.width,gfxvidinfo.height);
+	printf("Screen w: %d, h: %d\n",screen -> Width,screen -> Height);
+	printf("XOffset: %d, YOffset: %d\n",XOffset,YOffset);
+
 
 	S  = screen;
 	CM = screen->ViewPort.ColorMap;
