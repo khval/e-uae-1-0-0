@@ -281,7 +281,7 @@ BOOL alib_open_AHI (void)
 
 			if (!OpenDevice (AHINAME, 0, (struct IORequest *)alib_AHIio[0], 0))
 			{
-				DebugPrintF("alib :: OpenDevice no errors\n");
+				DebugPrintF("alib :: OpenDevice(%s) no errors\n",AHINAME);
 
 				if ((alib_AHIio[1] = malloc (sizeof(struct AHIRequest))))
 				{
@@ -303,15 +303,11 @@ BOOL alib_open_AHI (void)
 
 void alib_close_AHI (void)
 {
-	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
-
 	if ( (alib_AHIio[0]) && (alib_ahiopen) )
 	{
     		if (!CheckIO ((struct IORequest *) alib_AHIio[0]))
 			WaitIO ((struct IORequest *) alib_AHIio[0]);
 	}
-
-	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
 
 	if (alib_linkio) /* Only if the second request was started */
 	{
@@ -319,16 +315,12 @@ void alib_close_AHI (void)
 		WaitIO ((struct IORequest *) alib_AHIio[1]);
 	}
 
-	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
-
 	if (alib_ahiopen) CloseDevice ((struct IORequest *) alib_AHIio[0]);
 
 	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
 
    	if (alib_AHIio[0]) DeleteIORequest ((void*) alib_AHIio[0]);
 	if (alib_AHIio[1]) free (alib_AHIio[1]);
-	
-	DebugPrintF("%d:%s:%s\n",__LINE__,__FILE__,__FUNCTION__);
 
 	if (alib_AHImp) DeleteMsgPort ((void*)alib_AHImp);
 	alib_AHIio[0] = NULL;
