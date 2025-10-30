@@ -1,17 +1,17 @@
 /* confdefs.h */
 #define PACKAGE_NAME "E-UAE"
 #define PACKAGE_TARNAME "e-uae"
-#define PACKAGE_VERSION "1.1.1"
-#define PACKAGE_STRING "E-UAE 1.1.1"
+#define PACKAGE_VERSION "1.1.2"
+#define PACKAGE_STRING "E-UAE 1.1.2"
 #define PACKAGE_BUGREPORT ""
 #define PACKAGE_URL ""
 #define PACKAGE "e-uae"
-#define VERSION "1.1.1"
+#define VERSION "1.1.2"
 #define UAE_VERSION_MAJOR 1
 #define UAE_VERSION_MINOR 0
 #define UAE_VERSION_REVISION 0
 #define UAE_VERSION_TAG ""
-#define UAE_VERSION "1.0.0"
+#define UAE_VERSION "1.1.2"
 #define STDC_HEADERS 1
 #define HAVE_SYS_TYPES_H 1
 #define HAVE_SYS_STAT_H 1
