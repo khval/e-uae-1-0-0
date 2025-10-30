@@ -296,7 +296,7 @@ CCASDEPMODE = depmode=gcc3
 CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CDOBJS = 
-CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=    -DBSDSOCKET
+CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=  -DBSDSOCKET  -DPICASSO96 -DPICASSO96_SUPPORTED
 CPP = gcc -E
 CPPFLAGS =     -DCPUEMU_0 -DCPUEMU_5 -DCPUEMU_6 -DFPUEMU -D__USE_INLINE__ -DJIT -DDRIVESOUND -DAGA -DAUTOCONFIG -DFILESYS -DSUPPORT_THREADS -DFDI2RAW -DDEBUGGER -DSAVESTATE -DENFORCER -DACTION_REPLAY -DXARCADE 
 CPUOBJS = cpuemu_0.$(OBJEXT) cpuemu_5.$(OBJEXT) cpuemu_6.$(OBJEXT) fpp.$(OBJEXT)
@@ -555,6 +555,7 @@ uae_SOURCES = \
 
 EXTRA_uae_SOURCES = \
 	uaeaccelerator.c \
+	oal.c \
 	bsdsocket.c bsdsocket-posix-new.c build68k.c catweasel.c cdrom.c \
 	fpp.c compemu_support.c compemu_macroblocks_ppc.c compemu_compiler_ppc.c \
 	debug.c identify.c filesys.c filesys_bootrom.c fsdb.c fsdb_unix.c fsusage.c genblitter.c \
@@ -580,6 +581,7 @@ uae_DEPENDENCIES = \
 	writelog.$(OBJEXT)			\
 	filesys.$(OBJEXT) fsdb.$(OBJEXT) fsusage.$(OBJEXT) hardfile.$(OBJEXT) filesys_unix.$(OBJEXT) fsdb_unix.$(OBJEXT) hardfile_unix.$(OBJEXT) 			\
 	uaeaccelerator.$(OBJEXT)			\
+	oal.$(OBJEXT)			\
 	bsdsocket.$(OBJEXT)			\
 	scsi-none.$(OBJEXT)			\
 				\
@@ -592,9 +594,9 @@ uae_LDADD = md-ppc-gcc/libmachdep.a jd-amigainput/libjoydep.a \
 	sd-amigaos/libsnddep.a gfx-amigaos/libgfxdep.a \
 	gui-muirexx/libguidep.a keymap/libkeymap.a dms/libdms.a \
 	caps/libcaps.a blitfunc.o blittable.o cpustbl.o cpudefs.o \
-	libcpuemu.a writelog.$(OBJEXT) filesys.$(OBJEXT) fsdb.$(OBJEXT) fsusage.$(OBJEXT) hardfile.$(OBJEXT) filesys_unix.$(OBJEXT) fsdb_unix.$(OBJEXT) hardfile_unix.$(OBJEXT) uaeaccelerator.$(OBJEXT) bsdsocket.$(OBJEXT) scsi-none.$(OBJEXT) \
+	libcpuemu.a writelog.$(OBJEXT) filesys.$(OBJEXT) fsdb.$(OBJEXT) fsusage.$(OBJEXT) hardfile.$(OBJEXT) filesys_unix.$(OBJEXT) fsdb_unix.$(OBJEXT) hardfile_unix.$(OBJEXT) uaeaccelerator.$(OBJEXT) oal.$(OBJEXT) bsdsocket.$(OBJEXT) scsi-none.$(OBJEXT) \
 	 debug.$(OBJEXT) ppc_disasm.$(OBJEXT) identify.$(OBJEXT)  td-amigaos/libthreaddep.a \
-	od-amiga/libosdep.a -lz  -lm
+	od-amiga/libosdep.a -lz  -lm -lopenal -lpthread
 readdisk_SOURCES = \
 	readdisk.c missing.c
 
