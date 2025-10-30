@@ -10,7 +10,6 @@ config.log
 config.status
 src/gfxdep
 src/guidep
-src/include/config.h
 src/joydep
 src/machdep
 src/md-fpp.h
@@ -18,7 +17,6 @@ src/od-macosx/Info.plist
 src/osdep
 src/sounddep
 src/stamp-h1
-src/sysconfig.h
 src/target.h
 src/threaddep
 src/tools/blitops.c
@@ -32,7 +30,6 @@ src/tools/gencpu.c
 src/tools/genlinetoscr.c
 src/tools/missing.c
 src/tools/readcpu.c
-src/tools/sysconfig.h
 src/tools/writelog.c
 src/blit.h
 src/blitfunc.c
