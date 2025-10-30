@@ -54,7 +54,9 @@
 #endif
 
 #ifdef __AMIGAOS4__
+#ifndef __USE_INLINE__
 #define __USE_INLINE__
+#endif
 #include <proto/dos.h>
 #include <proto/timer.h>
 #endif
@@ -71,12 +73,8 @@ int log_scsi;
 
 struct gui_info gui_data;
 
-extern void bsdsocket_os41_install(void);
-extern void bsdsocket_os41_reset (void);
 extern void accelerator_install (void);
-
 extern void accelerator_reset (void);
-
 
 /*
  * Random prefs-related junk that needs to go elsewhere.
@@ -958,6 +956,7 @@ int init_sdl (void)
 #endif
 
 #ifndef NO_MAIN_IN_MAIN_C
+
 int main (int argc, char **argv)
 {
     init_sdl ();
