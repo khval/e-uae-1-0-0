@@ -17,7 +17,6 @@
 
 extern APTR amiga_thread_safe_mx;
 extern struct Task *main_task;
-extern int socket_thread_triggered_sigbit;
 
 #define TDEBUG 0
 
@@ -142,18 +141,10 @@ void thread_final_func()
 
 	struct Task *task = FindTask(NULL);
 	uint32 index = (uint32) task -> tc_UserData;
-
-	DPrintf("Closing task: %p\n", task);
-
 	struct handle_thread_s *thread = (struct handle_thread_s *) GetCurrentThread();
-
-	DPrintf("%s:%ld -- index: %ld\n",__FUNCTION__,__LINE__,index);
 
 	if (thread)
 	{
-
-	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
-
 		// lets unhook it early... maybe it helps..
 		hThreads[index].ptr = NULL;	 // unhook the thread struct.
 
@@ -191,8 +182,6 @@ void thread_final_func()
 
 		if (thread -> t.SocketBase)
 			CloseLibrary( thread -> t.SocketBase );
-
-	DPrintf("%s:%ld\n",__FUNCTION__,__LINE__);
 
 		if (thread -> t.output) 
 		{

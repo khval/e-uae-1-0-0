@@ -120,7 +120,9 @@ APTR sigqueue_mx = NULL;
 //int thread_triggered_sigbit = 0;
 
 bool remap_initiated = FALSE;
-void init_remap_keyboard( void );
+
+void init_remap_keyboard_logitech_k310( void );
+void init_remap_keyboard_AK7000( void );
 
 struct kIcon iconifyIcon = { NULL, NULL };
 struct kIcon zoomIcon = { NULL, NULL };
@@ -263,7 +265,8 @@ static BOOL init_libs (void)
 
 	if(!ITimer || !IExpansion) return FALSE;
 
-	init_remap_keyboard();
+//	init_remap_keyboard_logitech_k310();
+	init_remap_keyboard_AK7000();
 
 #endif
 
@@ -287,7 +290,50 @@ static BOOL init_libs (void)
 
 char remap_scancode[256];
 
-void init_remap_keyboard( void )
+// US keyboard mapping
+
+void init_remap_keyboard_AK7000( void )
+{
+	int sc;
+
+	for (sc=0;sc<128;sc++)
+	{
+		remap_scancode[sc] = sc;
+	}
+	
+	remap_scancode[0x3A]=0x3A;   
+	remap_scancode[0x2b]=0x0d; 
+
+	remap_scancode[0x0b]=0x0b;
+	remap_scancode[0x0c]=0x0c;
+
+	// map dead keys to closest keys on a win/dos keyboard.
+
+	remap_scancode[112]=0x5F; 	// Home to Help
+	remap_scancode[113]=0x5B;	// End to amiga numpad (
+	remap_scancode[71]=0x5A;	// insert to amiga numpad )
+
+	// swaped to avoid issues with host system... (Amiga+M etc.)
+
+	remap_scancode[100]=102;	// Left Alt to Left Amiga
+	remap_scancode[102]=100;	// Left Window to Left Alt.
+
+	remap_scancode[101]=0x67;	// Right AltGr to Right Amiga
+	remap_scancode[103]=0x64;	// Right Window to Right Alt.
+
+	// high bit is used for state...
+
+	for (sc=0;sc<128;sc++)
+	{
+		remap_scancode[128+sc] = remap_scancode[sc];
+	}
+
+	remap_initiated = TRUE;
+}
+
+// Norwegian keyboard maping 
+
+void init_remap_keyboard_logitech_k310( void )
 {
 	int sc;
 
@@ -304,9 +350,9 @@ void init_remap_keyboard( void )
 
 	// map dead keys to closest keys on a win/dos keyboard.
 
-	remap_scancode[112]=0x5A;	// Home to 0xFA
-	remap_scancode[113]=0x5B;	// End to 0x5B
-	remap_scancode[71]=0x5F;	// insert to Help key.
+	remap_scancode[112]=0x5F; 	// Home to Help
+	remap_scancode[113]=0x5B;	// End to amiga numpad (
+	remap_scancode[71]=0x5A;	// insert to amiga numpad )
 
 	// swaped to avoid issues with host system... (Amiga+M etc.)
 
@@ -352,7 +398,7 @@ int main (int argc, char *argv[])
 		BPTR	prevlock;
 
 		fromWB = true;
-		set_logfile ("T:E-UAE.log");
+//		set_logfile ("T:E-UAE.log");
 
 		if (wbmsg->sm_NumArgs == 2)
 		{
@@ -372,8 +418,7 @@ int main (int argc, char *argv[])
 		real_main (argc, argv);
 	} 
 
-    if (fromWB)
-	set_logfile (0);
+//    if (fromWB)	set_logfile (0);
 
     return 0;
 }
