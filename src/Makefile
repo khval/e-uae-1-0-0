@@ -594,7 +594,7 @@ uae_LDADD = md-ppc-gcc/libmachdep.a jd-amigainput/libjoydep.a \
 	sd-amigaos/libsnddep.a gfx-amigaos/libgfxdep.a \
 	gui-muirexx/libguidep.a keymap/libkeymap.a dms/libdms.a \
 	caps/libcaps.a blitfunc.o blittable.o cpustbl.o cpudefs.o \
-	libcpuemu.a writelog.$(OBJEXT) filesys.$(OBJEXT) fsdb.$(OBJEXT) fsusage.$(OBJEXT) hardfile.$(OBJEXT) filesys_unix.$(OBJEXT) fsdb_unix.$(OBJEXT) hardfile_unix.$(OBJEXT) uaeaccelerator.$(OBJEXT) oal.$(OBJEXT) bsdsocket.$(OBJEXT) scsi-none.$(OBJEXT) \
+	libcpuemu.a writelog.$(OBJEXT) filesys.$(OBJEXT) fsdb.$(OBJEXT) fsusage.$(OBJEXT) hardfile.$(OBJEXT) filesys_unix.$(OBJEXT) fsdb_unix.$(OBJEXT) hardfile_unix.$(OBJEXT) uaeaccelerator.$(OBJEXT) bsdsocket.$(OBJEXT) scsi-none.$(OBJEXT) \
 	 debug.$(OBJEXT) ppc_disasm.$(OBJEXT) identify.$(OBJEXT)  td-amigaos/libthreaddep.a \
 	od-amiga/libosdep.a -lz  -lm -lopenal -lpthread
 readdisk_SOURCES = \
