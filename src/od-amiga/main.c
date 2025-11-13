@@ -412,6 +412,48 @@ int main (int argc, char *argv[])
 				SetCurrentDir(prevlock);	// retsore path.
 			}
 		}
+		else
+		{
+			struct FileRequester *FileRequest;
+
+			FileRequest = AllocAslRequest (ASL_FileRequest, NULL);
+			if (FileRequest)
+			{
+				if (AslRequestTags (FileRequest,
+					ASLFR_TitleText,  "select config",
+					ASLFR_InitialDrawer, "progdir:configs",
+					ASLFR_InitialPattern, "",
+					ASLFR_DoPatterns,   TRUE,
+					ASLFR_DoSaveMode,   FALSE,
+					ASLFR_RejectIcons,  TRUE,
+//					ASLFR_Window,  win,
+					TAG_DONE))
+				{
+					char *path_and_file;
+
+					path_and_file = malloc( strlen(FileRequest->fr_Drawer) + strlen(FileRequest->fr_File) + 2 );
+
+					if (path_and_file)
+					{
+						strcpy (path_and_file, FileRequest->fr_Drawer);
+						if (strlen (path_and_file) && !(path_and_file[strlen (path_and_file) - 1] == ':' || path_and_file[strlen (path_and_file) - 1] == '/')) strcat (path_and_file, "/");
+						strcat (path_and_file, FileRequest->fr_File);
+
+						newargs[0] = "euae";
+						newargs[1] = "-f";
+						newargs[2] = path_and_file;
+
+						currprefs.console_output = 2;
+
+						real_main (3, newargs);
+
+						free(path_and_file);
+					}
+				}
+
+				FreeAslRequest (FileRequest);
+			}
+		}
 	}
 	else
 	{
