@@ -1,0 +1,33 @@
+
+if exists ram:uae
+delete ram:uae all
+delete ram:uae.lha
+endif
+
+makedir ram:uae
+makedir ram:uae/docs
+copy src/uae ram:uae
+strip ram:uae/uae
+copy docs/#? ram:uae/docs >NIL:
+copy README ram:uae
+copy COPYING ram:uae
+
+copy envarc:Sys/def_tool.info ram:uae/uae.info
+copy envarc:Sys/def_drawer.info ram:uae.info
+copy envarc:Sys/def_drawer.info ram:uae/docs.info
+copy envarc:Sys/def_drawer.info ram:uae/accelerator.library.info
+copy envarc:Sys/def_drawer.info ram:uae/configs.info
+ 
+copy envarc:Sys/def_ascii.info ram:uae/COPYING.info
+copy envarc:Sys/def_ascii.info ram:uae/README.info
+
+copy package ram:uae
+
+makedir ram:uae/accelerator.library
+copy /os31/os31-test-app/accelerator_wrappers.h ram:uae/accelerator.library/proto_accelerator.h
+copy /os31/os31-test-app/AcceleratorPatch.hunk ram:uae/accelerator.library
+copy /os31/os31-test-app/AcceleratorTest.hunk ram:uae/accelerator.library
+copy /os31/os31-test-app/ReadMe.txt ram:uae/accelerator.library
+
+lha a -erv ram:uae.lha ram:uae ram:uae.info
+
