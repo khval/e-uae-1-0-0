@@ -1,4 +1,4 @@
-E-UAE PowerPC JIT project v1.1.1
+E-UAE PowerPC JIT project v1.1.2
 ================================
 
 This project is a fork of the E-UAE Amiga emulation project. 
@@ -22,6 +22,23 @@ Lastest source code you can find here:
 
 https://github.com/khval/e-uae-1-0-0/tree/uae-1-1-0
 https://github.com/salass00/e-uae
+
+Release v1.1.2 @ 2025
+
+Changes by LiveForIt / Kjetil Hvalstrand
+
+* Auto center window in AmigaGFX mode
+
+* new console_output option
+
+* on full-screen mode, now use window size to
+  find a screen mode that matches.
+
+* AGA might be a little faster,
+  (Edge detection, scanline change check, code unrolled)
+
+* in early early pre-alfa AHI driver support..
+  (Is not recommended to install.)
 
 Release v1.1.1 @ 2025
 
