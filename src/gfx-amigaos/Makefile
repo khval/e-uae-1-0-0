@@ -114,7 +114,7 @@ am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
 libgfxdep_a_AR = $(AR) $(ARFLAGS)
 libgfxdep_a_LIBADD =
-am_libgfxdep_a_OBJECTS = ami-win.$(OBJEXT) ami-appw.$(OBJEXT) comp.$(OBJEXT) window_icons.$(OBJEXT) video_convert.$(OBJEXT) video_palette.$(OBJEXT)
+am_libgfxdep_a_OBJECTS = ami-win.$(OBJEXT) ami-appw.$(OBJEXT) comp.$(OBJEXT) window_icons.$(OBJEXT) video_convert.$(OBJEXT) video_palette.$(OBJEXT) helper-functions.$(OBJEXT)
 libgfxdep_a_OBJECTS = $(am_libgfxdep_a_OBJECTS)
 AM_V_P = $(am__v_P_$(V))
 am__v_P_ = $(am__v_P_$(AM_DEFAULT_VERBOSITY))
@@ -191,9 +191,9 @@ CCASDEPMODE = depmode=gcc3
 CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CDOBJS = 
-CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=    
+CFLAGS = -g -O2  -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=   -DPICASSO96_SUPPORTED
 CPP = gcc -E
-CPPFLAGS =     -DCPUEMU_0 -DCPUEMU_5 -DCPUEMU_6 -DFPUEMU -D__USE_INLINE__ -DJIT -DPICASSO96_SUPPORTED -DDRIVESOUND -DAGA -DAUTOCONFIG -DFILESYS -DSUPPORT_THREADS -DFDI2RAW -DDEBUGGER -DSAVESTATE -DENFORCER -DACTION_REPLAY -DXARCADE 
+CPPFLAGS =     -DCPUEMU_0 -DCPUEMU_5 -DCPUEMU_6 -DFPUEMU -D__USE_INLINE__ -DJIT -DDRIVESOUND -DAGA -DAUTOCONFIG -DFILESYS -DSUPPORT_THREADS -DFDI2RAW -DDEBUGGER -DSAVESTATE -DENFORCER -DACTION_REPLAY -DXARCADE 
 CPUOBJS = cpuemu_0.$(OBJEXT) cpuemu_5.$(OBJEXT) cpuemu_6.$(OBJEXT) fpp.$(OBJEXT)
 CXX = g++
 CXXDEPMODE = depmode=gcc3
@@ -340,7 +340,7 @@ AM_CPPFLAGS =  -I$(top_srcdir)/src/include \
 	-I$(top_builddir)/src -I$(top_srcdir)/src
 AM_CFLAGS = -Wa,--execstack  -fomit-frame-pointer   -Wall -Wno-unused -Wno-format -W -Wmissing-prototypes -Wstrict-prototypes -DREGPARAM=
 noinst_LIBRARIES = libgfxdep.a
-libgfxdep_a_SOURCES = ami-win.c ami-appw.c comp.c window_icons.c video_convert.c video_palette.c
+libgfxdep_a_SOURCES = ami-win.c ami-appw.c comp.c window_icons.c video_convert.c video_palette.c helper-functions.c
 noinst_HEADERS = gfx.h
 all: all-am
 

@@ -98,10 +98,11 @@ ULONG CFG_16bit_mode,CFG_32bit_mode;
 
 struct 
 {
+	BOOL saved;
 	int x,y;
 	int bw,bh;
 	int w,h
-} save_window = {0,0,0,0,0,0} ;
+} save_window = {FALSE,  0,0,  0,0,  0,0} ;
 
 #ifdef PICASSO96
 
@@ -190,6 +191,8 @@ void set_p96_output_A8R8G8B8( void );
  void set_vpal_8bit_to_32bit_be(struct MyCLUTEntry *pal, uint32 num1);
  void set_vpal_8bit_to_32bit_be_2pixels(struct MyCLUTEntry *pal, uint32 num);
  void set_vpal_8bit_to_32bit_le_2pixels(struct MyCLUTEntry *pal, uint32 num);
+
+void gfx_center_window(struct Screen *My_Screen, BOOL BorderMode, ULONG window_width, ULONG window_height, ULONG *win_left, ULONG *win_top);
 
 struct screen_rect
 {
@@ -1272,6 +1275,7 @@ static int setup_customscreen (void)
 
 static void open_window_as_last(void)
 {
+
 	W = OpenWindowTags (NULL,
 			WA_Title,        (ULONG)PACKAGE_NAME,
 			WA_AutoAdjust,   TRUE,
@@ -1330,11 +1334,11 @@ int conv_tmp_buffer_bpr = 0;
 bool alloc_p96_draw_bitmap( struct BitMap *dest_bm, int w, int h, int src_depth )
 {
 	APTR lock;
-	printf("draw bitmap is %d,%d,%d, 0x%08x\n",w,h,src_depth, DRAW_FMT_SRC);
+	write_log("draw bitmap is %d,%d,%d, 0x%08x\n",w,h,src_depth, DRAW_FMT_SRC);
 
 	if (!dest_bm)
 	{
-		printf("wTF: ????\n");
+		printf("WTF: dest_bm is not NULL ????\n");
 		return false;
 	}
 
@@ -1660,14 +1664,14 @@ void init_comp( struct Window *W )
 			init_aga_comp(output_depth);
 		}
 
-		printf("screen_is_picasso: %s\n", screen_is_picasso ? "Yes" : "No");
+		write_log("screen_is_picasso: %s\n", screen_is_picasso ? "Yes" : "No");
 
 		if (screen_is_picasso) 
 		{
-			printf("Picasso96 format %d (%s)\n", picasso_vidinfo.rgbformat, 
+			write_log("Picasso96 format %d (%s)\n", picasso_vidinfo.rgbformat, 
 				rgb_format_to_name( picasso_vidinfo.rgbformat) );
 
-			printf("output_depth: %d output format: %d (%s)\n", output_depth, output_format,
+			write_log("output_depth: %d output format: %d (%s)\n", output_depth, output_format,
 				rgb_format_to_name( output_format ) );
 
 			COMP_FMT_SRC = output_format;
@@ -1695,7 +1699,7 @@ void init_comp( struct Window *W )
 				}
 				else
 				{
-					printf("*** Failed to alloc p96 draw buffer ***\n");
+					write_log("*** Failed to alloc p96 draw buffer ***\n");
 					p96_conv_fn = NULL;
 				}
 
@@ -1751,7 +1755,7 @@ void init_comp( struct Window *W )
 
 	if (screen_is_picasso)
 	{
-		printf("*** this is a picasso96 screen, (using picasso_vidinfo.width: %d, picasso_vidinfo.height: %d)\n",  
+		write_log("*** this is a picasso96 screen, (using picasso_vidinfo.width: %d, picasso_vidinfo.height: %d)\n",  
 					picasso_vidinfo.width,  
 					picasso_vidinfo.height);
 
@@ -1761,7 +1765,7 @@ void init_comp( struct Window *W )
 
 	if ((draw_p96_RP != W -> RPort) && (draw_p96_RP != &conv_p96_RP) && (draw_p96_RP != &comp_p96_RP))
 	{
-		printf("*** ERROR *** draw_p96_RP is BAD !!!\n");
+		write_log("*** ERROR *** draw_p96_RP is BAD !!!\n");
 	}
 }
 
@@ -2102,7 +2106,7 @@ static int graphics_subinit (void)
 
 	if (draw_aga_RP -> BitMap)
 	{
-		printf("BitMap was allocated with width %d\n",gfxvidinfo.width);
+		write_log("BitMap was allocated with width %d\n",gfxvidinfo.width);
 
 		Line = AllocVecTagList ((gfxvidinfo.width + 15) & ~15, tags_public );
 		if (!Line)
@@ -2273,6 +2277,19 @@ void initialize_gfxvidinfo_width_height()
 	save_window.h = (currprefs.gfx_height_win) ? currprefs.gfx_height_win : gfxvidinfo.height;
 	save_window.bh = 0;
 	save_window.bw = 0;
+
+	if (save_window.saved == FALSE)
+	{
+		struct Screen *screen = LockPubScreen( "Workbench" );
+
+		if (screen)
+		{
+			gfx_center_window( screen, TRUE, save_window.w, save_window.h, &save_window.x, &save_window.y );
+			UnlockPubScreen( NULL, screen );
+		}
+	}
+
+	save_window.saved = TRUE;
 }
 
 static int graphics_init_first_time = 1;
@@ -2787,12 +2804,8 @@ BOOL has_p96_mode( uae_u32 width, uae_u32 height, int depth, int max_modes )
 
 	if (max_modes>MAX_PICASSO_MODES) max_modes = MAX_PICASSO_MODES;
 	
-//	printf("looking for: %d,%d,%d\n",width,height,depth);
-
 	for (i = DisplayModes; i < DisplayModes + max_modes ; i++ )
 	{
-//		printf("CHK %d,%d,%d\n",i -> res.width,i -> res.height,i -> depth);
-
 		if ((i -> res.width == width) &&
 			(i -> res.height == height) &&
 			((i -> depth << 3) == depth)) return TRUE;
@@ -3109,7 +3122,7 @@ void gfx_unlock_picasso (void)
 
 static void set_window_for_picasso (void)
 {
-	DEBUG_LOG ("Function: set_window_for_picasso\n");
+	write_log ("Function: set_window_for_picasso\n");
 
  //	if (screen_was_picasso) return;
 
@@ -3118,10 +3131,10 @@ static void set_window_for_picasso (void)
 		&& current_depth == picasso_vidinfo.depth)
 		return;
 
-	printf("---------------------------------------\n");
-	printf("current_width %d,  current_height %d, current_depth %d\n",current_width,current_height,current_depth );
-	printf("new_width %d,  new_height %d, new_p96_depth %d \n",picasso_vidinfo.width,picasso_vidinfo.height,picasso_vidinfo.depth);
-	printf("----------------------------------------\n");
+	write_log("---------------------------------------\n");
+	write_log("current_width %d,  current_height %d, current_depth %d\n",current_width,current_height,current_depth );
+	write_log("new_width %d,  new_height %d, new_p96_depth %d \n",picasso_vidinfo.width,picasso_vidinfo.height,picasso_vidinfo.depth);
+	write_log("----------------------------------------\n");
 
 
 	p96_xoffset = 0;
@@ -3183,7 +3196,7 @@ void gfx_set_picasso_state (int on)
 
 	if ( W == NULL)
 	{
-		printf("no window open... so nothing to do?\n");
+		write_log("no window open... so nothing to do?\n");
 		return;
 	}
 
@@ -3527,16 +3540,16 @@ void p96_conv_all()
 	int dest_bpr;
 
 	if (conv_p96_RP.BitMap != draw_p96_RP -> BitMap)
-		{ printf("conv bitmap is expected to be draw bitmap\n");return; }
+		{ write_log("conv bitmap is expected to be draw bitmap\n");return; }
 
 	if (draw_p96_RP -> BitMap == NULL)
-		{ printf("draw_p96_RP -> BitMap has no bitmap\n");return; }
+		{ write_log("draw_p96_RP -> BitMap has no bitmap\n");return; }
 
 	if (picasso_invalid_lines == NULL )
-		{ printf("unexpcted NULL on picasso_invalid_lines\n"); return; }
+		{ write_log("unexpcted NULL on picasso_invalid_lines\n"); return; }
 
 	if (conv_tmp_buffer == NULL)
-		{ printf("unexpcted NULL on conv_tmp_buffer\n"); return; }
+		{ write_log("unexpcted NULL on conv_tmp_buffer\n"); return; }
 
 	dest_bpr = comp_p96_RP.BitMap ?
 		comp_p96_RP.BitMap -> BytesPerRow : 
@@ -3637,7 +3650,7 @@ int is_vsync (void)
 	{
 		if (screen_is_picasso)
 		{
-//			printf("picasso_vidinfo.rowbytes %d pixbytes: %d\n",picasso_vidinfo.rowbytes,picasso_vidinfo.pixbytes);
+//			write_log("picasso_vidinfo.rowbytes %d pixbytes: %d\n",picasso_vidinfo.rowbytes,picasso_vidinfo.pixbytes);
 
 			if (p96_update_format)
 			{
@@ -3683,7 +3696,7 @@ int is_vsync (void)
 	{
 		if (every++ % 30 == 0)		// report high deleys every now and then.
 		{
-			printf("DeltaTime: %f ms time, memory free: %lu\n"
+			write_log("DeltaTime: %f ms time, memory free: %lu\n"
 				"dx_rect_count: %d "
 				"dx_blit_count: %d "
 				"dx_lock_count: %d "
