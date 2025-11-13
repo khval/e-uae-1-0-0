@@ -79,6 +79,13 @@ The following options all have a prefix of the form <target>. The value of
   default is platform-dependent.
 
 
+console_output=<option>
+
+  None - Do not print log.
+  Debug - kernel level logging.
+  Console - write log to console.
+
+
 use_gui=<boolean> (default=true)
 
   Open a configuration GUI at start-up before starting the emulation proper.
