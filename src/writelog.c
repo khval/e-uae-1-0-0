@@ -19,6 +19,9 @@
 
 static FILE *logfile;
 
+struct uae_prefs currprefs __attribute__((used)), changed_prefs __attribute__((used));
+
+
 /*
  * By default write-log and friends access the stderr stream.
  * This function allows you to specify a file to be used for logging
@@ -69,21 +72,36 @@ void write_jit_log(const char *fmt, ...)
 }
 #endif
 
+enum
+{
+	OUTPUT_CONSOLE,
+	OUTPUT_AUX
+};
+
 void write_log (const char *fmt, ...)
 {
     va_list ap;
     va_start (ap, fmt);
+
 #ifdef HAVE_VFPRINTF
 
-	#if 0
-	    vfprintf (logfile ? logfile : stderr, fmt, ap);
-	#else
+	switch (currprefs.console_output)		// CONSOLE
 	{
-		char tmp[1000];
-		vsprintf(tmp, fmt, ap);
-		DebugPrintF(tmp);
-	}	
-	#endif
+		case OUTPUT_CONSOLE:
+			vfprintf (logfile ? logfile : stderr, fmt, ap);
+			break;
+
+		case OUTPUT_AUX:
+			{
+				char tmp[1000];
+				vsprintf(tmp, fmt, ap);
+				DebugPrintF(tmp);
+			}
+			break;
+
+		default:
+			break;
+	}
 #else
     /* Technique stolen from GCC.  */
     {

@@ -56,9 +56,6 @@ struct uae_prefs {
     int parallel_demand;
     int socket_emu;
 
-#ifdef DEBUGGER
-    int start_debugger;
-#endif
     int start_gui;
 
     KbdLang keyboard_lang;
@@ -74,24 +71,6 @@ struct uae_prefs {
     int sound_adjust;
     int sound_volume;
 
-#ifdef JIT
-    int comptrustbyte;
-    int comptrustword;
-    int comptrustlong;
-    int compoptim;
-#ifdef JIT_DEBUG
-    int complog;
-    int complogcompiled;
-#endif
-    int comptestconsistency;
-
-    int comp_hardflush;
-    int comp_constjump;
-
-    int cachesize;
-    int optcount[10];
-#endif
-
     int gfx_framerate;
     int gfx_width_win, gfx_height_win;
     int gfx_width_fs, gfx_height_fs;
@@ -105,16 +84,6 @@ struct uae_prefs {
     int gfx_pfullscreen;
     int gfx_xcenter;
     int gfx_ycenter;
-
-#ifdef GFXFILTER
-    int gfx_filter;
-    int gfx_filter_scanlines;
-    int gfx_filter_scanlineratio;
-    int gfx_filter_scanlinelevel;
-    int gfx_filter_horiz_zoom, gfx_filter_vert_zoom;
-    int gfx_filter_horiz_offset, gfx_filter_vert_offset;
-    int gfx_filter_filtermode;
-#endif
 
     int color_mode;
 
@@ -142,23 +111,14 @@ struct uae_prefs {
     char romextfile[256];
     char keyfile[256];
     char flashfile[256];
-#ifdef ACTION_REPLAY
-    char cartfile[256];
-#endif
+
     char prtname[256];
     char sername[256];
-#ifndef WIN32
-    char scsi_device[256];
-#endif
 
     int m68k_speed;
     int cpu_level;
     int cpu_compatible;
     int address_space_24;
-
-#ifdef HAVE_MACHDEP_TIMER
-    int use_processor_clock;
-#endif
 
     uae_u32 z3fastmem_size;
     uae_u32 fastmem_size;
@@ -174,15 +134,80 @@ struct uae_prefs {
 
     int nr_floppies;
     int dfxtype[4];
+
+    int hide_cursor;				/* Whether to hide host WM cursor or not */
+
+    /* input */
+
+    int jport0;
+    int jport1;
+    int input_selected_setting;
+    int input_joymouse_multiplier;
+    int input_joymouse_deadzone;
+    int input_joystick_deadzone;
+    int input_joymouse_speed;
+    int input_autofire_framecnt;
+    int input_mouse_speed;
+    struct uae_input_device joystick_settings[MAX_INPUT_SETTINGS + 1][MAX_INPUT_DEVICES];
+    struct uae_input_device mouse_settings[MAX_INPUT_SETTINGS + 1][MAX_INPUT_DEVICES];
+    struct uae_input_device keyboard_settings[MAX_INPUT_SETTINGS + 1][MAX_INPUT_DEVICES];
+
+    /* Target specific options */
+
+#ifdef __amigaos4__
+	int console_output;
+#endif
+
+#ifdef DEBUGGER
+    int start_debugger;
+#endif
+
+#ifdef JIT
+    int comptrustbyte;
+    int comptrustword;
+    int comptrustlong;
+    int compoptim;
+#ifdef JIT_DEBUG
+    int complog;
+    int complogcompiled;
+#endif
+    int comptestconsistency;
+
+    int comp_hardflush;
+    int comp_constjump;
+
+    int cachesize;
+    int optcount[10];
+#endif
+
+#ifdef GFXFILTER
+    int gfx_filter;
+    int gfx_filter_scanlines;
+    int gfx_filter_scanlineratio;
+    int gfx_filter_scanlinelevel;
+    int gfx_filter_horiz_zoom, gfx_filter_vert_zoom;
+    int gfx_filter_horiz_offset, gfx_filter_vert_offset;
+    int gfx_filter_filtermode;
+#endif
+
+#ifdef ACTION_REPLAY
+    char cartfile[256];
+#endif
+
+#ifndef WIN32
+    char scsi_device[256];
+#endif
+
+#ifdef HAVE_MACHDEP_TIMER
+    int use_processor_clock;
+#endif
+
 #ifdef DRIVESOUND
     int dfxclick[4];
     char dfxclickexternal[4][256];
     int dfxclickvolume;
 #endif
 
-    int hide_cursor;				/* Whether to hide host WM cursor or not */
-
-    /* Target specific options */
 #ifdef USE_X11_GFX
     int x11_use_low_bandwidth;
     int x11_use_mitshm;
@@ -238,20 +263,7 @@ struct uae_prefs {
     int statecapturerate, statecapturebuffersize;
 #endif
 
-    /* input */
 
-    int jport0;
-    int jport1;
-    int input_selected_setting;
-    int input_joymouse_multiplier;
-    int input_joymouse_deadzone;
-    int input_joystick_deadzone;
-    int input_joymouse_speed;
-    int input_autofire_framecnt;
-    int input_mouse_speed;
-    struct uae_input_device joystick_settings[MAX_INPUT_SETTINGS + 1][MAX_INPUT_DEVICES];
-    struct uae_input_device mouse_settings[MAX_INPUT_SETTINGS + 1][MAX_INPUT_DEVICES];
-    struct uae_input_device keyboard_settings[MAX_INPUT_SETTINGS + 1][MAX_INPUT_DEVICES];
 };
 
 extern void save_options (FILE *, const struct uae_prefs *, int);

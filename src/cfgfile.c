@@ -116,10 +116,17 @@ static const struct cfg_lines opttable[] =
     {"hardfile", "access,sectors, surfaces, reserved, blocksize, path format" },
     {"filesystem", "access,'Amiga volume-name':'host directory path' - where 'access' can be 'read-only' or 'read-write'" },
 #endif
+
+#ifdef __amigaos4__
+    {"console_output", "console, debug or none" },
+#endif
+
 #ifdef CATWEASEL
     {"catweasel_io","Catweasel board io base address" }
 #endif
 };
+
+static const char *outputmode[] = { "console", "debug" ,"none", 0 };
 
 static const char *guimode1[] = { "no", "yes", "nowait", 0 };
 static const char *guimode2[] = { "false", "true", "nowait", 0 };
@@ -845,6 +852,10 @@ static int cfgfile_parse_host (struct uae_prefs *p, char *option, char *value)
 	|| cfgfile_intval (option, value, "state_replay_buffer", &p->statecapturebuffersize, 1)
 	|| cfgfile_yesno  (option, value, "state_replay", &p->statecapture))
 	return 1;
+#endif
+
+#ifdef __amigaos4__
+	if (cfgfile_strval (option, value, "console_output", &p->console_output, outputmode, 1)) return 1;
 #endif
 
 #ifdef DRIVESOUND

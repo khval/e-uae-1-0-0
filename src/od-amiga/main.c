@@ -23,6 +23,7 @@
 #include <proto/exec.h>
 #include <proto/dos.h>
 #include <proto/mpega.h>
+#include <proto/asl.h>
 
 #include "custom.h"
 #include "newcpu.h"
@@ -408,6 +409,9 @@ int main (int argc, char *argv[])
 				newargs[0] = "euae";
 				newargs[1] = "-f";
 				newargs[2] = wargs[1].wa_Name;
+
+				currprefs.console_output = 2;
+
 				real_main (3, newargs);
 				SetCurrentDir(prevlock);	// retsore path.
 			}
