@@ -15,7 +15,9 @@
 #include "writelog.h"
 #include "options.h"
 
+#ifdef __AMIGA__
 #include <proto/exec.h>
+#endif
 
 static FILE *logfile;
 
@@ -95,7 +97,9 @@ void write_log (const char *fmt, ...)
 			{
 				char tmp[1000];
 				vsprintf(tmp, fmt, ap);
-				DebugPrintF(tmp);
+#ifdef __AMIGA__
+        DebugPrintF(tmp);
+#endif
 			}
 			break;
 

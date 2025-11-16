@@ -8,7 +8,7 @@
 #define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the <memory.h> header file. */
-/* #undef HAVE_MEMORY_H */
+#define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
@@ -71,7 +71,7 @@
 #define SIZEOF_INT 4
 
 /* The size of `long', as computed by sizeof. */
-#define SIZEOF_LONG 4
+#define SIZEOF_LONG 8
 
 /* The size of `long long', as computed by sizeof. */
 #define SIZEOF_LONG_LONG 8
@@ -80,10 +80,10 @@
 #define SIZEOF_SHORT 2
 
 /* The size of `void *', as computed by sizeof. */
-#define SIZEOF_VOID_P 4
+#define SIZEOF_VOID_P 8
 
 /* The size of `__int64', as computed by sizeof. */
-#define SIZEOF___INT64 8
+#define SIZEOF___INT64 0
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
