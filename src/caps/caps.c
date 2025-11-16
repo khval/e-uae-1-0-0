@@ -47,11 +47,11 @@ struct {
   CapsLong (*CAPSUnlockImage)(CapsLong id);
   CapsLong (*CAPSLoadImage)(CapsLong id, CapsULong flag);
   CapsLong (*CAPSGetImageInfo)(struct CapsImageInfo *pi, CapsLong id);
-  CapsLong (*CAPSLockTrack)(struct CapsTrackInfo *pi, CapsLong id, CapsULong cylinder, CapsULong head, CapsULong flag);
+  CapsLong (*CAPSLockTrack)(void *pi, CapsLong id, CapsULong cylinder, CapsULong head, CapsULong flag);
   CapsLong (*CAPSUnlockTrack)(CapsLong id, CapsULong cylinder, CapsULong head);
   CapsLong (*CAPSUnlockAllTracks)(CapsLong id);
   char *(*CAPSGetPlatformName)(CapsULong pid);
-  CapsLong (*CAPSGetVersionInfo)(struct CapsVersionInfo *pi, CapsULong flag);
+  CapsLong (*CAPSGetVersionInfo)(void *pi, CapsULong flag);
 } capslib;
 
 /*
@@ -296,7 +296,7 @@ LONG CAPSGetImageInfo (struct CapsImageInfo * pi, LONG id)
     return retval;
 }
 
-LONG CAPSLockTrack (struct CapsTrackInfo * pi,
+LONG CAPSLockTrack (void * pi,
 		    LONG id,
 		    ULONG cylinder,
 		    ULONG head,
@@ -342,7 +342,7 @@ LONG CAPSUnlockAllTracks (LONG id)
     return retval;
 }
 
-LONG CAPSGetVersionInfo (struct CapsVersionInfo *pi, CapsULong flag)
+LONG CAPSGetVersionInfo (void *pi, CapsULong flag)
 {
     struct Library *LibBase = (struct Library*)CapsImageBase;
     LONG retval;

@@ -162,6 +162,7 @@ uae_DEPENDENCIES = \
 	libcpuemu.a			\
 	@EXTRAOBJS@			\
 	@FILESYSOBJS@ 			\
+	uaeaccelerator.o		\
 	@BSDSOCKOBJS@			\
 	@SCSIOBJS@			\
 	@CDOBJS@			\
@@ -184,6 +185,7 @@ uae_LDADD = \
 	libcpuemu.a			\
 	@EXTRAOBJS@			\
 	@FILESYSOBJS@			\
+	uaeaccelerator.o		\
 	@BSDSOCKOBJS@			\
 	@SCSIOBJS@			\
 	@CDOBJS@			\
